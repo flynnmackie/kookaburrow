@@ -1,0 +1,7 @@
+node_modules/
+data/
+*.log
+
+# Hunter-provided tools (staged on targets per run) - keep the folder, not the files
+binaries/*
+!binaries/.gitkeep

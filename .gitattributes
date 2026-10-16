@@ -1,0 +1,2 @@
+# Shell hunts run on Linux targets and must keep LF line endings.
+*.sh text eol=lf
