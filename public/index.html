@@ -119,11 +119,52 @@
   a:hover { color:#7be3ff; text-decoration:underline; text-underline-offset:4px; }
 
   /* two-column pages */
-  .auth-layout, .host-layout, .hunt-layout, .add-layout, .prof-layout { flex:1; min-height:0; display:grid; gap:10px; grid-template-rows:minmax(0, 1fr); }
+  .auth-layout, .host-layout, .collection-layout, .add-layout, .run-layout, .prof-layout { flex:1; min-height:0; display:grid; gap:10px; grid-template-rows:minmax(0, 1fr); }
   .auth-layout { grid-template-columns:minmax(0, 4fr) minmax(230px, 1fr); }
   .prof-layout { grid-template-columns:minmax(260px, 1fr) minmax(0, 2fr); }
   .host-layout { grid-template-columns:minmax(0, 2fr) minmax(210px, 1fr); }
-  .hunt-layout { grid-template-columns:minmax(230px, 1fr) minmax(0, 2fr); }
+  .collection-layout { grid-template-columns:minmax(230px, 1fr) minmax(0, 2fr); }
+  .run-layout { grid-template-columns:minmax(190px, 250px) minmax(0, 1fr); }
+  .run-layout > .card { overflow:auto; }
+  .run-layout h2 { margin-top:0; }
+  .run-layout .act { width:100%; margin-top:6px; }
+  .warn { color:var(--orange); }
+  .modal { position:fixed; inset:0; z-index:50; background:rgba(0,0,0,.72); display:flex; align-items:center; justify-content:center; padding:20px; }
+  .modal[hidden] { display:none; }
+  .modal .dlg { width:min(940px, 100%); height:min(660px, 100%); display:flex; flex-direction:column; background:var(--panel2); border:1px solid var(--line-hi); border-top:2px solid var(--blue); box-shadow:0 20px 60px rgba(0,0,0,.7); }
+  .dlg-head { display:flex; justify-content:space-between; align-items:center; padding:14px 18px 10px; border-bottom:1px solid var(--line); }
+  .dlg-head h2 { margin:0; }
+  .dlg-x { background:none; border:0; color:var(--dim); font-size:22px; line-height:1; cursor:pointer; }
+  .dlg-x:hover { color:var(--text); }
+  .dlg-body { padding:4px 18px 8px; overflow:auto; min-height:0; }
+  .dlg-body input[type=text], .dlg-body input[type=search] { width:100%; }
+  .dlg-foot { display:flex; align-items:center; gap:10px; padding:12px 18px; border-top:1px solid var(--line); }
+  .dlg-foot .act { width:auto; margin:0; }
+  .dlg-foot .sum { margin-left:auto; font:italic 13px var(--f-body); color:var(--dim); }
+  .dlg .fl { font:500 9.5px var(--f-label); text-transform:uppercase; letter-spacing:.2em; color:var(--orange); margin:14px 0 5px; display:block; }
+  .pickbox { border:1px solid var(--line); background:#070707; height:200px; overflow:auto; margin-top:6px; }
+  .dlg-tabs { display:flex; border-bottom:1px solid var(--line); padding:0 18px; }
+  .dlg-tabs button { background:none; border:0; color:var(--dim); padding:10px 16px; cursor:pointer; font:500 10.5px var(--f-label); text-transform:uppercase; letter-spacing:.18em; transition:all var(--ease); }
+  .dlg-tabs button:hover { color:var(--text); }
+  .dlg-tabs button.on { color:var(--text); box-shadow:inset 0 -2px 0 var(--blue); }
+  .dlg-body[hidden] { display:none; }
+  .dlg-body { flex:1; }
+  .dlg-body.coll { display:grid; grid-template-columns:minmax(220px, 2fr) 3fr; gap:14px; padding-top:14px; overflow:hidden; }
+  .dlg-body.coll[hidden] { display:none; }
+  .coll-list { display:flex; flex-direction:column; min-height:0; }
+  .coll-list .pickbox { flex:1; height:auto; min-height:0; }
+  .coll-detail { overflow:auto; min-height:0; border:1px solid var(--line); padding:4px 14px 12px; --c-desc:var(--blue); --c-dep:var(--orange); --c-tag:#b9b3a7; --c-code:var(--dim); }
+  .coll-detail pre.code { max-height:none; font-size:12px; tab-size:4; border-left:1px solid var(--line-hi); }
+  .pick.on { background:var(--panel2); box-shadow:inset 2px 0 0 var(--blue); }
+  @media (max-width:760px) { .dlg-body.coll { grid-template-columns:1fr; overflow:auto; } .coll-detail { min-height:240px; } }
+  .tcols { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .tcols .pickbox { height:330px; }
+  .pick { display:flex; align-items:center; gap:9px; padding:5px 10px; cursor:pointer; border-bottom:1px solid var(--line); font-size:14px; }
+  .pick:last-child { border-bottom:0; }
+  .pick:hover { background:var(--hover); }
+  .pick .pn { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .pick .pt { font:italic 12px var(--f-body); color:var(--dim); white-space:nowrap; }
+  @media (max-width:640px) { .tcols { grid-template-columns:1fr; } }
   .add-layout { grid-template-columns:minmax(300px, 1fr) minmax(0, 1fr); }
   .add-layout > .card { overflow:auto; }
   .add-layout h2 { margin-top:0; }
@@ -153,11 +194,11 @@
   .uh .hd { white-space:normal; }
   .uh-deps { font:italic 12px var(--f-body); color:var(--orange); margin-top:3px; }
   .uh pre.code { margin:8px 0 0; font-size:12px; max-height:340px; overflow:auto; }
-  .auth-layout > .card, .host-layout > .card, .hunt-layout > .card, .add-layout > .card, .prof-layout > .card { margin:0; min-height:0; }
+  .auth-layout > .card, .host-layout > .card, .collection-layout > .card, .add-layout > .card, .run-layout > .card, .prof-layout > .card { margin:0; min-height:0; }
   .col { display:flex; flex-direction:column; gap:10px; min-height:0; min-width:0; }
   .col > .card { margin:0; flex:1 1 0; min-height:0; } .col > .card.auto { flex:0 0 auto; }
-  .hunt-layout > .card:first-child { display:flex; flex-direction:column; overflow:hidden; }
-  #huntList, #actionList { flex:1; min-height:0; overflow:auto; }
+  .collection-layout > .card:first-child { display:flex; flex-direction:column; overflow:hidden; }
+  #collectionList, #actionList { flex:1; min-height:0; overflow:auto; }
 
   .form { display:flex; flex-direction:column; gap:8px; }
   .form input, .form select { width:100%; }
@@ -193,54 +234,54 @@
   .tagchip:hover { color:var(--text); border-color:var(--blue-d); }
   .tagchip.on { color:var(--blue); border-color:var(--blue-d); background:rgba(0,200,255,.06); font-style:normal; }
 
-  /* hunts list and tag filter */
+  /* collections list and tag filter */
   .toggle { display:flex; margin-bottom:10px; border:1px solid var(--line-hi); flex-shrink:0; }
   .toggle button { flex:1; background:none; border:0; color:var(--dim); padding:7px 8px; cursor:pointer; font:500 10px var(--f-label); text-transform:uppercase; letter-spacing:.18em; transition:all var(--ease); }
   .toggle button + button { border-left:1px solid var(--line-hi); }
   .toggle button:hover { color:var(--text); background:var(--hover); }
   .toggle button.on { background:var(--panel2); color:var(--text); box-shadow:inset 0 -2px 0 var(--blue); }
-  #huntSearch, #actionSearch { margin-bottom:10px !important; flex-shrink:0; }
-  #huntTagFilter, #actionTagFilter { margin-bottom:10px; flex-shrink:0; }
+  #collectionSearch, #actionSearch { margin-bottom:10px !important; flex-shrink:0; }
+  #collectionTagFilter, #actionTagFilter { margin-bottom:10px; flex-shrink:0; }
   .tf-row { display:flex; align-items:center; gap:10px; }
   .tf-row select { flex:1; min-width:0; }
   .tf-row .tagchip { align-self:stretch; font:500 12px var(--f-ui); padding:0 11px; white-space:nowrap; }
   .tf-row a { font:500 9.5px var(--f-label); letter-spacing:.14em; text-transform:uppercase; white-space:nowrap; }
   .tf-chips { display:flex; flex-wrap:wrap; gap:5px; margin-top:8px; }
-  .hunt-item { padding:5px 10px; border-bottom:1px solid var(--line); cursor:pointer; transition:background var(--ease); }
-  .hunt-item:hover { background:var(--hover); }
-  .hunt-item.on { background:var(--panel2); box-shadow:inset 2px 0 0 var(--blue); }
+  .collection-item { padding:5px 10px; border-bottom:1px solid var(--line); cursor:pointer; transition:background var(--ease); }
+  .collection-item:hover { background:var(--hover); }
+  .collection-item.on { background:var(--panel2); box-shadow:inset 2px 0 0 var(--blue); }
   .vtick { float:right; margin-left:6px; font:700 12px/1 var(--f-body); color:var(--ok); cursor:help; }
-  .hunt-item { position:relative; }
-  .hunt-item:last-child { border-bottom:0; }
-  .hunt-item .hn { font:600 15px/1.2 var(--f-head); color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .hunt-item .hd { font-size:12px; line-height:1.3; color:var(--dim); margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .hunt-item .mtag { font:italic 11px var(--f-body); color:var(--orange); margin-left:6px; font-weight:400; }
-  .hunt-item .mwarn { color:var(--orange); margin-left:8px; }
-  .hunt-item .hl { font:11px/1.4 var(--f-mono); color:var(--faint); margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .collection-item { position:relative; }
+  .collection-item:last-child { border-bottom:0; }
+  .collection-item .hn { font:600 15px/1.2 var(--f-head); color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .collection-item .hd { font-size:12px; line-height:1.3; color:var(--dim); margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .collection-item .mtag { font:italic 11px var(--f-body); color:var(--orange); margin-left:6px; font-weight:400; }
+  .collection-item .mwarn { color:var(--orange); margin-left:8px; }
+  .collection-item .hl { font:11px/1.4 var(--f-mono); color:var(--faint); margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .htags { display:flex; flex-wrap:nowrap; overflow:hidden; gap:3px; margin-top:3px; }
   .htag { font:italic 11px/1.35 var(--f-body); color:var(--faint); border:1px solid var(--line); padding:0 5px; cursor:pointer; white-space:nowrap; flex-shrink:0; transition:all var(--ease); }
   .htag:hover { color:var(--text); border-color:var(--blue-d); }
   .htag.on { color:var(--blue); border-color:var(--blue-d); font-style:normal; }
-  /* hunts whose binary dependencies have not been uploaded */
-  .hunt-item.unmet { background:rgba(229,72,77,.06); box-shadow:inset 2px 0 0 var(--bad); }
-  .hunt-item.unmet:hover { background:rgba(229,72,77,.11); }
-  .hunt-item.unmet.on { background:rgba(229,72,77,.16); }
-  .hunt-item.unmet .hn { color:var(--bad); }
+  /* collections whose binary dependencies have not been uploaded */
+  .collection-item.unmet { background:rgba(229,72,77,.06); box-shadow:inset 2px 0 0 var(--bad); }
+  .collection-item.unmet:hover { background:rgba(229,72,77,.11); }
+  .collection-item.unmet.on { background:rgba(229,72,77,.16); }
+  .collection-item.unmet .hn { color:var(--bad); }
   /* ...and light green once every one of them has been uploaded */
-  .hunt-item.met { background:rgba(140,235,165,.07); box-shadow:inset 2px 0 0 var(--ok); }
-  .hunt-item.met:hover { background:rgba(140,235,165,.12); }
-  .hunt-item.met.on { background:rgba(140,235,165,.17); }
-  .hunt-item.met .hn { color:#a6efba; }
-  .hunt-item .hready { font:500 8.5px var(--f-label); letter-spacing:.12em; text-transform:uppercase; color:#a6efba; margin-top:2px; }
-  #huntDetail.met, #actionDetail.met { border-color:#2f6b4a; }
-  #huntDetail.met .hd-name, #actionDetail.met .hd-name { color:#a6efba; }
+  .collection-item.met { background:rgba(140,235,165,.07); box-shadow:inset 2px 0 0 var(--ok); }
+  .collection-item.met:hover { background:rgba(140,235,165,.12); }
+  .collection-item.met.on { background:rgba(140,235,165,.17); }
+  .collection-item.met .hn { color:#a6efba; }
+  .collection-item .hready { font:500 8.5px var(--f-label); letter-spacing:.12em; text-transform:uppercase; color:#a6efba; margin-top:2px; }
+  #collectionDetail.met, #actionDetail.met { border-color:#2f6b4a; }
+  #collectionDetail.met .hd-name, #actionDetail.met .hd-name { color:#a6efba; }
   .dep.have { color:#a6efba; border-color:#2f6b4a; background:rgba(140,235,165,.07); font-style:normal; }
-  .hunt-item .hmiss { font:500 8.5px var(--f-label); letter-spacing:.12em; text-transform:uppercase; color:var(--bad); margin-top:2px; }
+  .collection-item .hmiss { font:500 8.5px var(--f-label); letter-spacing:.12em; text-transform:uppercase; color:var(--bad); margin-top:2px; }
 
-  /* hunt viewer */
-  #huntDetail, #actionDetail { --c-desc:var(--blue); --c-dep:var(--orange); --c-tag:#b9b3a7; --c-code:var(--dim); }
-  #huntDetail.unmet, #actionDetail.unmet { border-color:#6b2a2e; }
-  #huntDetail.unmet .hd-name, #actionDetail.unmet .hd-name { color:var(--bad); }
+  /* collection viewer */
+  #collectionDetail, #actionDetail { --c-desc:var(--blue); --c-dep:var(--orange); --c-tag:#b9b3a7; --c-code:var(--dim); }
+  #collectionDetail.unmet, #actionDetail.unmet { border-color:#6b2a2e; }
+  #collectionDetail.unmet .hd-name, #actionDetail.unmet .hd-name { color:var(--bad); }
   .hd-name { font:500 28px/1.1 var(--f-head); color:var(--text); letter-spacing:.01em; }
   .hd-file { font:11px var(--f-mono); color:var(--faint); margin:4px 0 14px; }
   .hd-warn { font-size:13px; color:var(--orange); border:1px solid var(--orange-d); padding:6px 10px; margin-bottom:12px; }
@@ -254,7 +295,7 @@
   .dep { color:var(--orange); border:1px solid var(--orange-d); padding:0 9px; font:italic 13px var(--f-body); }
   .dep.miss { color:var(--bad); border-color:#6b2a2e; background:rgba(229,72,77,.07); font-style:normal; }
   .hd-tag { color:#b9b3a7; border:1px solid var(--line-hi); padding:0 9px; font:italic 13px var(--f-body); }
-  #huntDetail pre.code, #actionDetail pre.code { max-height:none; border-left:1px solid var(--line-hi); font-size:12px; tab-size:4; }
+  #collectionDetail pre.code, #actionDetail pre.code { max-height:none; border-left:1px solid var(--line-hi); font-size:12px; tab-size:4; }
   .t-c { color:#5f5c56; font-style:italic; } .t-s { color:#e0a25a; } .t-v { color:#6cc7e0; }
   .t-f { color:var(--orange); } .t-p { color:#8fb4cc; } .t-k { color:#d8d2c4; font-weight:700; }
 
@@ -293,7 +334,7 @@
     #sidenav button.sidehead { margin-top:0; border-top:0; border-left:1px solid var(--line); }
     #sidenav button.sub { padding-left:12px; }
     .card { padding:12px 14px; }
-    .auth-layout, .host-layout, .hunt-layout, .add-layout, .prof-layout { grid-template-columns:minmax(0, 1fr); grid-template-rows:none; grid-auto-rows:minmax(0, 1fr); }
+    .auth-layout, .host-layout, .collection-layout, .add-layout, .run-layout, .prof-layout { grid-template-columns:minmax(0, 1fr); grid-template-rows:none; grid-auto-rows:minmax(0, 1fr); }
   }
 </style>
 </head>
@@ -307,32 +348,32 @@
   <aside id="sidenav"></aside>
   <main>
     <!-- Settings -->
-    <section class="page" id="settings/view-hunts">
-      <div class="hunt-layout">
+    <section class="page" id="settings/view-collections">
+      <div class="collection-layout">
         <div class="card">
-          <input id="huntSearch" type="search" placeholder="Search hunt names and scripts" autocomplete="off" style="width:100%; margin-bottom:10px">
-          <div class="toggle" id="huntToggle">
+          <input id="collectionSearch" type="search" placeholder="Search collection names and scripts" autocomplete="off" style="width:100%; margin-bottom:10px">
+          <div class="toggle" id="collectionToggle">
             <button data-type="powershell" class="on">PowerShell</button>
             <button data-type="bash">Linux</button>
           </div>
-          <div id="huntTagFilter"></div>
-          <div id="huntList"></div>
+          <div id="collectionTagFilter"></div>
+          <div id="collectionList"></div>
         </div>
-        <div class="card" id="huntDetail"></div>
+        <div class="card" id="collectionDetail"></div>
       </div>
     </section>
-    <section class="page" id="settings/add-hunts">
+    <section class="page" id="settings/add-collections">
       <div class="add-layout">
         <div class="card" id="ahForm">
-          <h2 id="ahTitle">New hunt</h2>
+          <h2 id="ahTitle">New collection</h2>
           <span class="fl">Type</span>
           <div class="toggle" id="ahType"><button type="button" data-type="powershell" class="on">PowerShell</button><button type="button" data-type="bash">Linux</button></div>
           <span class="fl">File name</span>
-          <div class="fileline"><input id="ahFile" type="text" placeholder="my-hunt" autocomplete="off" spellcheck="false"><span class="ext" id="ahExt">.ps1</span></div>
-          <span class="fl">Hunt name</span>
-          <input id="ahName" type="text" placeholder="Short title of the hunt" autocomplete="off">
+          <div class="fileline"><input id="ahFile" type="text" placeholder="my-collection" autocomplete="off" spellcheck="false"><span class="ext" id="ahExt">.ps1</span></div>
+          <span class="fl">Collection name</span>
+          <input id="ahName" type="text" placeholder="Short title of the collection" autocomplete="off">
           <span class="fl">Description</span>
-          <textarea id="ahDesc" rows="3" placeholder="What this hunt looks for and why it matters"></textarea>
+          <textarea id="ahDesc" rows="3" placeholder="What this collection looks for and why it matters"></textarea>
           <span class="fl">Tags</span>
           <input id="ahTags" type="text" placeholder="persistence, registry (comma separated)" autocomplete="off" spellcheck="false">
           <span class="fl">Dependencies</span>
@@ -343,23 +384,33 @@
           </div>
           <span class="fl">Script</span>
           <textarea class="scriptbox" id="ahScript" rows="12" spellcheck="false"></textarea>
-          <div class="formfoot"><button type="button" class="act" id="ahSubmit">Add Hunt</button><button type="button" class="act sec" id="ahCancel" hidden>Cancel</button><span id="ahMsg"></span></div>
+          <div class="formfoot"><button type="button" class="act" id="ahSubmit">Add Collection</button><button type="button" class="act sec" id="ahCancel" hidden>Cancel</button><span id="ahMsg"></span></div>
         </div>
         <div class="card">
-          <h2>Your hunts</h2>
+          <h2>Your collections</h2>
           <div id="ahList"></div>
         </div>
       </div>
     </section>
     <!-- Burrow -->
-    <section class="page" id="burrow/hunts">
-      <div class="card"><h2>Hunts</h2><p class="dim">Nothing here yet.</p></div>
+    <section class="page" id="burrow/hunt">
+      <div class="run-layout">
+        <div class="card">
+          <h2>Hunt</h2>
+          <p class="dim">Run collections against hosts or groups and keep the results.</p>
+          <button class="act" id="bhNew">New Hunt</button>
+        </div>
+        <div class="card">
+          <h2>Previous hunts</h2>
+          <div id="bhList"></div>
+        </div>
+      </div>
     </section>
-    <section class="page" id="burrow/actions">
-      <div class="card"><h2>Actions</h2><p class="dim">Nothing here yet.</p></div>
+    <section class="page" id="burrow/respond">
+      <div class="card"><h2>Respond</h2><p class="dim">Nothing here yet.</p></div>
     </section>
     <section class="page" id="settings/view-actions">
-      <div class="hunt-layout">
+      <div class="collection-layout">
         <div class="card">
           <input id="actionSearch" type="search" placeholder="Search action names and scripts" autocomplete="off" style="width:100%; margin-bottom:10px">
           <div class="toggle" id="actionToggle">
@@ -405,7 +456,7 @@
     <section class="page" id="settings/binaries">
       <div class="card">
         <h2>Binaries</h2>
-        <p class="dim">External tools that hunts depend on. They are not shipped with the platform: upload each one here. On every run the platform copies the binary to a temporary folder on the target, runs the hunt, and deletes the folder afterwards.</p>
+        <p class="dim">External tools that collections depend on. They are not shipped with the platform: upload each one here. On every run the platform copies the binary to a temporary folder on the target, runs the collection, and deletes the folder afterwards.</p>
         <div id="binMsg" class="bad" style="margin-bottom:8px"></div>
         <table id="binTable"><thead><tr><th>Binary</th><th>Used by</th><th>File</th><th>Status</th><th></th></tr></thead><tbody></tbody></table>
         <input type="file" id="binFile" hidden>
@@ -489,13 +540,13 @@
       </div>
     </section>
 
-    <!-- Hunt: nothing yet -->
+    <!-- Collection: nothing yet -->
 
     <!-- Output -->
     <section class="page" id="output/log">
       <div class="card">
         <h2>Run log</h2>
-        <table id="runTable"><thead><tr><th>Started</th><th>Hunt</th><th>Status</th><th>Hosts</th><th></th></tr></thead><tbody></tbody></table>
+        <table id="runTable"><thead><tr><th>Started</th><th>Collection</th><th>Status</th><th>Hosts</th><th></th></tr></thead><tbody></tbody></table>
       </div>
       <div class="card" id="runDetail" hidden></div>
     </section>
@@ -517,6 +568,28 @@
 
     <div class="card" id="emptyTab" hidden><p class="dim" style="margin:0">Nothing here yet.</p></div>
   </main>
+</div>
+<div class="modal" id="huntModal" hidden role="dialog" aria-modal="true" aria-labelledby="hmTitle">
+  <div class="dlg">
+    <div class="dlg-head"><h2 id="hmTitle">New hunt</h2><button class="dlg-x" id="hmClose" aria-label="Close">×</button></div>
+    <div class="dlg-tabs" id="hmTabs"><button type="button" class="on" data-tab="details">Details</button><button type="button" data-tab="collections" id="hmTabColl">Collections</button></div>
+    <div class="dlg-body" id="hmPaneDetails">
+      <span class="fl">Hunt name</span>
+      <input id="hmName" type="text" placeholder="e.g. Weekly persistence sweep" autocomplete="off">
+      <div class="tcols">
+        <div><span class="fl">Groups</span><div class="pickbox" id="hmGroups"></div></div>
+        <div><span class="fl">Hosts</span><div class="pickbox" id="hmHosts"></div></div>
+      </div>
+    </div>
+    <div class="dlg-body coll" id="hmPaneColl" hidden>
+      <div class="coll-list">
+        <input id="hmSearch" type="search" placeholder="Search collections" autocomplete="off">
+        <div class="pickbox" id="hmCollections"></div>
+      </div>
+      <div class="coll-detail" id="hmDetail"></div>
+    </div>
+    <div class="dlg-foot"><button class="act" id="hmRun">Run Hunt</button><button class="act sec" id="hmCancel">Cancel</button><span id="hmMsg"></span><span class="sum" id="hmSummary"></span></div>
+  </div>
 </div>
 <script src="app.js"></script>
 </body>

@@ -8,7 +8,7 @@ TAGS=(containment process)
 # ACTION TEMPLATE (bash) - copy to actions/bash/<your-action>.sh
 #
 # An action is a script that CHANGES the host (kill a process, create a user, block an address...).
-# It is written like a hunt (see hunts/TEMPLATE.sh) with one extra metadata variable.
+# It is written like a collection (see collections/TEMPLATE.sh) with one extra metadata variable.
 #
 # Metadata
 #   * NAME, DESCRIPTION, DEPENDENCIES, PARAMETERS and TAGS must be the first statements in the

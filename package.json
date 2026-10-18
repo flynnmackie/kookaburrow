@@ -1,7 +1,7 @@
 {
   "name": "kookaburrow",
   "version": "0.1.0",
-  "description": "Threat hunting platform: discover hosts, connect over WinRM/SSH, run PowerShell hunts, store results.",
+  "description": "Threat hunting platform: discover hosts, connect over WinRM/SSH, run PowerShell collections, store results.",
   "main": "server.js",
   "private": true,
   "engines": { "node": ">=20" },

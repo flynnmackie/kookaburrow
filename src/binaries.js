@@ -1,11 +1,11 @@
-// Hunter-provided binaries live in binaries/. Each hunt declares the ones it needs in
+// Hunter-provided binaries live in binaries/. Each collection declares the ones it needs in
 // $Dependencies; those names are the "slots" the UI shows. A slot is filled by uploading any
 // file, which is stored under the slot's name.
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { binariesDir } = require('./config');
-const hunts = require('./hunts');
+const collections = require('./collections');
 
 const MAX_BYTES = 200 * 1024 * 1024;
 
@@ -19,7 +19,7 @@ function sha256(file) {
 // Every declared dependency (even if not uploaded yet) plus any stray files already in the folder.
 function listBinaries() {
   const usedBy = new Map();
-  for (const h of hunts.listHunts()) {
+  for (const h of collections.listCollections()) {
     for (const dep of h.dependencies) {
       if (!usedBy.has(dep)) usedBy.set(dep, []);
       usedBy.get(dep).push({ id: h.id, name: h.name });
@@ -43,10 +43,10 @@ function listBinaries() {
   });
 }
 
-// Only names a hunt asks for can be uploaded, so the folder cannot be filled with arbitrary files.
+// Only names a collection asks for can be uploaded, so the folder cannot be filled with arbitrary files.
 function saveBinary(name, data) {
   if (!isSafeName(name)) throw new Error('Invalid binary name');
-  if (!hunts.listHunts().some((h) => h.dependencies.includes(name))) throw new Error(`No hunt requires "${name}"`);
+  if (!collections.listCollections().some((h) => h.dependencies.includes(name))) throw new Error(`No collection requires "${name}"`);
   if (!Buffer.isBuffer(data) || !data.length) throw new Error('No file received');
   if (data.length > MAX_BYTES) throw new Error('File is too large');
   if (/\.(exe|dll|sys)$/i.test(name) && data.subarray(0, 2).toString('latin1') !== 'MZ') {

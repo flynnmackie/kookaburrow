@@ -1,27 +1,27 @@
 ﻿const fs = require('fs');
 const crypto = require('crypto');
 const path = require('path');
-const { huntsDir, actionsDir, binariesDir, runConcurrency } = require('./config');
+const { collectionsDir, actionsDir, binariesDir, runConcurrency } = require('./config');
 const { db, save, id } = require('./store');
 const winrm = require('./remote/winrm');
 const ssh = require('./remote/ssh');
 
-// Hunts live in hunts/powershell (*.ps1) and hunts/bash (*.sh); the id is "<type>/<file>".
-// Every hunt opens with four metadata variables (see hunts/TEMPLATE.ps1 and TEMPLATE.sh):
+// Collections live in collections/powershell (*.ps1) and collections/bash (*.sh); the id is "<type>/<file>".
+// Every collection opens with four metadata variables (see collections/TEMPLATE.ps1 and TEMPLATE.sh):
 //   PowerShell                         Bash
 //   $Name = 'Title'                    NAME='Title'
 //   $Description = 'What it finds'     DESCRIPTION='What it finds'
 //   $Dependencies = @('tool.exe')      DEPENDENCIES=('tool')      (@() / () for none)
 //   $Tags = @('persistence', 'wmi')    TAGS=(persistence wmi)
 // The platform reads them as text and never executes the file to do so. Comments and blank
-// lines may sit between them; the first other line starts the hunt itself.
-const HUNT_TYPES = [
+// lines may sit between them; the first other line starts the collection itself.
+const COLLECTION_TYPES = [
   { type: 'powershell', ext: '.ps1' },
   { type: 'bash', ext: '.sh' },
 ];
-// hunts/verified.json maps hunt ids to the SHA-256 of the shipped file (line endings ignored).
-// A hunt is "verified" only while its file still matches; edited or user-added hunts are not.
-// Regenerate the manifest after changing a shipped hunt: node scripts/verify-hunts.js
+// collections/verified.json maps collection ids to the SHA-256 of the shipped file (line endings ignored).
+// A collection is "verified" only while its file still matches; edited or user-added collections are not.
+// Regenerate the manifest after changing a shipped collection: node scripts/verify-collections.js
 const hashText = (t) => crypto.createHash('sha256').update(t.split('\r\n').join('\n')).digest('hex');
 function loadVerified(root) {
   try { return JSON.parse(fs.readFileSync(path.join(root, 'verified.json'), 'utf8')); } catch { return {}; }
@@ -70,7 +70,7 @@ function readArray(s, i, type) {
   return null;
 }
 
-function parseHunt(text, type) {
+function parseCollection(text, type) {
   const s = text.replace(/^\uFEFF/, '');
   const ps = type === 'powershell';
   const re = ps ? /^[ \t]*\$(Name|Description|Dependencies|Tags|Parameters)[ \t]*=[ \t]*/i : /^[ \t]*(NAME|DESCRIPTION|DEPENDENCIES|TAGS|PARAMETERS)=/;
@@ -87,7 +87,7 @@ function parseHunt(text, type) {
     let r = null;
     if (s[vs] === '"' || s[vs] === "'") r = readString(s, vs, type);
     else if (s.startsWith(ps ? '@(' : '(', vs)) r = readArray(s, vs + (ps ? 1 : 0), type);
-    if (!r) break; // unsupported or malformed value: treat as the start of the hunt
+    if (!r) break; // unsupported or malformed value: treat as the start of the collection
     let e2 = s.indexOf('\n', r[1]);
     if (e2 < 0) e2 = s.length;
     // Only a trailing comment may follow the value; anything else (e.g. "'a' + 'b'") is an expression.
@@ -111,44 +111,44 @@ function parseHunt(text, type) {
   };
 }
 
-// With a query, only hunts whose header fields or script text contain it (case-insensitive)
-// are returned, each tagged with where it matched. `tags` (array) keeps only hunts that
-// carry every one of those tags. `requiresDeps` keeps only hunts that declare at least one
+// With a query, only collections whose header fields or script text contain it (case-insensitive)
+// are returned, each tagged with where it matched. `tags` (array) keeps only collections that
+// carry every one of those tags. `requiresDeps` keeps only collections that declare at least one
 // dependency (an external binary).
 function listScripts(root, query, tags = [], requiresDeps = false) {
   const q = String(query || '').trim().toLowerCase();
   const wanted = tags.map((t) => String(t).trim().toLowerCase()).filter(Boolean);
   const out = [];
   const verified = loadVerified(root);
-  for (const { type, ext } of HUNT_TYPES) {
+  for (const { type, ext } of COLLECTION_TYPES) {
     const dir = path.join(root, type);
     if (!fs.existsSync(dir)) continue;
     for (const f of fs.readdirSync(dir).filter((n) => n.toLowerCase().endsWith(ext)).sort()) {
       const text = fs.readFileSync(path.join(dir, f), 'utf8');
-      const p = parseHunt(text, type);
-      const hunt = {
+      const p = parseCollection(text, type);
+      const collection = {
         id: `${type}/${f}`, type, file: f,
         name: p.name || f.slice(0, -ext.length), description: p.description,
         dependencies: p.dependencies, parameters: p.parameters, tags: p.tags, warnings: p.warnings,
         verified: verified[`${type}/${f}`] === hashText(text),
       };
-      if (!wanted.every((t) => hunt.tags.includes(t))) continue;
-      if (requiresDeps && !hunt.dependencies.length) continue;
-      hunt.missingDependencies = resolveBinaries(hunt).missing; // declared binaries not uploaded yet
+      if (!wanted.every((t) => collection.tags.includes(t))) continue;
+      if (requiresDeps && !collection.dependencies.length) continue;
+      collection.missingDependencies = resolveBinaries(collection).missing; // declared binaries not uploaded yet
       if (q) {
-        const inName = [hunt.name, f, hunt.description, ...hunt.dependencies, ...hunt.tags].some((s) => s.toLowerCase().includes(q));
+        const inName = [collection.name, f, collection.description, ...collection.dependencies, ...collection.tags].some((s) => s.toLowerCase().includes(q));
         const line = text.split(/\r?\n/).find((l) => l.toLowerCase().includes(q));
         if (!inName && line === undefined) continue;
-        hunt.match = { name: inName, script: line !== undefined, line: line?.trim().slice(0, 160) ?? null };
+        collection.match = { name: inName, script: line !== undefined, line: line?.trim().slice(0, 160) ?? null };
       }
-      out.push(hunt);
+      out.push(collection);
     }
   }
   return out;
 }
 
-// Every tag used by hunts of one type, most common first, for the tag filter.
-function listTags(type, root = huntsDir) {
+// Every tag used by collections of one type, most common first, for the tag filter.
+function listTags(type, root = collectionsDir) {
   const counts = new Map();
   for (const h of listScripts(root)) {
     if (type && h.type !== type) continue;
@@ -159,19 +159,19 @@ function listTags(type, root = huntsDir) {
 
 // Resolve by matching against the directory listing, never by joining user input to a path.
 // `text` is the full file (what gets executed); `body` is the script without the header.
-function resolveHunt(huntId, root = huntsDir) {
-  const h = listScripts(root).find((x) => x.id === huntId);
+function resolveCollection(collectionId, root = collectionsDir) {
+  const h = listScripts(root).find((x) => x.id === collectionId);
   if (!h) return null;
   const file = path.join(root, h.type, h.file);
   const text = fs.readFileSync(file, 'utf8');
-  return { ...h, file, text, body: parseHunt(text, h.type).body };
+  return { ...h, file, text, body: parseCollection(text, h.type).body };
 }
 
-// Maps a hunt's $Dependencies to hunter-provided files in binaries/. Dependency names come from
-// hunt files, so anything that is not a bare file name is treated as missing.
-function resolveBinaries(hunt) {
+// Maps a collection's $Dependencies to hunter-provided files in binaries/. Dependency names come from
+// collection files, so anything that is not a bare file name is treated as missing.
+function resolveBinaries(collection) {
   const found = [], missing = [];
-  for (const dep of hunt.dependencies) {
+  for (const dep of collection.dependencies) {
     const file = path.join(binariesDir, dep);
     const safe = dep === path.basename(dep) && !dep.startsWith('.');
     if (safe && fs.existsSync(file) && fs.statSync(file).isFile()) found.push(file);
@@ -180,28 +180,28 @@ function resolveBinaries(hunt) {
   return { found, missing };
 }
 
-async function executeOnHost(host, hunt) {
+async function executeOnHost(host, collection) {
   const started = Date.now();
   let r;
   try {
-    const bins = resolveBinaries(hunt);
+    const bins = resolveBinaries(collection);
     if (bins.missing.length) throw new Error(`Missing binaries: ${bins.missing.join(', ')}. Place them in the binaries folder and run again.`);
     if (bins.found.length && host.protocol !== 'winrm') throw new Error('Binary staging over SSH is not implemented yet');
 
-    if (hunt.type === 'powershell' && host.protocol === 'winrm') r = await winrm.runScript(host, hunt.file, bins.found);
-    else if (host.protocol === 'ssh') r = await ssh.runScript(host, hunt.text, hunt.type);
-    else throw new Error(`${hunt.type} hunts cannot run over ${host.protocol}`);
+    if (collection.type === 'powershell' && host.protocol === 'winrm') r = await winrm.runScript(host, collection.file, bins.found);
+    else if (host.protocol === 'ssh') r = await ssh.runScript(host, collection.text, collection.type);
+    else throw new Error(`${collection.type} collections cannot run over ${host.protocol}`);
   } catch (e) {
     r = { exitCode: -1, stdout: '', stderr: e.message, truncated: false };
   }
   return { ...r, durationMs: Date.now() - started };
 }
 
-function startRun(hunt, hosts) {
+function startRun(collection, hosts) {
   const run = {
     id: id(),
-    huntId: hunt.id,
-    huntName: hunt.name,
+    collectionId: collection.id,
+    collectionName: collection.name,
     status: 'running',
     startedAt: new Date().toISOString(),
     results: hosts.map((h) => ({ hostId: h.id, hostLabel: h.hostname || h.address, address: h.address, status: 'queued' })),
@@ -216,7 +216,7 @@ function startRun(hunt, hosts) {
         const i = next++;
         const res = run.results[i];
         res.status = 'running';
-        const out = await executeOnHost(hosts[i], hunt);
+        const out = await executeOnHost(hosts[i], collection);
         Object.assign(res, out, { status: out.exitCode === 0 ? 'ok' : 'error', finishedAt: new Date().toISOString() });
         save();
       }
@@ -229,8 +229,8 @@ function startRun(hunt, hosts) {
   return run;
 }
 
-const listHunts = (...a) => listScripts(huntsDir, ...a);
+const listCollections = (...a) => listScripts(collectionsDir, ...a);
 const listActions = (...a) => listScripts(actionsDir, ...a);
-const resolveAction = (id) => resolveHunt(id, actionsDir);
+const resolveAction = (id) => resolveCollection(id, actionsDir);
 
-module.exports = { parseHunt, loadVerified, hashText, listHunts, listActions, listTags, resolveHunt, resolveAction, startRun, huntsDir, actionsDir };
+module.exports = { parseCollection, loadVerified, hashText, listCollections, listActions, listTags, resolveCollection, resolveAction, startRun, collectionsDir, actionsDir };

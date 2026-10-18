@@ -1,11 +1,11 @@
 const fs = require('fs');
 const path = require('path');
-const hunts = require('./hunts');
+const collections = require('./collections');
 
-// Create, edit and delete scripts written by the user: hunts (Settings > Hunts > Add Hunts) and
+// Create, edit and delete scripts written by the user: collections (Settings > Collections > Add Collections) and
 // actions (Settings > Actions > Add Actions). "User-created" means a file that is not in the
 // folder's verified.json, so shipped scripts (even edited ones) can never be changed or deleted here.
-// Hunts carry $Dependencies; actions carry $Parameters instead and have no dependencies.
+// Collections carry $Dependencies; actions carry $Parameters instead and have no dependencies.
 const TYPES = { powershell: '.ps1', bash: '.sh' };
 const FILE_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 const ITEM_RE = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$/; // dependency names and tags, valid bare in both languages
@@ -14,7 +14,7 @@ const MAX_SCRIPT = 200 * 1024;
 
 const clean = (s) => String(s ?? '').replace(/\s*[\r\n]+\s*/g, ' ').trim();
 const list = (v) => [...new Set((Array.isArray(v) ? v : []).map((x) => String(x).trim()).filter(Boolean))];
-// Quoting that hunts.js reads back exactly: '' inside '...' for PowerShell, "..." with \ escapes for bash.
+// Quoting that collections.js reads back exactly: '' inside '...' for PowerShell, "..." with \ escapes for bash.
 const quote = (s, type) => (type === 'powershell'
   ? `'${s.replace(/'/g, "''")}'`
   : `"${s.replace(/([\\"$`])/g, '\\$1')}"`);
@@ -67,12 +67,12 @@ function makeFiles({ root, noun, listAll, resolve }) {
     if (path.dirname(full) !== path.resolve(root, type)) throw new Error('Invalid file name');
     return full;
   }
-  const isShipped = (type, file) => `${type}/${file}${TYPES[type]}` in hunts.loadVerified(root);
+  const isShipped = (type, file) => `${type}/${file}${TYPES[type]}` in collections.loadVerified(root);
 
   function write(full, f) {
     const text = build(f);
     // The platform must be able to read the header back exactly, or the script would list wrongly.
-    const p = hunts.parseHunt(text, f.type);
+    const p = collections.parseCollection(text, f.type);
     const same = p.name === f.name && p.description === f.description
       && p.dependencies.join('\n') === f.dependencies.join('\n') && p.tags.join('\n') === f.tags.join('\n')
       && (!isAction || p.parameters.join('\n') === f.parameters.join('\n')) && p.body === f.script;
@@ -122,13 +122,13 @@ function makeFiles({ root, noun, listAll, resolve }) {
       fs.unlinkSync(full);
     },
     listUser() {
-      const verified = hunts.loadVerified(root);
+      const verified = collections.loadVerified(root);
       return listAll().filter((h) => !(h.id in verified)).map((h) => view(h.type, h.file));
     },
   };
 }
 
 module.exports = {
-  hunts: makeFiles({ root: hunts.huntsDir, noun: 'hunt', listAll: () => hunts.listHunts(), resolve: (id) => hunts.resolveHunt(id) }),
-  actions: makeFiles({ root: hunts.actionsDir, noun: 'action', listAll: () => hunts.listActions(), resolve: (id) => hunts.resolveAction(id) }),
+  collections: makeFiles({ root: collections.collectionsDir, noun: 'collection', listAll: () => collections.listCollections(), resolve: (id) => collections.resolveCollection(id) }),
+  actions: makeFiles({ root: collections.actionsDir, noun: 'action', listAll: () => collections.listActions(), resolve: (id) => collections.resolveAction(id) }),
 };

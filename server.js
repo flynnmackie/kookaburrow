@@ -5,9 +5,9 @@ const { encrypt } = require('./src/crypto');
 const scanner = require('./src/scanner');
 const winrm = require('./src/remote/winrm');
 const ssh = require('./src/remote/ssh');
-const hunts = require('./src/hunts');
+const collections = require('./src/collections');
 const binaries = require('./src/binaries');
-const huntFiles = require('./src/hunt-files');
+const collectionFiles = require('./src/collection-files');
 
 const app = express();
 app.use(express.json({ limit: '400kb' }));
@@ -174,50 +174,50 @@ app.delete('/api/binaries/:name', wrap((req, res) => {
   res.json(binaries.listBinaries().find((b) => b.name === req.params.name) || { ok: true });
 }));
 
-// ---- Hunts and runs ---------------------------------------------------------------------
-// ?q=text searches names and scripts; ?tags=a,b keeps hunts that have all of those tags;
-// ?deps=1 keeps only hunts that need at least one dependency (binary).
-app.get('/api/hunts', (req, res) => {
+// ---- Collections and runs ---------------------------------------------------------------------
+// ?q=text searches names and scripts; ?tags=a,b keeps collections that have all of those tags;
+// ?deps=1 keeps only collections that need at least one dependency (binary).
+app.get('/api/collections', (req, res) => {
   const tags = String(req.query.tags || '').split(',');
-  res.json(hunts.listHunts(String(req.query.q || ''), tags, req.query.deps === '1'));
+  res.json(collections.listCollections(String(req.query.q || ''), tags, req.query.deps === '1'));
 });
-// User-written hunts (Add Hunts page). Shipped hunts are never touched by these routes.
-app.get('/api/hunts/user', wrap((req, res) => res.json(huntFiles.hunts.listUser())));
-app.post('/api/hunts', wrap((req, res) => res.json(huntFiles.hunts.create(req.body))));
-app.put('/api/hunts/:type/:file', wrap((req, res) => res.json(huntFiles.hunts.update(req.params.type, req.params.file, req.body))));
-app.delete('/api/hunts/:type/:file', wrap((req, res) => { huntFiles.hunts.remove(req.params.type, req.params.file); res.json({ ok: true }); }));
-app.get('/api/hunts/tags', (req, res) => res.json(hunts.listTags(req.query.type)));
-// Script contents for the viewer. resolveHunt only matches ids from the directory listing.
-app.get('/api/hunts/:type/:file', (req, res) => {
-  const h = hunts.resolveHunt(`${req.params.type}/${req.params.file}`);
+// User-written collections (Add Collections page). Shipped collections are never touched by these routes.
+app.get('/api/collections/user', wrap((req, res) => res.json(collectionFiles.collections.listUser())));
+app.post('/api/collections', wrap((req, res) => res.json(collectionFiles.collections.create(req.body))));
+app.put('/api/collections/:type/:file', wrap((req, res) => res.json(collectionFiles.collections.update(req.params.type, req.params.file, req.body))));
+app.delete('/api/collections/:type/:file', wrap((req, res) => { collectionFiles.collections.remove(req.params.type, req.params.file); res.json({ ok: true }); }));
+app.get('/api/collections/tags', (req, res) => res.json(collections.listTags(req.query.type)));
+// Script contents for the viewer. resolveCollection only matches ids from the directory listing.
+app.get('/api/collections/:type/:file', (req, res) => {
+  const h = collections.resolveCollection(`${req.params.type}/${req.params.file}`);
   if (!h) return res.status(404).json({ error: 'Not found' });
   const { file, text, ...pub } = h; // body = script without the header
   res.json(pub);
 });
 
-// Actions: scripts that change a host (kill a process, add a user, ...). Listed and viewed like hunts;
+// Actions: scripts that change a host (kill a process, add a user, ...). Listed and viewed like collections;
 // running them is not wired up yet.
 app.get('/api/actions', (req, res) => {
   const tags = String(req.query.tags || '').split(',');
-  res.json(hunts.listActions(String(req.query.q || ''), tags, req.query.deps === '1'));
+  res.json(collections.listActions(String(req.query.q || ''), tags, req.query.deps === '1'));
 });
-// User-written actions (Add Actions page); same rules as hunts.
-app.get('/api/actions/user', wrap((req, res) => res.json(huntFiles.actions.listUser())));
-app.post('/api/actions', wrap((req, res) => res.json(huntFiles.actions.create(req.body))));
-app.put('/api/actions/:type/:file', wrap((req, res) => res.json(huntFiles.actions.update(req.params.type, req.params.file, req.body))));
-app.delete('/api/actions/:type/:file', wrap((req, res) => { huntFiles.actions.remove(req.params.type, req.params.file); res.json({ ok: true }); }));
-app.get('/api/actions/tags', (req, res) => res.json(hunts.listTags(req.query.type, hunts.actionsDir)));
+// User-written actions (Add Actions page); same rules as collections.
+app.get('/api/actions/user', wrap((req, res) => res.json(collectionFiles.actions.listUser())));
+app.post('/api/actions', wrap((req, res) => res.json(collectionFiles.actions.create(req.body))));
+app.put('/api/actions/:type/:file', wrap((req, res) => res.json(collectionFiles.actions.update(req.params.type, req.params.file, req.body))));
+app.delete('/api/actions/:type/:file', wrap((req, res) => { collectionFiles.actions.remove(req.params.type, req.params.file); res.json({ ok: true }); }));
+app.get('/api/actions/tags', (req, res) => res.json(collections.listTags(req.query.type, collections.actionsDir)));
 app.get('/api/actions/:type/:file', (req, res) => {
-  const a = hunts.resolveAction(`${req.params.type}/${req.params.file}`);
+  const a = collections.resolveAction(`${req.params.type}/${req.params.file}`);
   if (!a) return res.status(404).json({ error: 'Not found' });
   const { file, text, ...pub } = a;
   res.json(pub);
 });
 
-// body: { huntId, hostIds?: [], listId?: string }
+// body: { collectionId, hostIds?: [], listId?: string }
 app.post('/api/runs', wrap((req, res) => {
-  const hunt = hunts.resolveHunt(req.body.huntId);
-  if (!hunt) throw new Error('Unknown hunt');
+  const collection = collections.resolveCollection(req.body.collectionId);
+  if (!collection) throw new Error('Unknown collection');
   let hostIds = req.body.hostIds || [];
   if (req.body.listId) {
     const list = db.lists.find((l) => l.id === req.body.listId);
@@ -226,7 +226,7 @@ app.post('/api/runs', wrap((req, res) => {
   }
   const targets = [...new Set(hostIds)].map((hid) => db.hosts.find((h) => h.id === hid)).filter(Boolean);
   if (!targets.length) throw new Error('No valid hosts selected');
-  res.json(hunts.startRun(hunt, targets));
+  res.json(collections.startRun(collection, targets));
 }));
 // Listing omits per-host output; fetch a run for the full results.
 app.get('/api/runs', (req, res) => res.json(db.runs.map((r) => ({

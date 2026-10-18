@@ -24,6 +24,12 @@ function save() {
 
 const id = () => crypto.randomBytes(8).toString('hex');
 
+// Runs saved before hunts were renamed to collections keep their data under the new field names.
+for (const run of db.runs) {
+  if ('huntId' in run) { run.collectionId = run.huntId; delete run.huntId; }
+  if ('huntName' in run) { run.collectionName = run.huntName; delete run.huntName; }
+}
+
 // A restart mid-run would otherwise leave runs "running" forever.
 for (const run of db.runs) {
   if (run.status !== 'running') continue;

@@ -1,4 +1,4 @@
-// SSH via ssh2. The hunt script is streamed to PowerShell's stdin on the target, so nothing
+// SSH via ssh2. The collection script is streamed to PowerShell's stdin on the target, so nothing
 // is written to the remote disk. Target needs pwsh (Linux/macOS) or powershell/pwsh (Windows).
 const { Client } = require('ssh2');
 const { decrypt } = require('../crypto');

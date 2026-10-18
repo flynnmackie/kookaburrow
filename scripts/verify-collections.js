@@ -1,11 +1,11 @@
-// Marks every hunt and action currently on disk as verified by writing verified.json in
-// hunts/ and actions/. Run only for scripts you have reviewed: node scripts/verify-hunts.js
+// Marks every collection and action currently on disk as verified by writing verified.json in
+// collections/ and actions/. Run only for scripts you have reviewed: node scripts/verify-collections.js
 const fs = require('fs');
 const path = require('path');
-const { huntsDir, actionsDir } = require('../src/config');
-const { hashText } = require('../src/hunts');
+const { collectionsDir, actionsDir } = require('../src/config');
+const { hashText } = require('../src/collections');
 
-for (const root of [huntsDir, actionsDir]) {
+for (const root of [collectionsDir, actionsDir]) {
   const out = {};
   for (const [type, ext] of [['powershell', '.ps1'], ['bash', '.sh']]) {
     const dir = path.join(root, type);

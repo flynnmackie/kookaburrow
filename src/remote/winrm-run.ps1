@@ -21,8 +21,8 @@ if ($env:KB_MODE -eq 'probe') {
     $p.FilePath = $env:KB_SCRIPT
     Invoke-Command @p | Out-String -Width 4096
 } else {
-    # The hunt needs binaries: stage them in a temp folder on the target, expose it to the hunt
-    # as $BinDir, run the hunt, then always delete the folder and close the session.
+    # The collection needs binaries: stage them in a temp folder on the target, expose it to the collection
+    # as $BinDir, run the collection, then always delete the folder and close the session.
     $bins = @($env:KB_BINS | ConvertFrom-Json)
     $session = New-PSSession @p
     $dir = $null

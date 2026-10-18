@@ -14,7 +14,7 @@ const NAV = [
   // { heading: 'Name' } is a titled dropdown with no pages yet.
   { id: 'settings', label: 'Settings', pages: [
     { heading: 'System' },
-    ['view-hunts', 'View Hunts', 'Hunts'], ['add-hunts', 'Add Hunts', 'Hunts'], ['binaries', 'Binaries', 'Hunts'],
+    ['view-collections', 'View Collections', 'Collections'], ['add-collections', 'Add Collections', 'Collections'], ['binaries', 'Binaries', 'Collections'],
     ['view-actions', 'View Actions', 'Actions'], ['add-actions', 'Add Actions', 'Actions'],
     { heading: 'User Management' },
     { heading: 'Shell Settings' },
@@ -24,7 +24,7 @@ const NAV = [
     ['view-hosts', 'View Hosts', 'Hosts'], ['profiles', 'Profiles', 'Hosts'], ['groups', 'Groups', 'Hosts'],
     ['discover', 'Discover', 'Add Hosts'], ['manual', 'Manually Add', 'Add Hosts'],
   ] },
-  { id: 'burrow', label: 'Burrow!', accent: true, pages: [['hunts', 'Hunts'], ['actions', 'Actions']] },
+  { id: 'burrow', label: 'Burrow!', accent: true, pages: [['hunt', 'Hunt'], ['respond', 'Respond']] },
   { id: 'output', label: 'Output', pages: [['log', 'Log'], ['report', 'Report'], ['json', 'JSON']] },
   // Shell and Health are placed apart on the right of the top bar; nothing in them yet.
   { id: 'shell', label: 'Shell', pages: [], right: true },
@@ -32,9 +32,10 @@ const NAV = [
 ];
 const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
 const loaders = {
-  'settings/view-hunts': () => loadHuntList(),
+  'settings/view-collections': () => loadCollectionList(),
   'settings/view-actions': () => loadActionList(),
-  'settings/add-hunts': () => addHunts(),
+  'burrow/hunt': loadBurrowHunts,
+  'settings/add-collections': () => addCollections(),
   'settings/add-actions': () => addActions(),
   'settings/binaries': loadBinaries,
   'hosts/view-hosts': loadHosts,
@@ -272,9 +273,9 @@ $('mkList').onclick = async () => {
   catch (e) { $('listMsg').textContent = e.message; }
 };
 
-// ---- Settings: View Hunts / View Actions ----
+// ---- Settings: View Collections / View Actions ----
 // One library view serves both: a searchable, filterable list of scripts on the left and the open
-// script on the right. `id` prefixes the element ids (huntList, actionList, ...); `url` is the API root.
+// script on the right. `id` prefixes the element ids (collectionList, actionList, ...); `url` is the API root.
 function makeLibrary({ id, url, noun, folder, showParams }) {
   const el = (s) => $(id + s);
   const Noun = noun[0].toUpperCase() + noun.slice(1);
@@ -346,7 +347,7 @@ function makeLibrary({ id, url, noun, folder, showParams }) {
     });
     const dir = `${folder}/${type === 'bash' ? 'bash' : 'powershell'}`;
     const tag = (m) => !m ? '' : [m.name && 'name', m.script && 'script'].filter(Boolean).join(' + ');
-    el('List').innerHTML = all.filter((h) => h.type === type).map((h) => `<div class="hunt-item ${h.id === open ? 'on' : ''} ${depState(h)}" data-id="${esc(h.id)}">
+    el('List').innerHTML = all.filter((h) => h.type === type).map((h) => `<div class="collection-item ${h.id === open ? 'on' : ''} ${depState(h)}" data-id="${esc(h.id)}">
     ${h.verified ? VERIFIED : ''}<div class="hn">${esc(h.name)} ${h.match ? `<span class="mtag">${tag(h.match)}</span>` : ''}${h.warnings.length ? `<span class="mwarn" title="${esc(h.warnings.join('; '))}">⚠</span>` : ''}</div>
     <div class="hd" title="${esc(h.description)}">${esc(h.description)}</div>
     ${h.tags.length ? `<div class="htags">${h.tags.map((t) => `<span class="htag ${selectedTags.includes(t) ? 'on' : ''}" data-tag="${esc(t)}">${esc(t)}</span>`).join('')}</div>` : ''}
@@ -366,7 +367,7 @@ function makeLibrary({ id, url, noun, folder, showParams }) {
   // Clicking a script shows it in the right-hand box; clicking one of its tags filters by it.
   el('List').onclick = (e) => {
     if (e.target.dataset.tag) { toggleTag(e.target.dataset.tag); return; }
-    const item = e.target.closest('.hunt-item'); if (!item) return;
+    const item = e.target.closest('.collection-item'); if (!item) return;
     open = item.dataset.id;
     renderList();
     show(open);
@@ -406,13 +407,13 @@ function makeLibrary({ id, url, noun, folder, showParams }) {
   return load;
 }
 const VERIFIED = '<span class="vtick" title="Verified: shipped with Kookaburrow and unmodified">✓</span>';
-const loadHuntList = makeLibrary({ id: 'hunt', url: '/api/hunts', noun: 'hunt', folder: 'hunts' });
+const loadCollectionList = makeLibrary({ id: 'collection', url: '/api/collections', noun: 'collection', folder: 'collections' });
 const loadActionList = makeLibrary({ id: 'action', url: '/api/actions', noun: 'action', folder: 'actions', showParams: true });
 
-// ---- Settings: Add Hunts / Add Actions ----
+// ---- Settings: Add Collections / Add Actions ----
 // Left: a form that writes <folder>/<type>/<file>.ps1|.sh. Right: the scripts the user has written, with
 // view / edit / delete. Shipped (verified) scripts never appear here, so they cannot be changed.
-// Hunts list their dependencies (external binaries); actions list their parameters (named inputs).
+// Collections list their dependencies (external binaries); actions list their parameters (named inputs).
 function makeEditor({ P, url, noun, folder, items, hints }) {
   const el = (s) => $(P + s);
   const EXT = { powershell: '.ps1', bash: '.sh' };
@@ -523,8 +524,8 @@ function makeEditor({ P, url, noun, folder, items, hints }) {
   reset();
   return load;
 }
-const addHunts = makeEditor({
-  P: 'ah', url: '/api/hunts', noun: 'hunt', folder: 'hunts',
+const addCollections = makeEditor({
+  P: 'ah', url: '/api/collections', noun: 'collection', folder: 'collections',
   items: { key: 'dependencies', label: 'Dependencies', placeholder: { powershell: 'autorunsc.exe', bash: 'osqueryi' } },
   hints: {
     powershell: '# Runs remotely. Read-only checks; write results to the output stream.\nGet-Process | Select-Object Id, ProcessName, Path | Format-Table -AutoSize',
@@ -540,7 +541,106 @@ const addActions = makeEditor({
   },
 });
 
-// Small syntax highlighter for the two hunt languages. Each alternative is one capture group.
+// ---- Burrow: Hunt ----
+// Left: start a new hunt. Right: previous hunts. A hunt runs one or more collections on hosts/groups.
+// The dialog is in place; starting a hunt from it is not wired up yet.
+async function loadBurrowHunts() {
+  let runs = [];
+  try { runs = await api('GET', '/api/runs'); } catch (e) { $('bhList').innerHTML = `<p class="bad">${esc(e.message)}</p>`; return; }
+  $('bhList').innerHTML = runs.length
+    ? `<table><thead><tr><th>Hunt</th><th>Collections</th><th>Hosts</th><th>Status</th><th>Started</th></tr></thead><tbody>${runs.map((r) => `<tr>
+        <td>${esc(r.name || r.collectionName)}</td><td>${esc((r.collectionNames || [r.collectionName]).join(', '))}</td><td>${r.results.length}</td>
+        <td class="${r.status === 'completed' ? 'ok' : r.status === 'running' ? '' : 'bad'}">${esc(r.status.replaceAll('_', ' '))}</td>
+        <td class="dim">${esc(new Date(r.startedAt).toLocaleString())}</td></tr>`).join('')}</tbody></table>`
+    : '<p class="dim" style="margin:0">No hunts yet. Use New Hunt to run collections against your hosts.</p>';
+}
+
+const hm = { collections: [], hosts: [], lists: [], selC: new Set(), selH: new Set(), selL: new Set(), q: '', shown: null };
+const hmEl = (s) => $('hm' + s);
+function hmCount() {
+  const ids = new Set(hm.selH);
+  for (const l of hm.lists) if (hm.selL.has(l.id)) l.hostIds.forEach((i) => ids.add(i));
+  return ids.size;
+}
+function hmSummary() {
+  const c = hm.selC.size, h = hmCount();
+  hmEl('Summary').textContent = `${c} collection${c === 1 ? '' : 's'} · ${h} host${h === 1 ? '' : 's'}`;
+  hmEl('TabColl').textContent = c ? `Collections (${c})` : 'Collections';
+}
+// Collections tab: tick the ones to run; click a name to read its description and script on the right.
+function hmRenderCollections() {
+  const q = hm.q.toLowerCase();
+  const shown = hm.collections.filter((c) => !q || [c.name, c.file, c.description, ...c.tags].some((s) => s.toLowerCase().includes(q)));
+  hmEl('Collections').innerHTML = shown.map((c) => `<div class="pick ${c.id === hm.shown ? 'on' : ''}" data-view="${esc(c.id)}">
+      <input type="checkbox" data-c="${esc(c.id)}" ${hm.selC.has(c.id) ? 'checked' : ''} aria-label="Include ${esc(c.name)}">
+      <span class="pn">${esc(c.name)}</span><span class="pt">${c.type === 'bash' ? 'Linux' : 'PowerShell'}</span></div>`).join('')
+    || '<p class="dim" style="margin:6px 10px">No collections match.</p>';
+}
+async function hmShow(id) {
+  hm.shown = id;
+  hmRenderCollections();
+  try {
+    const h = await api('GET', `/api/collections/${id}`);
+    if (id !== hm.shown) return;
+    hmEl('Detail').innerHTML = `<div class="hd-name">${esc(h.name)}</div><div class="hd-file">${esc(h.id)}</div>
+      <div class="hd-label hd-label-desc">Description</div><div class="hd-desc">${h.description ? esc(h.description) : '<span class="dim">-</span>'}</div>
+      <div class="hd-label hd-label-dep">Dependencies</div><div class="hd-deps">${h.dependencies.length ? h.dependencies.map((d) => `<span class="dep ${h.missingDependencies.includes(d) ? 'miss' : 'have'}">${esc(d)}${h.missingDependencies.includes(d) ? ' (not uploaded)' : ''}</span>`).join('') : '<span class="dim">None</span>'}</div>
+      <div class="hd-label hd-label-tags">Tags</div><div class="hd-tags">${h.tags.length ? h.tags.map((t) => `<span class="hd-tag">${esc(t)}</span>`).join('') : '<span class="dim">None</span>'}</div>
+      <div class="hd-label hd-label-code">Collection</div><pre class="code">${highlight(h.body, h.type)}</pre>`;
+  } catch (e) { hmEl('Detail').innerHTML = `<p class="bad">${esc(e.message)}</p>`; }
+}
+function hmTab(name) {
+  document.querySelectorAll('#hmTabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === name));
+  hmEl('PaneDetails').hidden = name !== 'details';
+  hmEl('PaneColl').hidden = name !== 'collections';
+}
+function hmRenderTargets() {
+  hmEl('Groups').innerHTML = hm.lists.map((l) => `<label class="pick"><input type="checkbox" data-l="${esc(l.id)}" ${hm.selL.has(l.id) ? 'checked' : ''}>
+      <span class="pn">${esc(l.name)}</span><span class="pt">${l.hostIds.length} host${l.hostIds.length === 1 ? '' : 's'}</span></label>`).join('')
+    || '<p class="dim" style="margin:6px 0">No groups yet.</p>';
+  hmEl('Hosts').innerHTML = hm.hosts.map((h) => `<label class="pick"><input type="checkbox" data-h="${esc(h.id)}" ${hm.selH.has(h.id) ? 'checked' : ''}>
+      <span class="pn">${esc(h.name)}</span><span class="pt">${esc(h.address)}</span></label>`).join('')
+    || '<p class="dim" style="margin:6px 0">No saved hosts yet.</p>';
+}
+async function openHuntModal() {
+  hm.selC.clear(); hm.selH.clear(); hm.selL.clear(); hm.q = '';
+  hm.shown = null; hmEl('Detail').innerHTML = '<p class="dim">Click a collection to see what it does.</p>'; hmTab('details');
+  hmEl('Name').value = ''; hmEl('Search').value = ''; hmEl('Msg').textContent = '';
+  hmEl('Msg').className = '';
+  $('huntModal').hidden = false;
+  hmEl('Name').focus();
+  try {
+    [hm.collections, hm.hosts, hm.lists] = await Promise.all([api('GET', '/api/collections'), api('GET', '/api/hosts'), api('GET', '/api/lists')]);
+  } catch (e) { hmEl('Msg').textContent = e.message; hmEl('Msg').className = 'bad'; }
+  hmRenderCollections(); hmRenderTargets(); hmSummary();
+}
+const closeHuntModal = () => { $('huntModal').hidden = true; };
+$('bhNew').onclick = openHuntModal;
+$('hmCancel').onclick = closeHuntModal;
+$('hmClose').onclick = closeHuntModal;
+$('huntModal').onclick = (e) => { if (e.target.id === 'huntModal') closeHuntModal(); };
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('huntModal').hidden) closeHuntModal(); });
+$('hmTabs').onclick = (e) => { if (e.target.dataset.tab) hmTab(e.target.dataset.tab); };
+$('hmCollections').onclick = (e) => {
+  const row = e.target.closest('[data-view]');
+  if (row && !e.target.matches('input')) hmShow(row.dataset.view);
+};
+hmEl('Search').oninput = () => { hm.q = hmEl('Search').value.trim(); hmRenderCollections(); };
+$('huntModal').onchange = (e) => {
+  const d = e.target.dataset, set = d.c ? [hm.selC, d.c] : d.h ? [hm.selH, d.h] : d.l ? [hm.selL, d.l] : null;
+  if (!set) return;
+  if (e.target.checked) set[0].add(set[1]); else set[0].delete(set[1]);
+  hmSummary();
+};
+hmEl('Run').onclick = () => {
+  const msg = (t, cls) => { hmEl('Msg').textContent = t; hmEl('Msg').className = cls; };
+  if (!hmEl('Name').value.trim()) return msg('Give the hunt a name.', 'bad');
+  if (!hm.selC.size) return msg('Select at least one collection.', 'bad');
+  if (!hmCount()) return msg('Select at least one host or group.', 'bad');
+  msg('Running hunts from here is not wired up yet.', 'warn');
+};
+
+// Small syntax highlighter for the two collection languages. Each alternative is one capture group.
 const HL = {
   powershell: {
     re: /((?<![$\w])#.*$)|("(?:[^"`\\]|`[\s\S]|\\.)*"|'(?:[^']|'')*')|(\$\{[^}]*\}|\$[\w:?]+)|(\b[A-Z][A-Za-z]+-[A-Z][A-Za-z]+\b)|((?<=\s)-[A-Za-z]+\b)|(\b(?:if|else|elseif|foreach|for|while|switch|function|param|return|try|catch|finally|throw|in|begin|process|end)\b)/gm,
@@ -566,13 +666,13 @@ function highlight(code, type) {
 }
 
 // ---- Settings: Binaries ----
-// One row per binary that a hunt declares in $Dependencies. Red until the hunter uploads it.
+// One row per binary that a collection declares in $Dependencies. Red until the hunter uploads it.
 const fmtSize = (n) => (n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
 async function loadBinaries() {
   const list = await api('GET', '/api/binaries');
   $('binTable').tBodies[0].innerHTML = list.map((b) => `<tr class="${b.present ? 'ready' : 'missing'}">
     <td><b>${esc(b.name)}</b></td>
-    <td>${b.usedBy.map((h) => esc(h.name)).join('<br>') || '<span class="dim">No hunt uses this</span>'}</td>
+    <td>${b.usedBy.map((h) => esc(h.name)).join('<br>') || '<span class="dim">No collection uses this</span>'}</td>
     <td><div class="binfield" title="${b.present ? `SHA-256 ${esc(b.sha256)}` : ''}">${b.present
       ? `${esc(b.name)} <span class="dim" style="margin-left:8px">${fmtSize(b.size)} · ${esc(b.sha256.slice(0, 12))}…</span>`
       : 'No file uploaded'}</div></td>
@@ -580,7 +680,7 @@ async function loadBinaries() {
     <td><div class="binactions">
       <button class="act ${b.present ? 'sec' : ''}" data-upload="${esc(b.name)}" ${b.usedBy.length ? '' : 'disabled'}>${b.present ? 'Replace…' : 'Upload…'}</button>
       <button class="del" data-remove="${esc(b.name)}" ${b.present ? '' : 'disabled'}>Remove</button>
-    </div></td></tr>`).join('') || '<tr><td colspan="5" class="dim">No hunt declares a binary dependency</td></tr>';
+    </div></td></tr>`).join('') || '<tr><td colspan="5" class="dim">No collection declares a binary dependency</td></tr>';
 }
 let uploadSlot = null;
 $('binTable').onclick = async (e) => {
@@ -588,7 +688,7 @@ $('binTable').onclick = async (e) => {
   $('binMsg').textContent = '';
   if (upload) { uploadSlot = upload; $('binFile').click(); } // opens the file explorer
   if (remove) {
-    if (!confirm(`Remove ${remove}? Hunts that need it will fail until it is uploaded again.`)) return;
+    if (!confirm(`Remove ${remove}? Collections that need it will fail until it is uploaded again.`)) return;
     try { await api('DELETE', `/api/binaries/${encodeURIComponent(remove)}`); } catch (err) { $('binMsg').textContent = err.message; }
     loadBinaries();
   }
@@ -613,7 +713,7 @@ let pollRuns, openId = null;
 async function loadRuns() {
   const runs = await api('GET', '/api/runs');
   $('runTable').tBodies[0].innerHTML = runs.map((r) => `<tr>
-    <td>${new Date(r.startedAt).toLocaleString()}</td><td>${esc(r.huntName)}</td>
+    <td>${new Date(r.startedAt).toLocaleString()}</td><td>${esc(r.collectionName)}</td>
     <td class="${r.status === 'completed' ? 'ok' : r.status === 'running' ? 'dim' : 'bad'}">${r.status.replaceAll('_', ' ')}</td>
     <td>${r.results.filter((x) => x.status === 'ok').length}/${r.results.length} ok</td>
     <td><a data-open="${r.id}">View</a> &nbsp; <a data-del-run="${r.id}">Delete</a></td></tr>`).join('') || '<tr><td colspan="5" class="dim">No runs yet</td></tr>';
@@ -634,7 +734,7 @@ async function openRun(id) {
   openId = id;
   const r = await api('GET', `/api/runs/${id}`);
   $('runDetail').hidden = false;
-  $('runDetail').innerHTML = `<h2>${esc(r.huntName)} - ${r.status.replaceAll('_', ' ')}</h2>` + r.results.map((x) => `
+  $('runDetail').innerHTML = `<h2>${esc(r.collectionName)} - ${r.status.replaceAll('_', ' ')}</h2>` + r.results.map((x) => `
     <div style="margin-bottom:14px"><b>${esc(x.hostLabel)}</b> <span class="dim">${esc(x.address)}</span>
     <span class="${x.status === 'ok' ? 'ok' : x.status === 'error' ? 'bad' : 'dim'}">${x.status}</span>
     ${x.durationMs ? `<span class="dim">${(x.durationMs / 1000).toFixed(1)}s</span>` : ''}${x.truncated ? ' <span class="bad">(output truncated)</span>' : ''}
@@ -647,7 +747,7 @@ let jsonText = '', jsonReq = 0;
 async function loadJsonRuns() {
   const runs = await api('GET', '/api/runs');
   const keep = $('jsonRun').value;
-  $('jsonRun').innerHTML = runs.map((r) => `<option value="${r.id}">${esc(new Date(r.startedAt).toLocaleString())} - ${esc(r.huntName)}</option>`).join('')
+  $('jsonRun').innerHTML = runs.map((r) => `<option value="${r.id}">${esc(new Date(r.startedAt).toLocaleString())} - ${esc(r.collectionName)}</option>`).join('')
     || '<option value="">No runs yet</option>';
   if (keep && runs.some((r) => r.id === keep)) $('jsonRun').value = keep;
   $('jsonRun').disabled = !runs.length;
@@ -655,7 +755,7 @@ async function loadJsonRuns() {
 }
 async function showRunJson() {
   const id = $('jsonRun').value, req = ++jsonReq;
-  if (!id) { jsonText = ''; $('jsonOut').textContent = 'No runs yet. Results appear here once a hunt has been run.'; setJsonButtons(); return; }
+  if (!id) { jsonText = ''; $('jsonOut').textContent = 'No runs yet. Results appear here once a collection has been run.'; setJsonButtons(); return; }
   const run = await api('GET', `/api/runs/${id}`);
   if (req !== jsonReq) return; // a newer selection is loading
   jsonText = JSON.stringify(run, null, 2);
