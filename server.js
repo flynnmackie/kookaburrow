@@ -8,6 +8,7 @@ const ssh = require('./src/remote/ssh');
 const collections = require('./src/collections');
 const binaries = require('./src/binaries');
 const collectionFiles = require('./src/collection-files');
+const browse = require('./src/browse');
 
 const app = express();
 app.use(express.json({ limit: '400kb' }));
@@ -241,6 +242,20 @@ app.delete('/api/runs/:id', (req, res) => {
   save();
   res.json({ ok: true });
 });
+
+// ---- Browse: read-only view of collections, actions, binaries and collected evidence --------
+const browseWrap = (fn) => (req, res) => {
+  try { fn(req, res); } catch (e) { res.status(e.status || 400).json({ error: firstLine(e.message) }); }
+};
+app.get('/api/browse', browseWrap((req, res) => res.json(browse.list(String(req.query.path || '/')))));
+app.get('/api/browse/file', browseWrap((req, res) => res.json(browse.preview(String(req.query.path || '')))));
+app.get('/api/browse/download', browseWrap((req, res) => {
+  const src = browse.source(String(req.query.path || ''));
+  res.setHeader('Content-Disposition', `attachment; filename="${src.name.replace(/[^\w. -]/g, '_')}"`);
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.type('application/octet-stream');
+  if (src.buffer) res.send(src.buffer); else res.sendFile(src.file);
+}));
 
 // Last-resort handler: malformed JSON bodies etc. return JSON, never a stack trace.
 app.use((err, req, res, next) => {

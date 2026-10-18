@@ -26,15 +26,16 @@ const NAV = [
   ] },
   { id: 'burrow', label: 'Burrow!', accent: true, pages: [['hunt', 'Hunt'], ['respond', 'Respond']] },
   { id: 'output', label: 'Output', pages: [['log', 'Log'], ['report', 'Report'], ['json', 'JSON']] },
+  { id: 'browse', label: 'Browse', pages: [['files', 'Files']] },
   // Shell and Health are placed apart on the right of the top bar; nothing in them yet.
   { id: 'shell', label: 'Shell', pages: [], right: true },
   { id: 'health', label: 'Health', pages: [], right: true },
 ];
-const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
 const loaders = {
   'settings/view-collections': () => loadCollectionList(),
   'settings/view-actions': () => loadActionList(),
   'burrow/hunt': loadBurrowHunts,
+  'browse/files': () => loadBrowse('/'),
   'settings/add-collections': () => addCollections(),
   'settings/add-actions': () => addActions(),
   'settings/binaries': loadBinaries,
@@ -46,7 +47,7 @@ const loaders = {
   'output/json': loadJsonRuns,
 };
 
-// Side menu. Pages numbered I, II, ... in order; pages with a group sit under a titled dropdown.
+// Side menu. Pages with a group sit under a titled dropdown.
 // Every dropdown starts closed; the ones you open stay open across refreshes (kept in localStorage).
 const OPEN_KEY = 'kb.openGroups';
 const openGroups = new Set();
@@ -58,7 +59,7 @@ let currentTab = null, currentSlug = null;
 function renderSide() {
   const tab = currentTab;
   if (!tab.pages.length) { $('sidenav').innerHTML = '<div class="empty">Nothing here yet</div>'; return; }
-  let html = '', last = null, n = 0;
+  let html = '', last = null;
   const heading = (name) => {
     const open = openGroups.has(`${tab.id}/${name}`);
     html += `<button class="sidehead" data-group="${esc(`${tab.id}/${name}`)}" aria-expanded="${open}"><span class="chev">${open ? '▾' : '▸'}</span>${esc(name)}</button>`;
@@ -74,9 +75,8 @@ function renderSide() {
     const key = group ? `${tab.id}/${group}` : null;
     if (group && group !== last) heading(group);
     last = group || null;
-    const num = ROMAN[n++]; // numbering counts every page, open or not, so it never shifts
     if (key && !openGroups.has(key)) continue;
-    html += `<button data-tab="${tab.id}" data-page="${pid}" class="${group ? 'sub' : ''} ${currentSlug === `${tab.id}/${pid}` ? 'on' : ''}"><span class="num">${num}</span>${esc(label)}</button>`;
+    html += `<button data-tab="${tab.id}" data-page="${pid}" class="${group ? 'sub' : ''} ${currentSlug === `${tab.id}/${pid}` ? 'on' : ''}">${esc(label)}</button>`;
   }
   $('sidenav').innerHTML = html;
 }
@@ -638,6 +638,53 @@ hmEl('Run').onclick = () => {
   if (!hm.selC.size) return msg('Select at least one collection.', 'bad');
   if (!hmCount()) return msg('Select at least one host or group.', 'bad');
   msg('Running hunts from here is not wired up yet.', 'warn');
+};
+
+// ---- Browse ----
+// A read-only file view over collections, actions, binaries and collected evidence. Click a folder to open
+// it, click a file to preview it on the right.
+const bb = { path: '/', entries: [], open: null };
+const bbFmt = (n) => (n == null ? '' : n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1048576).toFixed(1)} MB`);
+const bbIcon = (dir) => dir
+  ? '<svg class="ico" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M1.5 3.5h4.2l1.3 1.5h7.5v7.5h-13z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>'
+  : '<svg class="ico" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M3.5 1.5h6l3 3v10h-9z M9.5 1.5v3h3" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>';
+async function loadBrowse(path) {
+  if (typeof path === 'string') { bb.path = path; bb.open = null; }
+  try {
+    const r = await api('GET', `/api/browse?path=${encodeURIComponent(bb.path)}`);
+    bb.entries = r.entries;
+  } catch (e) { $('bbList').innerHTML = `<p class="bad">${esc(e.message)}</p>`; return; }
+  renderBrowse();
+  if (!bb.open) $('bbPreview').innerHTML = '<p class="dim">Select a file to preview it.</p>';
+}
+function renderBrowse() {
+  const segs = bb.path.split('/').filter(Boolean);
+  let acc = '';
+  $('bbCrumbs').innerHTML = `<a data-path="/">Browse</a>` + segs.map((s) => { acc += '/' + s; return ` <span class="sep">/</span> <a data-path="${esc(acc)}">${esc(s)}</a>`; }).join('');
+  const top = bb.path === '/';
+  const rows = bb.entries.map((e) => `<tr class="bb-row" data-name="${esc(e.name)}" data-dir="${e.dir ? 1 : 0}">
+      <td class="bb-name">${bbIcon(e.dir)}<span>${esc(e.label || e.name)}</span>${e.desc ? `<span class="bb-desc">${esc(e.desc)}</span>` : ''}</td>
+      <td class="dim">${e.dir ? `${e.count} item${e.count === 1 ? '' : 's'}` : bbFmt(e.size)}</td>
+      <td class="dim">${top || !e.modified ? '' : esc(new Date(e.modified).toLocaleString())}</td></tr>`).join('');
+  $('bbList').innerHTML = `<table><thead><tr><th>Name</th><th>${top ? 'Contents' : 'Size / items'}</th><th>${top ? '' : 'Modified'}</th></tr></thead><tbody>${rows || '<tr><td colspan="3" class="dim">This folder is empty.</td></tr>'}</tbody></table>`;
+  document.querySelectorAll('#bbList .bb-row').forEach((tr) => tr.classList.toggle('on', tr.dataset.dir === '0' && tr.dataset.name === bb.open));
+}
+$('bbCrumbs').onclick = (e) => { const p = e.target.dataset.path; if (p) loadBrowse(p); };
+$('bbList').onclick = async (e) => {
+  const tr = e.target.closest('.bb-row'); if (!tr) return;
+  const full = (bb.path === '/' ? '' : bb.path) + '/' + tr.dataset.name;
+  if (tr.dataset.dir === '1') { loadBrowse(full); return; }
+  bb.open = tr.dataset.name;
+  renderBrowse();
+  try {
+    const f = await api('GET', `/api/browse/file?path=${encodeURIComponent(full)}`);
+    if (bb.open !== tr.dataset.name) return;
+    const ext = f.name.slice(f.name.lastIndexOf('.') + 1).toLowerCase();
+    const body = f.binary ? `<p class="dim">Binary file (${bbFmt(f.size)}); no preview. Use Download to save it.</p>`
+      : `<pre class="code">${ext === 'ps1' ? highlight(f.text, 'powershell') : ext === 'sh' ? highlight(f.text, 'bash') : ext === 'json' ? highlightJson(f.text) : esc(f.text)}</pre>${f.truncated ? `<p class="dim" style="margin-top:6px">Showing the first 512 KB of ${bbFmt(f.size)}.</p>` : ''}`;
+    $('bbPreview').innerHTML = `<div class="bb-head"><div><div class="bb-title">${esc(f.name)}</div><div class="hd-file">${esc(f.path)} · ${bbFmt(f.size)} · ${esc(new Date(f.modified).toLocaleString())}</div></div>
+      <a class="act sec" href="/api/browse/download?path=${encodeURIComponent(f.path)}" download>Download</a></div>${body}`;
+  } catch (err) { $('bbPreview').innerHTML = `<p class="bad">${esc(err.message)}</p>`; }
 };
 
 // Small syntax highlighter for the two collection languages. Each alternative is one capture group.
