@@ -34,7 +34,7 @@
   .bgmark { position:fixed; inset:7vh 5vw 4vh; z-index:0; pointer-events:none; opacity:.10; filter:grayscale(.35) contrast(.9);
     background:url('bg-kookaburrow.png') center / contain no-repeat; }
   header, .layout { position:relative; z-index:1; }
-  header { display:flex; align-items:center; gap:24px; padding:0 14px; height:42px; flex-shrink:0; border-bottom:1px solid var(--line); background:#090b0f; }
+  header { display:flex; align-items:center; gap:24px; padding:0 14px; height:56px; flex-shrink:0; border-bottom:1px solid var(--line); background:#090b0f; }
   header h1 { margin:0; font:600 14px/1 var(--f-ui); color:var(--text); white-space:nowrap; }
 
   #topnav { display:flex; align-items:stretch; gap:2px; flex:1; min-width:0; height:100%; overflow-x:auto; }
@@ -52,6 +52,45 @@
   #topnav button.right:hover { border-color:var(--blue); background:var(--hover); color:#7be3ff; }
   #topnav button.right.on { border-color:var(--blue); background:var(--hover); color:#fff; }
 
+  .brand { display:flex; align-items:center; transition:filter var(--ease); }
+  .brand:hover { filter:brightness(1.2); text-decoration:none; }
+  .brand img { height:46px; width:auto; display:block; }
+  body.home .bgmark { display:none; }
+  .badge.grey { color:var(--dim); border-color:var(--line-hi); }
+  #authTable .reason { font-size:11px; line-height:1.35; margin-top:3px; max-width:340px; color:var(--dim); }
+  #authTable .reason.bad { color:var(--bad); }
+  #authTable td { vertical-align:top; }
+  #authTable tr.fading { animation:kbfade 2.2s ease-in forwards; }
+  @keyframes kbfade { to { opacity:0; } }
+  #toasts { position:fixed; right:16px; bottom:16px; z-index:80; display:flex; flex-direction:column; gap:8px; align-items:flex-end; pointer-events:none; }
+  .toast { background:var(--panel2); border:1px solid var(--line-hi); border-left:3px solid var(--ok); border-radius:var(--r); padding:9px 14px; font-size:13px; box-shadow:0 8px 24px rgba(0,0,0,.5); opacity:0; transform:translateY(8px); animation:kbtoast .25s ease-out forwards; transition:opacity .7s ease, transform .7s ease; }
+  .toast.bad { border-left-color:var(--bad); }
+  .toast.out { opacity:0 !important; transform:translateY(4px); }
+  @keyframes kbtoast { to { opacity:1; transform:none; } }
+  .home { display:flex; flex-direction:column; }
+  .home-top { display:flex; justify-content:flex-end; align-items:center; gap:10px; }
+  #signOutMsg { font-size:12px; color:var(--dim); }
+  .home-main { flex:1; min-height:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; text-align:center; padding-bottom:24px; }
+  /* info on the left, bird in the true centre (the empty third column balances the first), big */
+  .home-hero { display:grid; grid-template-columns:minmax(230px, 1fr) auto minmax(230px, 1fr); align-items:center; gap:28px; width:100%; margin-bottom:6px; }
+  .home-hero::after { content:''; }
+  .home-logo { max-height:min(62vh, 560px); max-width:100%; height:auto; width:auto; justify-self:center; }
+  .home-info { display:grid; grid-template-columns:auto 1fr; gap:6px 16px; margin:0; padding:0 0 0 8px; justify-self:start; text-align:left; font-size:12.5px; }
+  .home-info dt { color:var(--faint); white-space:nowrap; }
+  .home-info dd { margin:0; word-break:break-word; color:var(--ok); }
+  .home-info dd .dim, .home-info dd .bad { color:var(--dim); }
+  @media (max-width:1000px) {
+    .home-hero { grid-template-columns:1fr; justify-items:center; gap:14px; }
+    .home-hero::after { display:none; }
+    .home-logo { order:-1; max-height:44vh; }
+    .home-info { justify-self:center; padding:0; }
+  }
+  .home-name { font:600 24px var(--f-ui); letter-spacing:.01em; }
+  .home-tag { color:var(--dim); font-size:13.5px; margin-bottom:10px; }
+  .home-btns { display:flex; flex-wrap:wrap; justify-content:center; gap:8px; max-width:640px; }
+  a.act:not(.sec) { background:var(--blue); color:#00141c; border:1px solid var(--blue); }
+  a.act:not(.sec):hover { background:#33d4ff; border-color:#33d4ff; text-decoration:none; color:#00141c; }
+  .home-btns a.act { padding:6px 16px; font-size:13px; }
   .layout { display:flex; flex:1; min-height:0; }
   #sidenav { width:146px; flex-shrink:0; padding:6px 0; border-right:1px solid var(--line); background:rgba(10,12,17,.72); overflow-y:auto; }
   #sidenav button { display:flex; align-items:center; gap:8px; width:100%; text-align:left; background:none; border:0; border-radius:0; color:var(--dim); padding:4px 12px; margin:0; cursor:pointer; font:500 12.5px var(--f-ui); transition:color var(--ease), background var(--ease); }
@@ -104,7 +143,9 @@
   .auth-layout, .host-layout, .collection-layout, .add-layout, .run-layout, .browse-layout, .prof-layout { flex:1; min-height:0; display:grid; gap:8px; grid-template-rows:minmax(0, 1fr); }
   .auth-layout { grid-template-columns:minmax(0, 4fr) minmax(230px, 1fr); }
   .prof-layout { grid-template-columns:minmax(260px, 1fr) minmax(0, 2fr); }
-  .host-layout { grid-template-columns:minmax(0, 2fr) minmax(210px, 1fr); }
+  .host-layout { grid-template-columns:minmax(0, 4fr) minmax(190px, 1fr); }
+  .gcell { display:flex; flex-wrap:wrap; align-items:center; gap:4px; }
+  .gcell select { min-width:130px; padding:2px 6px; font-size:12px; }
   .collection-layout { grid-template-columns:minmax(230px, 1fr) minmax(0, 2fr); }
   .browse-layout { grid-template-columns:minmax(0, 3fr) minmax(0, 2fr); }
   .browse-layout > .card { overflow:auto; }
@@ -338,7 +379,7 @@
 <body>
 <div class="bgmark" aria-hidden="true"></div>
 <header>
-  <h1>Kookaburrow</h1>
+  <h1><a class="brand" href="#home" title="About Kookaburrow"><img src="logo-sm.png" alt="Kookaburrow" width="55" height="46"></a></h1>
   <nav id="topnav"></nav>
 </header>
 <div class="layout">
@@ -465,7 +506,7 @@
       <div class="host-layout">
         <div class="card">
           <h2>Saved hosts</h2>
-          <table id="hostTable"><thead><tr><th>Name</th><th>Address</th><th>OS</th><th>Protocol</th><th>Verified</th><th></th></tr></thead><tbody></tbody></table>
+          <table id="hostTable"><thead><tr><th>Name</th><th>Address</th><th>OS</th><th>Protocol</th><th>Verified</th><th>Add to group</th><th></th></tr></thead><tbody></tbody></table>
         </div>
         <div class="card">
           <h2>Groups</h2>
@@ -502,7 +543,7 @@
       <div class="card auto">
         <h2>Subnet scan</h2>
         <div class="row">
-          <input id="cidr" placeholder="192.168.1.0/24" size="22">
+          <input id="cidr" placeholder="192.168.50.0/24, 10.0.0.5-20, 172.16.1.7,8,9" size="46" title="Subnets (192.168.50.0/24), ranges (192.168.50.10-20), lists (192.168.50.5,6,7) or single addresses. Chain several with commas." spellcheck="false" autocomplete="off">
           <button class="act" id="scanBtn">Scan</button>
           <button class="act sec" id="scanStop" hidden>Cancel</button>
           <span class="dim" id="scanStatus"></span>
@@ -514,7 +555,7 @@
         <p class="dim">Results of the last scan. OS is assumed from open ports until a host is authenticated.</p>
         <table id="authTable"><thead><tr><th>Host</th><th>Hostname</th><th>OS (assumed)</th><th>Open ports</th><th>Profile</th><th>WinRM</th><th>SSH</th></tr></thead><tbody></tbody></table>
         <div class="row" style="margin-top:12px">
-          <button class="act" id="authBtn">Authenticate</button>
+          <button class="act" id="authBtn">Authenticate</button> <span id="authMsg"></span>
         </div>
       </div>
     </section>
@@ -540,6 +581,26 @@
     <!-- Collection: nothing yet -->
 
     <!-- Output -->
+    <!-- Home -->
+    <section class="page" id="home/home">
+      <div class="card home">
+        <div class="home-top"><span id="signOutMsg"></span><button class="act sec" id="signOut" type="button">Sign out</button></div>
+        <div class="home-main">
+          <div class="home-hero">
+            <dl class="home-info" id="homeInfo"></dl>
+            <img class="home-logo" src="logo.png" alt="Kookaburrow">
+          </div>
+          <div class="home-name">Kookaburrow</div>
+          <div class="home-tag">Threat hunting for Windows and Linux hosts</div>
+          <div class="home-btns">
+            <a class="act" href="#hosts/discover">Get started</a>
+            <a class="act sec" href="https://github.com/flynnmackie/kookaburrow#readme" target="_blank" rel="noopener noreferrer">Documentation</a>
+            <a class="act sec" href="#settings/add-collections">Write a collection</a>
+            <a class="act sec" href="#browse/files">Browse files</a>
+          </div>
+        </div>
+      </div>
+    </section>
     <!-- Browse -->
     <section class="page" id="browse/files">
       <div class="browse-layout">
@@ -598,6 +659,7 @@
     <div class="dlg-foot"><button class="act" id="hmRun">Run Hunt</button><button class="act sec" id="hmCancel">Cancel</button><span id="hmMsg"></span><span class="sum" id="hmSummary"></span></div>
   </div>
 </div>
+<div id="toasts" aria-live="polite"></div>
 <script src="app.js"></script>
 </body>
 </html>

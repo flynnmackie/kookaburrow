@@ -1,7 +1,7 @@
 const net = require('net');
 const dns = require('dns').promises;
 const { scan: cfg } = require('./config');
-const { id } = require('./store');
+const { id, db } = require('./store');
 
 const jobs = new Map();
 
@@ -24,6 +24,47 @@ function expandCidr(cidr) {
     // skip network/broadcast on normal subnets
     if (size > 2 && (i === 0 || i === size - 1)) continue;
     ips.push(intToIp(start + i));
+  }
+  return ips;
+}
+
+// A scan target is one or more comma-separated parts, chained freely:
+//   192.168.50.0/24          a subnet (network/broadcast skipped)
+//   192.168.50.10-20         last-octet range;  192.168.50.10-192.168.51.5  full range
+//   192.168.50.7             one address
+//   192.168.50.5,6,7  or  192.168.50.5,10-20   shorthand: a bare number reuses the previous address's first three octets
+function parseTargets(spec) {
+  const tokens = String(spec || '').split(',').map((t) => t.trim()).filter(Boolean);
+  if (!tokens.length) throw new Error('Enter an address, range or subnet to scan');
+  const seen = new Set(), ips = [];
+  const bad = (t) => new Error(`Can't read "${t}". Use forms like 192.168.50.0/24, 192.168.50.10-20, 192.168.50.5,6,7 or full addresses, separated by commas`);
+  const range = (from, to, t) => {
+    if (to < from) throw new Error(`The range "${t}" runs backwards`);
+    if (to - from + 1 + ips.length > cfg.maxHosts) throw new Error(`Too many addresses (max ${cfg.maxHosts} per scan)`);
+    for (let n = from; n <= to; n++) if (!seen.has(n)) { seen.add(n); ips.push(intToIp(n)); }
+  };
+  const head = (ip) => ip.split('.').slice(0, 3).join('.');
+  let prefix = null; // first three octets of the previous full address
+  for (const t of tokens) {
+    let m;
+    if ((m = /^(\d{1,3})(?:-(\d{1,3}))?$/.exec(t))) {
+      if (!prefix) throw bad(t);
+      range(ipToInt(`${prefix}.${m[1]}`), ipToInt(`${prefix}.${m[2] ?? m[1]}`), t);
+    } else if (t.includes('/')) {
+      const list = expandCidr(t);
+      if (list.length + ips.length > cfg.maxHosts) throw new Error(`Too many addresses (max ${cfg.maxHosts} per scan)`);
+      for (const ip of list) { const n = ipToInt(ip); if (!seen.has(n)) { seen.add(n); ips.push(ip); } }
+      prefix = head(t.split('/')[0]);
+    } else if ((m = /^(\d{1,3}\.\d{1,3}\.\d{1,3})\.(\d{1,3})-(\d{1,3})$/.exec(t))) {
+      range(ipToInt(`${m[1]}.${m[2]}`), ipToInt(`${m[1]}.${m[3]}`), t);
+      prefix = m[1];
+    } else if ((m = /^(\d{1,3}(?:\.\d{1,3}){3})-(\d{1,3}(?:\.\d{1,3}){3})$/.exec(t))) {
+      range(ipToInt(m[1]), ipToInt(m[2]), t);
+      prefix = head(m[1]);
+    } else if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(t)) {
+      range(ipToInt(t), ipToInt(t), t);
+      prefix = head(t);
+    } else throw bad(t);
   }
   return ips;
 }
@@ -57,9 +98,9 @@ async function scanHost(ip) {
   return { ip, hostname, openPorts: open, osGuess: guessOs(open) };
 }
 
-function startScan(cidr) {
-  const ips = expandCidr(cidr);
-  const job = { id: id(), cidr, status: 'running', total: ips.length, done: 0, found: [], startedAt: new Date().toISOString() };
+function startScan(spec) {
+  const ips = parseTargets(spec);
+  const job = { id: id(), cidr: String(spec), status: 'running', total: ips.length, done: 0, found: [], startedAt: new Date().toISOString() };
   jobs.set(job.id, job);
 
   (async () => {
@@ -71,7 +112,12 @@ function startScan(cidr) {
         const ip = ips[next++];
         const r = await scanHost(ip).catch(() => null);
         job.done++;
-        if (r) job.found.push(r);
+        if (r) {
+          // already authenticated and saved under Hosts? the page shows it as such instead of asking again
+          const saved = db.hosts.find((h) => h.address === r.ip);
+          if (saved) r.known = { protocol: saved.protocol, hostname: saved.hostname || saved.name, os: saved.os };
+          job.found.push(r);
+        }
       }
     }));
     job.found.sort((a, b) => ipToInt(a.ip) - ipToInt(b.ip));
@@ -89,4 +135,4 @@ function cancelScan(jobId) {
   return j;
 }
 
-module.exports = { startScan, getScan, cancelScan };
+module.exports = { startScan, getScan, cancelScan, parseTargets };

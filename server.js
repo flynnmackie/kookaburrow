@@ -9,6 +9,7 @@ const collections = require('./src/collections');
 const binaries = require('./src/binaries');
 const collectionFiles = require('./src/collection-files');
 const browse = require('./src/browse');
+const authTest = require('./src/auth-test');
 
 const app = express();
 app.use(express.json({ limit: '400kb' }));
@@ -138,6 +139,14 @@ app.delete('/api/hosts/:id', (req, res) => {
   res.json({ ok: true });
 });
 
+// Tests the profile assigned to a discovered host. Always answers 200 with { state, protocol, reason }:
+// authenticated | absent | rejected | error. A successful test saves the host (Host Management > View Hosts).
+app.post('/api/auth/test', wrap(async (req, res) => {
+  const ip = String(req.body.ip || '');
+  if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)) throw new Error('Invalid IP');
+  res.json(await authTest.testHost(ip));
+}));
+
 // ---- Host lists -------------------------------------------------------------------------
 app.get('/api/lists', (req, res) => res.json(db.lists));
 app.post('/api/lists', wrap((req, res) => {
@@ -241,6 +250,22 @@ app.delete('/api/runs/:id', (req, res) => {
   db.runs = db.runs.filter((r) => r.id !== req.params.id);
   save();
   res.json({ ok: true });
+});
+
+// Server facts for the home page. Nothing secret: no keys, paths outside the app, or credentials.
+app.get('/api/about', (req, res) => {
+  const os = require('os');
+  const addresses = Object.values(os.networkInterfaces()).flat()
+    .filter((i) => i && i.family === 'IPv4' && !i.internal).map((i) => i.address);
+  res.json({
+    version: require('./package.json').version, node: process.version,
+    hostname: os.hostname(), dnsDomain: process.env.USERDNSDOMAIN || '',
+    bind: `${config.host}:${config.port}`, addresses,
+    os: `${os.version()} ${os.release()} (${os.arch()})`,
+    uptimeSec: Math.round(process.uptime()), started: new Date(Date.now() - process.uptime() * 1000).toISOString(),
+    collections: collections.listCollections().length, actions: collections.listActions().length,
+    hosts: db.hosts.length, profiles: db.profiles.length, runs: db.runs.length,
+  });
 });
 
 // ---- Browse: read-only view of collections, actions, binaries and collected evidence --------

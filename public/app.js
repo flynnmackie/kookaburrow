@@ -1,4 +1,13 @@
-﻿const $ = (id) => document.getElementById(id);
+const $ = (id) => document.getElementById(id);
+// Small notice in the bottom-right corner; it fades out by itself after a couple of seconds.
+function toast(text, kind = 'ok') {
+  const el = document.createElement('div');
+  el.className = `toast ${kind}`;
+  el.textContent = text;
+  $('toasts').append(el);
+  setTimeout(() => el.classList.add('out'), 2600);
+  setTimeout(() => el.remove(), 3400);
+}
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 async function api(method, url, body) {
@@ -27,6 +36,8 @@ const NAV = [
   { id: 'burrow', label: 'Burrow!', accent: true, pages: [['hunt', 'Hunt'], ['respond', 'Respond']] },
   { id: 'output', label: 'Output', pages: [['log', 'Log'], ['report', 'Report'], ['json', 'JSON']] },
   { id: 'browse', label: 'Browse', pages: [['files', 'Files']] },
+  // The logo in the header opens this landing page. It has no tab of its own and no side menu.
+  { id: 'home', label: 'Home', hidden: true, pages: [['home', 'Home']] },
   // Shell and Health are placed apart on the right of the top bar; nothing in them yet.
   { id: 'shell', label: 'Shell', pages: [], right: true },
   { id: 'health', label: 'Health', pages: [], right: true },
@@ -36,6 +47,7 @@ const loaders = {
   'settings/view-actions': () => loadActionList(),
   'burrow/hunt': loadBurrowHunts,
   'browse/files': () => loadBrowse('/'),
+  'home/home': loadHome,
   'settings/add-collections': () => addCollections(),
   'settings/add-actions': () => addActions(),
   'settings/binaries': loadBinaries,
@@ -58,6 +70,8 @@ function saveOpenGroups() {
 let currentTab = null, currentSlug = null;
 function renderSide() {
   const tab = currentTab;
+  $('sidenav').hidden = !!tab.hidden;
+  if (tab.hidden) return;
   if (!tab.pages.length) { $('sidenav').innerHTML = '<div class="empty">Nothing here yet</div>'; return; }
   let html = '', last = null;
   const heading = (name) => {
@@ -89,6 +103,7 @@ function go(tabId, pageId) {
 
   document.querySelectorAll('#topnav button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab.id));
   currentTab = tab; currentSlug = slug;
+  document.body.classList.toggle('home', tab.id === 'home');
   renderSide();
   document.querySelectorAll('.page').forEach((s) => s.classList.toggle('on', s.id === slug));
   $('emptyTab').hidden = !!slug;
@@ -97,6 +112,7 @@ function go(tabId, pageId) {
 }
 
 NAV.forEach((t, i) => {
+  if (t.hidden) return;
   const b = document.createElement('button');
   b.textContent = t.label; b.dataset.tab = t.id;
   if (t.accent) b.className = 'accent';
@@ -119,10 +135,11 @@ $('sidenav').onclick = (e) => {
 const isActive = (slug) => $(slug)?.classList.contains('on');
 
 // ---- Discover ----
-let scanTimer;
+let scanTimer, scanSeen = new Set();
 $('scanBtn').onclick = async () => {
   try {
     const job = await api('POST', '/api/scans', { cidr: $('cidr').value });
+    scanSeen = new Set(); setDiscovered([]); authState = {}; saveAuthState(); renderAuthHosts(); // a new scan starts a fresh list
     $('scanBtn').disabled = true; $('scanStop').hidden = false; $('scanStop').onclick = () => api('DELETE', `/api/scans/${job.id}`);
     $('scanBar').hidden = false;
     scanTimer = setInterval(() => pollScan(job.id), 700);
@@ -132,11 +149,40 @@ async function pollScan(id) {
   const j = await api('GET', `/api/scans/${id}`);
   $('scanStatus').textContent = `${j.status}: ${j.done}/${j.total} scanned, ${j.found.length} found`;
   $('scanBar').firstElementChild.style.width = `${(j.done / j.total) * 100}%`;
+  addFound(j.found);
   if (j.status !== 'running') {
     clearInterval(scanTimer);
     $('scanBtn').disabled = false; $('scanStop').hidden = true;
-    renderScan(j.found);
+    const n = (ip) => ip.split('.').reduce((a, b) => a * 256 + Number(b), 0);
+    setDiscovered([...discovered].sort((a, b) => n(a.ip) - n(b.ip)));
+    renderAuthHosts();
   }
+}
+// New hosts from a running scan are added to the table as they are found.
+function addFound(found) {
+  const fresh = found.filter((h) => !scanSeen.has(h.ip));
+  if (!fresh.length) return;
+  for (const h of fresh) {
+    scanSeen.add(h.ip);
+    discovered.push(h);
+    if (h.known) {
+      // already authenticated and saved: show the green badge, say so, and let the row fade away as usual
+      authState[h.ip] = { [h.known.protocol]: { state: 'authenticated', reason: '', hostname: h.known.hostname, os: h.known.os } };
+      toast(`${h.ip} already authenticated`);
+      fadeOutHost(h.ip);
+    }
+  }
+  setDiscovered(discovered); saveAuthState();
+  renderAuthHosts();
+}
+// The row shows its authenticated badge for a moment, fades out slowly, then leaves the list (it lives under Hosts).
+function fadeOutHost(ip) {
+  authState[ip].fadeStart = Date.now();
+  setTimeout(() => {
+    setDiscovered(discovered.filter((h) => h.ip !== ip));
+    delete authState[ip]; saveAuthState();
+    renderAuthHosts();
+  }, 3500);
 }
 // Discovered hosts are remembered for the browser session so the table reloads after a refresh.
 let discovered = [];
@@ -146,11 +192,6 @@ function setDiscovered(found) {
   try { sessionStorage.setItem('discovered', JSON.stringify(found)); } catch { /* ignore */ }
 }
 
-// A finished scan fills the Discovered hosts table straight away.
-function renderScan(found) {
-  setDiscovered(found);
-  loadAuthHosts();
-}
 $('cidr').onkeydown = (e) => { if (e.key === 'Enter') $('scanBtn').click(); };
 
 // ---- Authenticate ----
@@ -166,21 +207,84 @@ async function loadAuthHosts() {
   renderAuthHosts();
   renderProfiles();
 }
+// Authentication state per discovered host, kept for the browser session like the scan results.
+// { [ip]: { winrm?: {state, reason, ...}, ssh?: {...}, testing?: 'winrm'|'ssh' } }
+let authState = {};
+try { authState = JSON.parse(sessionStorage.getItem('authState') || '{}'); } catch { /* storage unavailable */ }
+const saveAuthState = () => { try { sessionStorage.setItem('authState', JSON.stringify(authState)); } catch { /* ignore */ } };
+
+// One WinRM or SSH cell. Without a test it falls back to what the scan saw on that port.
+function authCell(h, proto) {
+  const st = authState[h.ip] || {};
+  if (st.testing === proto) return '<span class="badge grey">Testing…</span>';
+  const r = st[proto];
+  if (r) {
+    const [cls, label] = { authenticated: ['green', 'Authenticated'], absent: ['grey', 'Absent'], rejected: ['red', 'Credentials rejected'] }[r.state] || ['red', 'Failed'];
+    return `<span class="badge ${cls}">${label}</span>${r.reason ? `<div class="reason ${r.state === 'absent' ? '' : 'bad'}">${esc(r.reason)}</div>` : ''}`;
+  }
+  const ports = proto === 'winrm' ? [5985, 5986] : [22];
+  return h.openPorts.some((p) => ports.includes(p)) ? '<span class="dim">Port open · not tested</span>' : '<span class="dim">Absent</span>';
+}
 function renderAuthHosts() {
   const options = (ip) => `<option value="">— none —</option>` + profiles.map((p) =>
     `<option value="${p.id}" ${assignments[ip] === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('');
-  $('authTable').tBodies[0].innerHTML = discovered.map((h) => {
+  // a host that finished fading (e.g. across a page reload) is already in Hosts, so it is not listed again
+  const listed = discovered.filter((h) => !(authState[h.ip]?.fadeStart && Date.now() - authState[h.ip].fadeStart > 3500));
+  $('authTable').tBodies[0].innerHTML = listed.map((h) => {
     const [cls, label] = assumedOs(h);
-    return `<tr><td><b>${esc(h.ip)}</b></td><td>${esc(h.hostname || '-')}</td>
+    const fade = authState[h.ip]?.fadeStart ? `style="animation-delay:${((1200 - (Date.now() - authState[h.ip].fadeStart)) / 1000).toFixed(2)}s"` : '';
+    const ok = authState[h.ip]?.winrm?.state === 'authenticated' ? authState[h.ip].winrm : authState[h.ip]?.ssh?.state === 'authenticated' ? authState[h.ip].ssh : null;
+    return `<tr class="${fade ? 'fading' : ''}" ${fade}><td><b>${esc(h.ip)}</b></td><td>${esc(ok?.hostname || h.hostname || '-')}</td>
       <td><span class="os ${cls}">${label}</span></td><td class="dim">${h.openPorts.join(', ')}</td>
       <td><select class="psel" data-ip="${esc(h.ip)}">${options(h.ip)}</select></td>
-      <td class="bad">⚠ verify</td><td class="bad">⚠ verify</td></tr>`;
+      <td>${authCell(h, 'winrm')}</td><td>${authCell(h, 'ssh')}</td></tr>`;
   }).join('') || '<tr><td colspan="7" class="dim">No hosts yet. Run a subnet scan above.</td></tr>';
+}
+
+// Tests the profile assigned to one host. The server picks WinRM or SSH from the profile type.
+async function testHost(ip) {
+  const st = authState[ip] = authState[ip] || {};
+  const proto = profiles.find((p) => p.id === assignments[ip])?.kind === 'Linux (SSH)' ? 'ssh' : 'winrm';
+  st.testing = proto; delete st[proto];
+  renderAuthHosts();
+  try {
+    const r = await api('POST', '/api/auth/test', { ip });
+    delete st.testing;
+    st[r.protocol || proto] = r;
+    if (r.state === 'authenticated') {
+      toast(`${ip} authenticated. ${r.added ? 'Added to Hosts' : 'Hosts entry updated'}`);
+      fadeOutHost(ip);
+    }
+  } catch (e) {
+    delete st.testing;
+    st[proto] = { state: 'error', reason: e.message };
+  }
+  saveAuthState();
+  renderAuthHosts();
+  return st[proto]?.state;
 }
 $('authTable').onchange = async (e) => {
   if (!e.target.classList.contains('psel')) return;
-  try { assignments = await api('PUT', '/api/assignments', { ip: e.target.dataset.ip, profileId: e.target.value || null }); }
-  catch (err) { alert(err.message); loadAuthHosts(); }
+  const ip = e.target.dataset.ip;
+  try { assignments = await api('PUT', '/api/assignments', { ip, profileId: e.target.value || null }); }
+  catch (err) { alert(err.message); loadAuthHosts(); return; }
+  delete authState[ip]; saveAuthState(); // a different profile invalidates the old result
+  renderAuthHosts();
+  if (e.target.value) testHost(ip); // a valid profile is tested straight away
+};
+// "Authenticate" re-tests every host that has a profile, a few at a time.
+$('authBtn').onclick = async () => {
+  const ips = discovered.map((h) => h.ip).filter((ip) => assignments[ip]);
+  const msg = $('authMsg');
+  if (!ips.length) { msg.className = 'dim'; msg.textContent = 'Select a profile for at least one host first.'; return; }
+  $('authBtn').disabled = true; msg.className = 'dim'; msg.textContent = `Testing ${ips.length} host${ips.length === 1 ? '' : 's'}…`;
+  const results = [];
+  const queue = [...ips];
+  await Promise.all(Array.from({ length: Math.min(3, queue.length) }, async () => { while (queue.length) results.push(await testHost(queue.shift())); }));
+  const okN = results.filter((s) => s === 'authenticated').length;
+  msg.className = okN === results.length ? 'ok' : 'bad';
+  msg.textContent = `${okN} of ${results.length} authenticated${okN === results.length ? '' : '; see the reason under each failed host'}.`;
+  $('authBtn').disabled = false;
 };
 
 // ---- Profiles ----
@@ -232,14 +336,25 @@ $('pKind').onchange = kindChanged;
 kindChanged();
 
 // ---- Hosts ----
-let hosts = [];
+let hosts = [], hostLists = [];
 async function loadHosts() {
   let lists;
   [hosts, lists] = await Promise.all([api('GET', '/api/hosts'), api('GET', '/api/lists')]);
+  hostLists = lists;
+  // "Add to group": the groups a host is in show as tags (click one to take the host out); the dropdown
+  // offers the groups it is not in yet. Picking one makes the host a member straight away.
+  const groupCell = (h) => {
+    const mine = lists.filter((l) => l.hostIds.includes(h.id)), rest = lists.filter((l) => !l.hostIds.includes(h.id));
+    return `<div class="gcell">${mine.map((l) => `<button class="tagchip on" data-leave="${l.id}" data-host="${h.id}" title="Remove from ${esc(l.name)}">${esc(l.name)} ×</button>`).join('')}
+      <select class="gsel" data-host="${h.id}" ${rest.length ? '' : 'disabled'}>
+        <option value="">${lists.length ? (rest.length ? 'Add to group…' : 'In every group') : 'No groups yet'}</option>
+        ${rest.map((l) => `<option value="${l.id}">${esc(l.name)}</option>`).join('')}</select></div>`;
+  };
   $('hostTable').tBodies[0].innerHTML = hosts.map((h) => `<tr>
     <td>${esc(h.name)}</td><td>${esc(h.address)}</td><td>${esc(h.os)}</td><td>${h.protocol}</td>
     <td class="dim">${new Date(h.verifiedAt).toLocaleString()}</td>
-    <td><a data-del-host="${h.id}">Delete</a></td></tr>`).join('') || '<tr><td colspan="6" class="dim">No hosts saved</td></tr>';
+    <td>${groupCell(h)}</td>
+    <td><a data-del-host="${h.id}">Delete</a></td></tr>`).join('') || '<tr><td colspan="7" class="dim">No hosts saved</td></tr>';
 
   // Groups box: every group with its members.
   const byId = Object.fromEntries(hosts.map((h) => [h.id, h]));
@@ -252,8 +367,19 @@ async function loadHosts() {
   }).join('') || '<p class="dim" style="margin:0">No groups yet. Create one under Host Management → Groups.</p>';
 }
 $('hosts/view-hosts').onclick = async (e) => {
-  if (e.target.dataset.delHost) { await api('DELETE', `/api/hosts/${e.target.dataset.delHost}`); loadHosts(); }
+  if (e.target.dataset.delHost) { await api('DELETE', `/api/hosts/${e.target.dataset.delHost}`); loadHosts(); return; }
+  const { leave, host } = e.target.dataset;
+  if (leave) await setMembership(leave, host, false);
 };
+$('hosts/view-hosts').onchange = async (e) => {
+  if (e.target.classList.contains('gsel') && e.target.value) await setMembership(e.target.value, e.target.dataset.host, true);
+};
+async function setMembership(listId, hostId, member) {
+  const list = hostLists.find((l) => l.id === listId); if (!list) return;
+  const hostIds = member ? [...new Set([...list.hostIds, hostId])] : list.hostIds.filter((i) => i !== hostId);
+  try { await api('PUT', `/api/lists/${listId}`, { hostIds }); } catch (err) { alert(err.message); }
+  loadHosts();
+}
 
 // ---- Groups (the API still calls these "lists") ----
 async function loadGroups() {
@@ -687,6 +813,30 @@ $('bbList').onclick = async (e) => {
   } catch (err) { $('bbPreview').innerHTML = `<p class="bad">${esc(err.message)}</p>`; }
 };
 
+// ---- Home (opened from the logo) ----
+const fmtUptime = (sec) => {
+  const d = Math.floor(sec / 86400), h = Math.floor(sec % 86400 / 3600), m = Math.floor(sec % 3600 / 60);
+  return d ? `${d}d ${h}h` : h ? `${h}h ${m}m` : `${m}m ${sec % 60}s`;
+};
+async function loadHome() {
+  const rows = [];
+  try {
+    const a = await api('GET', '/api/about');
+    rows.push(['Server', esc(a.hostname) + (a.dnsDomain ? `<span class="dim">.${esc(a.dnsDomain.toLowerCase())}</span>` : '')],
+      ['Listening on', `${esc(a.bind)} <span class="dim">(this PC only)</span>`],
+      ['IP addresses', a.addresses.length ? a.addresses.slice(0, 4).map(esc).join('<br>') : '<span class="dim">none found</span>'],
+      ['Version', esc(a.version)],
+      ['Runtime', `Node ${esc(a.node)}`],
+      ['System', esc(a.os)],
+      ['Uptime', fmtUptime(a.uptimeSec)],
+      ['Library', `${a.collections} collections · ${a.actions} actions`],
+      ['Saved', `${a.hosts} hosts · ${a.profiles} profiles · ${a.runs} runs`]);
+  } catch (e) { rows.push(['Server', `<span class="bad">${esc(e.message)}</span>`]); }
+  rows.push(['Signed in as', '<span class="dim">Not signed in (sign-in is not set up yet)</span>']);
+  $('homeInfo').innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
+}
+$('signOut').onclick = () => { $('signOutMsg').textContent = 'Sign-in is not set up yet, so there is nothing to sign out of.'; };
+
 // Small syntax highlighter for the two collection languages. Each alternative is one capture group.
 const HL = {
   powershell: {
@@ -838,5 +988,10 @@ $('jsonSave').onclick = () => {
 };
 
 // ---- start (restores the tab/page from the URL hash) ----
+// Links such as href="#hosts/discover" change only the hash, so follow it.
+window.addEventListener('hashchange', () => {
+  const [t, p] = location.hash.slice(1).split('/');
+  if (t && `${t}/${p}` !== currentSlug) go(t, p);
+});
 const [startTab, startPage] = location.hash.slice(1).split('/');
 go(startTab || 'hosts', startPage);

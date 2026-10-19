@@ -9,7 +9,10 @@ $p = @{
     Credential     = $cred
     Authentication = $env:KB_AUTH
 }
-if ($env:KB_SSL -eq '1') { $p.UseSSL = $true }
+# Fail within ~20 s when a host does not answer instead of waiting minutes. Self-signed HTTPS certificates are accepted.
+$opt = @{ OpenTimeout = 20000 }
+if ($env:KB_SSL -eq '1') { $p.UseSSL = $true; $opt.SkipCACheck = $true; $opt.SkipCNCheck = $true }
+$p.SessionOption = New-PSSessionOption @opt
 
 if ($env:KB_MODE -eq 'probe') {
     $p.ScriptBlock = {
