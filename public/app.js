@@ -40,7 +40,7 @@ const LOCK = '<svg class="lock" viewBox="0 0 24 24" width="12" height="12" fill=
 async function loadAccess() {
   try {
     const [me, groups] = await Promise.all([api('GET', '/api/auth/me'), api('GET', '/api/permissions')]);
-    access = { username: me.username, roles: me.roles, permissions: new Set(me.permissions), all: me.all, options: Object.fromEntries(groups.flatMap((g) => g.permissions).map((p) => [p.key, p])) };
+    access = { username: me.username, roles: me.roleNames, permissions: new Set(me.permissions), all: me.all, options: Object.fromEntries(groups.flatMap((g) => g.permissions).map((p) => [p.key, p])) };
   } catch { /* a 401 already redirected to the sign-in page */ }
 }
 const permLabel = (key) => access.options[key]?.label || key;
@@ -89,7 +89,7 @@ document.addEventListener('mousedown', (e) => { const el = lockedTarget(e); if (
 
 // Which permission each page needs. The top-bar tab for an area is locked when every page in it is.
 const PAGE_PERM = {
-  'settings/user-management': 'users.view', 'settings/shell-settings': 'system.manage', 'settings/health-settings': 'system.manage',
+  'settings/user-management': 'users.view', 'settings/shell-settings': 'system.view', 'settings/health-settings': 'system.view',
   'settings/view-collections': 'collections.view', 'settings/add-collections': 'collections.manage', 'settings/binaries': 'collections.manage',
   'settings/view-actions': 'actions.view', 'settings/add-actions': 'actions.manage',
   'hosts/view-hosts': 'hosts.view', 'hosts/profiles': 'hosts.view', 'hosts/groups': 'hosts.view', 'hosts/discover': 'hosts.manage', 'hosts/manual': 'hosts.manage',
@@ -140,6 +140,8 @@ const loaders = {
   'shell/shell': loadShell,
   'health/monitor': loadMonitor,
   'settings/user-management': loadUserMgmt,
+  'settings/health-settings': loadHealthSettings,
+  'settings/shell-settings': loadShellSettings,
   'settings/add-collections': () => addCollections(),
   'settings/add-actions': () => addActions(),
   'settings/binaries': loadBinaries,
@@ -1159,7 +1161,7 @@ function renderUserMgmt() {
   decorateLocks(nb);
   $('umList').innerHTML = items.map((x) => `<div class="um-item ${um.mode === 'view' && x.id === um.sel[um.tab] ? 'on' : ''}" data-id="${esc(x.id)}">
       <div class="um-name">${esc(x.name || x.username)}${x.username === access.username ? ' <span class="dim">(you)</span>' : ''}</div>
-      <div class="um-sub">${users ? (x.roles.length ? x.roles.map((r) => umChip(r)).join('') : '<span class="dim">No roles</span>')
+      <div class="um-sub">${users ? (x.roles.length ? x.roles.map((r) => umChip(um.roles.find((q) => q.id === r)?.name || r)).join('') : '<span class="dim">No roles</span>')
         : `${x.members.length} member${x.members.length === 1 ? '' : 's'} · ${x.all ? 'full access' : `${x.permissions.length} permissions`}`}</div></div>`).join('')
     || `<p class="dim" style="margin:6px 10px">No ${um.tab} yet.</p>`;
   if (um.mode === 'new') return users ? renderNewUser() : renderRoleForm(null);
@@ -1262,6 +1264,158 @@ $('umDetail').onchange = (e) => {
   umRefreshTicks();
 };
 
+// ---- Settings: Health Settings ----
+// How often the monitor pings hosts and checks their WinRM/SSH port, and which hosts it checks (all of them by default;
+// untick a host to take it out, tick it to put it back). Anyone who can view the system sees this; changing it needs Manage system.
+const hs = { defaults: null, limits: null, hosts: [], monitored: new Set(), enabled: true };
+const HS_UNITS = [['seconds', 1], ['minutes', 60], ['hours', 3600]];
+function hsSetInterval(inputId, selectId, seconds) {
+  // shown in the largest unit that divides it exactly, e.g. 300 seconds as 5 minutes
+  const [name, mult] = [...HS_UNITS].reverse().find(([, m]) => seconds % m === 0) || HS_UNITS[0];
+  $(selectId).innerHTML = HS_UNITS.map(([n]) => `<option value="${n}" ${n === name ? 'selected' : ''}>${n}</option>`).join('');
+  $(inputId).value = seconds / mult;
+}
+const hsSeconds = (inputId, selectId) => Math.round(Number($(inputId).value) * HS_UNITS.find(([n]) => n === $(selectId).value)[1]);
+function hsHints() {
+  const hint = (id, inputId, selectId, def, [lo, hi]) => {
+    const s = hsSeconds(inputId, selectId);
+    $(id).textContent = !Number.isFinite(s) || s < lo || s > hi ? `Must be between ${fmtSecs(lo)} and ${fmtSecs(hi)}` : s === def ? '(the default)' : `(default ${fmtSecs(def)})`;
+    $(id).className = !Number.isFinite(s) || s < lo || s > hi ? 'bad' : 'dim';
+  };
+  hint('hsPingHint', 'hsPing', 'hsPingUnit', hs.defaults.pingSeconds, hs.limits.pingSeconds);
+  hint('hsPortHint', 'hsPort', 'hsPortUnit', hs.defaults.portSeconds, hs.limits.portSeconds);
+}
+const fmtSecs = (s) => (s % 3600 === 0 ? `${s / 3600} hour${s === 3600 ? '' : 's'}` : s % 60 === 0 ? `${s / 60} minute${s === 60 ? '' : 's'}` : `${s} seconds`);
+function renderHsHosts() {
+  const editable = can('system.manage');
+  $('hsHosts').innerHTML = hs.hosts.map((h) => `<label class="hs-host ${hs.monitored.has(h.id) ? '' : 'off'}" title="${editable ? '' : 'Changing this needs Manage system'}">
+      <input type="checkbox" data-host="${esc(h.id)}" ${hs.monitored.has(h.id) ? 'checked' : ''} ${editable ? '' : 'disabled'}>
+      <span class="hs-name">${esc(h.name)}</span><span class="hs-addr">${esc(h.address)}</span><span class="proto-${h.protocol === 'ssh' ? 'ssh' : 'winrm'}">${h.protocol === 'ssh' ? 'SSH' : 'WinRM'}</span><span class="hs-os">${esc(String(h.os || '').replace(/^Microsoft /, '').replace(/\s*\(\d[\d.]*\)$/, ''))}</span></label>`).join('')
+    || '<p class="dim" style="margin:8px 10px">No saved hosts yet.</p>';
+  $('hsCount').textContent = `${hs.monitored.size} of ${hs.hosts.length} monitored`;
+}
+async function loadHealthSettings() {
+  let r;
+  try { r = await api('GET', '/api/settings/health'); } catch (e) { $('hsMsg').textContent = e.message; $('hsMsg').className = 'um-msg bad'; return; }
+  hs.defaults = r.defaults; hs.limits = r.limits; hs.hosts = r.hosts; hs.enabled = r.settings.enabled;
+  setSwitch('hsEnabled', hs.enabled);
+  $('hsEnabledLabel').textContent = `Health monitoring: ${hs.enabled ? 'On' : 'Off'}`;
+  $('hsEnabledNote').textContent = hs.enabled ? 'Hosts are being checked' : 'No checks are running and the Health page and top-bar counts are off';
+  $('hsBody').classList.toggle('hs-off', !hs.enabled);
+  hs.monitored = new Set(r.hosts.filter((h) => !r.settings.excluded.includes(h.id)).map((h) => h.id));
+  hsSetInterval('hsPing', 'hsPingUnit', r.settings.pingSeconds);
+  hsSetInterval('hsPort', 'hsPortUnit', r.settings.portSeconds);
+  const editable = can('system.manage');
+  for (const id of ['hsPing', 'hsPingUnit', 'hsPort', 'hsPortUnit']) $(id).disabled = !editable;
+  $('hsMsg').textContent = '';
+  hsHints(); renderHsHosts();
+}
+for (const id of ['hsPing', 'hsPingUnit', 'hsPort', 'hsPortUnit']) $(id).oninput = hsHints;
+$('hsEnabled').onclick = async () => {
+  if (!can('system.manage')) return;
+  const to = !hs.enabled;
+  try { await api('PUT', '/api/settings/health', { enabled: to }); toast(`Health monitoring turned ${to ? 'on' : 'off'}`); await loadHealthSettings(); pollNavStats(); }
+  catch (e) { $('hsMsg').textContent = e.message; $('hsMsg').className = 'um-msg bad'; }
+};
+$('hsHosts').onchange = (e) => {
+  const id = e.target.dataset.host; if (!id) return;
+  e.target.checked ? hs.monitored.add(id) : hs.monitored.delete(id);
+  renderHsHosts();
+};
+$('hsAll').onclick = () => { if (!can('system.manage')) return showDenied({ permission: 'system.manage', what: 'change health settings' }); hs.monitored = new Set(hs.hosts.map((h) => h.id)); renderHsHosts(); };
+$('hsNone').onclick = () => { if (!can('system.manage')) return showDenied({ permission: 'system.manage', what: 'change health settings' }); hs.monitored = new Set(); renderHsHosts(); };
+$('hsDefaults').onclick = () => {
+  hsSetInterval('hsPing', 'hsPingUnit', hs.defaults.pingSeconds);
+  hsSetInterval('hsPort', 'hsPortUnit', hs.defaults.portSeconds);
+  hs.monitored = new Set(hs.hosts.map((h) => h.id));
+  hsHints(); renderHsHosts();
+  $('hsMsg').textContent = 'Defaults restored. Press Save to apply them.'; $('hsMsg').className = 'um-msg dim';
+};
+$('hsSave').onclick = async () => {
+  try {
+    await api('PUT', '/api/settings/health', {
+      pingSeconds: hsSeconds('hsPing', 'hsPingUnit'), portSeconds: hsSeconds('hsPort', 'hsPortUnit'),
+      excluded: hs.hosts.filter((h) => !hs.monitored.has(h.id)).map((h) => h.id),
+    });
+    toast('Health settings saved');
+    $('hsMsg').textContent = ''; pollNavStats();
+    loadHealthSettings();
+  } catch (e) { $('hsMsg').textContent = e.message; $('hsMsg').className = 'um-msg bad'; }
+};
+
+// ---- Settings: Shell Settings ----
+// The on/off switch turns shell access off for everyone (open shells are closed). Below it: which hosts shells can be opened
+// to (all of them, or only the ticked ones), how many shells can be open at once (never more than 8) and how many minutes a
+// shell may sit without input before it is closed. Anyone who can view the system sees this; changing it needs Manage system.
+const ss = { defaults: null, limits: null, hosts: [], allowed: new Set(), mode: 'all', enabled: true };
+function setSwitch(id, on) { $(id).setAttribute('aria-checked', String(on)); }
+function ssHints() {
+  const [lo, hi] = ss.limits.maxSessions, n = Number($('ssMax').value), t = Number($('ssTimeout').value), [tlo, thi] = ss.limits.timeoutMinutes;
+  const badMax = !Number.isInteger(n) || n < lo || n > hi, badTime = !Number.isInteger(t) || t < tlo || t > thi;
+  $('ssMaxHint').textContent = badMax ? `Must be a whole number from ${lo} to ${hi}` : `at most ${n} open at once (hard limit ${hi})`;
+  $('ssMaxHint').className = badMax ? 'bad' : 'dim';
+  $('ssTimeoutHint').textContent = badTime ? `Must be a whole number from ${tlo} to ${thi}` : `minutes without input${t === ss.defaults.timeoutMinutes ? ' (the default)' : ` (default ${ss.defaults.timeoutMinutes})`}`;
+  $('ssTimeoutHint').className = badTime ? 'bad' : 'dim';
+}
+function renderSsHosts() {
+  const editable = can('system.manage') && ss.mode === 'selected';
+  document.querySelectorAll('input[name=ssMode]').forEach((r) => { r.checked = r.value === ss.mode; r.disabled = !can('system.manage'); });
+  $('ssHosts').innerHTML = ss.hosts.map((h) => {
+    const on = ss.mode === 'all' || ss.allowed.has(h.id);
+    return `<label class="hs-host ${on ? '' : 'off'}" title="${ss.mode === 'all' ? 'Shells are allowed to every host. Choose "Only the hosts ticked below" to pick.' : can('system.manage') ? '' : 'Changing this needs Manage system'}">
+      <input type="checkbox" data-host="${esc(h.id)}" ${on ? 'checked' : ''} ${editable ? '' : 'disabled'}>
+      <span class="hs-name">${esc(h.name)}</span><span class="hs-addr">${esc(h.address)}</span><span class="proto-${h.protocol === 'ssh' ? 'ssh' : 'winrm'}">${h.protocol === 'ssh' ? 'SSH' : 'WinRM'}</span><span class="hs-os">${esc(String(h.os || '').replace(/^Microsoft /, '').replace(/\s*\(\d[\d.]*\)$/, ''))}</span></label>`;
+  }).join('') || '<p class="dim" style="margin:8px 10px">No saved hosts yet.</p>';
+  $('ssCount').textContent = ss.mode === 'all' ? `Shells can be opened to all ${ss.hosts.length} hosts` : `${ss.allowed.size} of ${ss.hosts.length} hosts allowed`;
+  $('ssAll').hidden = $('ssNone').hidden = ss.mode === 'all';
+}
+function renderSsSwitch(active) {
+  setSwitch('ssEnabled', ss.enabled);
+  $('ssEnabledLabel').textContent = `Shell access: ${ss.enabled ? 'On' : 'Off'}`;
+  $('ssEnabledNote').textContent = ss.enabled ? (active ? `${active} shell${active === 1 ? '' : 's'} open now` : 'No shells open') : 'Shells cannot be opened, and any that were open have been closed';
+  $('ssBody').classList.toggle('hs-off', !ss.enabled);
+}
+async function loadShellSettings() {
+  let r;
+  try { r = await api('GET', '/api/settings/shell'); } catch (e) { $('ssMsg').textContent = e.message; $('ssMsg').className = 'um-msg bad'; return; }
+  Object.assign(ss, { defaults: r.defaults, limits: r.limits, hosts: r.hosts, mode: r.settings.hostMode, enabled: r.settings.enabled });
+  ss.allowed = new Set(r.settings.hostMode === 'selected' ? r.settings.allowedHosts : r.hosts.map((h) => h.id));
+  $('ssMax').value = r.settings.maxSessions; $('ssTimeout').value = r.settings.timeoutMinutes;
+  const editable = can('system.manage');
+  $('ssMax').disabled = $('ssTimeout').disabled = !editable;
+  $('ssMsg').textContent = '';
+  renderSsSwitch(r.active); ssHints(); renderSsHosts();
+}
+$('ssEnabled').onclick = async () => {
+  if (!can('system.manage')) return;
+  const to = !ss.enabled;
+  if (!to && !confirm('Turn shell access off? Every open shell will be closed.')) return;
+  try { await api('PUT', '/api/settings/shell', { enabled: to }); toast(`Shell access turned ${to ? 'on' : 'off'}`); loadShellSettings(); }
+  catch (e) { $('ssMsg').textContent = e.message; $('ssMsg').className = 'um-msg bad'; }
+};
+$('ssMax').oninput = $('ssTimeout').oninput = ssHints;
+document.querySelectorAll('input[name=ssMode]').forEach((r) => { r.onchange = () => { if (!can('system.manage')) return; ss.mode = r.value; renderSsHosts(); }; });
+$('ssHosts').onchange = (e) => {
+  const id = e.target.dataset.host; if (!id) return;
+  e.target.checked ? ss.allowed.add(id) : ss.allowed.delete(id);
+  renderSsHosts();
+};
+const ssGuard = () => (can('system.manage') ? true : (showDenied({ permission: 'system.manage', what: 'change shell settings' }), false));
+$('ssAll').onclick = () => { if (ssGuard()) { ss.allowed = new Set(ss.hosts.map((h) => h.id)); renderSsHosts(); } };
+$('ssNone').onclick = () => { if (ssGuard()) { ss.allowed = new Set(); renderSsHosts(); } };
+$('ssDefaults').onclick = () => {
+  $('ssMax').value = ss.defaults.maxSessions; $('ssTimeout').value = ss.defaults.timeoutMinutes;
+  ss.mode = 'all'; ss.allowed = new Set(ss.hosts.map((h) => h.id));
+  ssHints(); renderSsHosts();
+  $('ssMsg').textContent = 'Defaults restored. Press Save to apply them.'; $('ssMsg').className = 'um-msg dim';
+};
+$('ssSave').onclick = async () => {
+  try {
+    await api('PUT', '/api/settings/shell', { hostMode: ss.mode, allowedHosts: [...ss.allowed], maxSessions: Number($('ssMax').value), timeoutMinutes: Number($('ssTimeout').value) });
+    toast('Shell settings saved'); loadShellSettings();
+  } catch (e) { $('ssMsg').textContent = e.message; $('ssMsg').className = 'um-msg bad'; }
+};
+
 // ---- Health: monitor ----
 // One box per saved host. Host is the ping result (checked every minute); Remote is the WinRM or SSH port (checked every
 // 5 minutes). Green is up, red is not responding, grey is not checked yet. The checks run in the server (src/monitor.js);
@@ -1293,6 +1447,7 @@ const monClass = (n, total) => (!total ? 'dim' : n === total ? 'ok' : n / total 
 // The small "hosts up · remote up" count under the Shell button in the top bar.
 function renderNavStats() {
   const el = $('navStats'); if (!el || !monSnap) return;
+  if (monSnap.enabled === false) { el.innerHTML = '<span title="Health monitoring is turned off in Settings > System > Health Settings">health monitoring off</span>'; return; }
   const { total, hostsUp, remoteUp } = monSnap.summary;
   el.innerHTML = total ? `<span title="Hosts up (answering ping)">hosts <b class="${monClass(hostsUp, total)}">${hostsUp}/${total}</b></span><span title="Remote up (WinRM or SSH port open)">remote <b class="${monClass(remoteUp, total)}">${remoteUp}/${total}</b></span>` : '';
 }
@@ -1304,7 +1459,12 @@ async function pollNavStats() {
 }
 function renderMonitor() {
   if (!monSnap) return;
-  $('monSum').innerHTML = monCountsHtml(monSnap);
+  if (monSnap.enabled === false) {
+    $('monSum').innerHTML = '<span class="dim">Monitoring is off</span>';
+    $('monGrid').innerHTML = '<p class="dim" style="margin:0">Health monitoring is turned off, so no hosts are being checked. It can be turned back on under Settings → System → Health Settings.</p>';
+    return;
+  }
+  $('monSum').innerHTML = monCountsHtml(monSnap) + (monSnap.summary.excluded ? `<span class="dim" title="Change which hosts are monitored in Settings > System > Health Settings">${monSnap.summary.excluded} not monitored</span>` : '');
   const n = (ip) => ip.split('.').reduce((a, b) => a * 256 + Number(b), 0) || 0;
   const hosts = [...monSnap.hosts].sort((a, b) => n(a.address) - n(b.address) || a.address.localeCompare(b.address));
   $('monGrid').innerHTML = hosts.map((h) => {
@@ -1351,8 +1511,9 @@ function updateShellButton() {
   const live = sh && sh.status !== 'ended';
   b.textContent = live ? 'End shell' : 'Start shell';
   b.classList.toggle('sec', !!live);
-  b.disabled = !shellHost || sh?.status === 'connecting';
-  b.title = shellHost ? '' : 'Select a host first';
+  const off = shellCfg && !shellCfg.enabled, blocked = !!(shellCfg && shellCfg.allowedHosts && shellHost && !shellCfg.allowedHosts.includes(shellHost));
+  b.disabled = !shellHost || sh?.status === 'connecting' || (!live && (off || blocked));
+  b.title = !live && off ? 'Shell access is turned off in Shell Settings' : !live && blocked ? 'Shells to this host are not allowed in Shell Settings' : shellHost ? '' : 'Select a host first';
 }
 function renderShellList() {
   const q = shellQuery.toLowerCase();
@@ -1362,7 +1523,7 @@ function renderShellList() {
   const el = $('shellList'); if (!el) return;
   el.innerHTML = shown.map((h) => {
     const live = shells.get(h.id) && shells.get(h.id).status !== 'ended';
-    return `<button class="shellhost ${h.id === shellHost ? 'on' : ''}" data-shell-host="${esc(h.id)}" title="${esc(h.os || '')}">
+    return `<button class="shellhost ${h.id === shellHost ? 'on' : ''} ${shellDenied(h.id) ? 'denied' : ''}" data-shell-host="${esc(h.id)}" title="${esc(shellDenied(h.id) ? (shellCfg && !shellCfg.enabled ? 'Shell access is turned off in Shell Settings' : 'Shells to this host are not allowed in Shell Settings') : h.os || '')}">
       <span class="sh-name">${live ? '<i class="dot"></i>' : ''}${esc(h.hostname || h.name)}</span><span class="sh-ip">${esc(h.address)}</span></button>`;
   }).join('') || `<div class="empty">${shellHosts.length ? 'No hosts match' : 'No authenticated hosts yet'}</div>`;
 }
@@ -1370,7 +1531,7 @@ function renderShellMain() {
   const h = hostOf(shellHost), sh = shells.get(shellHost);
   const [cls, label] = !sh ? ['grey', 'Not connected'] : { connecting: ['grey', 'Connecting…'], connected: ['green', 'Connected'], ended: ['red', 'Session ended'] }[sh.status];
   $('shellHead').innerHTML = h
-    ? `<span class="sh-title">${esc(h.hostname || h.name)}</span><span class="dim">${esc(h.address)} · ${h.protocol === 'ssh' ? 'SSH' : 'WinRM'}</span><span class="badge ${cls}">${label}</span>
+    ? `<span class="sh-title">${esc(h.hostname || h.name)}</span><span class="dim">${esc(h.address)} · ${h.protocol === 'ssh' ? 'SSH' : 'WinRM'}</span><span class="badge ${cls}">${label}</span>${shellCfg && !shellCfg.enabled ? '<span class="badge red" title="Turned off in Settings > System > Shell Settings">Shell access is off</span>' : shellDenied(shellHost) ? '<span class="badge red" title="Change this in Settings > System > Shell Settings">Not allowed for this host</span>' : ''}
        <span class="shell-actions"><button class="act sec" data-shell-act="Send file" data-perm="shell.files" data-perm-what="send files to hosts">Send file</button><button class="act sec" data-shell-act="Pull file" data-perm="shell.files" data-perm-what="pull files from hosts">Pull file</button><button class="act sec" data-shell-act="Quick hunt" data-perm="hunts.run" data-perm-what="run hunts">Quick hunt</button><button class="act sec" data-shell-act="Quick response" data-perm="actions.run" data-perm-what="run actions">Quick response</button></span>`
     : '<span class="dim">Select a host on the left, then press Start shell.</span>';
   for (const [id, s] of shells) s.el.hidden = id !== shellHost;
@@ -1391,7 +1552,10 @@ $('shellHead').onclick = (e) => {
   const h = hostOf(shellHost);
   toast(`${act} for ${h ? h.hostname || h.name : 'this host'} isn't built yet`, 'bad');
 };
+let shellCfg = null; // the limits from Shell Settings (on/off, allowed hosts, maximum and timeout)
+const shellDenied = (hostId) => !!(shellCfg && (!shellCfg.enabled || (shellCfg.allowedHosts && !shellCfg.allowedHosts.includes(hostId))));
 async function loadShell() {
+  try { shellCfg = await api('GET', '/api/shell/config'); } catch { shellCfg = null; }
   try { shellHosts = await api('GET', '/api/hosts'); } catch { shellHosts = []; }
   if (!shellHosts.some((h) => h.id === shellHost)) shellHost = null;
   // shells that kept running while the page was away are reattached (their recent output is replayed)
@@ -1602,7 +1766,7 @@ async function loadHome() {
   } catch (e) { rows.push(['Server', `<span class="bad">${esc(e.message)}</span>`]); }
   try {
     const me = await api('GET', '/api/auth/me');
-    const who = me.roles.length ? `${me.username} (${me.roles.join(', ')})` : me.username; // e.g. admin (admin)
+    const who = me.roleNames.length ? `${me.username} (${me.roleNames.join(', ')})` : me.username; // e.g. admin (admin)
     rows.push(['Signed in as', esc(who)]);
     $('signOutMsg').textContent = who; // shown beside the Sign out button
     renderHomeAccess(me, await api('GET', '/api/permissions'));
@@ -1615,7 +1779,7 @@ function renderHomeAccess(me, groups) {
   const can = options.filter((p) => has.has(p.key)), cant = options.filter((p) => !has.has(p.key));
   const list = (items, cls, mark, empty) => (items.length ? items.map((p) => `<li class="${cls}" title="${esc(p.desc)}"><i>${mark}</i>${esc(p.label)}</li>`).join('') : `<li class="dim">${empty}</li>`);
   $('homePerms').innerHTML = `<div class="hp-title">Your access</div>
-    <div class="hp-roles">${me.roles.length ? me.roles.map((r) => `<span class="um-chip">${esc(r)}</span>`).join('') : '<span class="dim">No roles</span>'}</div>
+    <div class="hp-roles">${me.roleNames.length ? me.roleNames.map((r) => `<span class="um-chip">${esc(r)}</span>`).join('') : '<span class="dim">No roles</span>'}</div>
     <div class="hp-head can">Can do${me.all ? ' <span class="dim">(full access)</span>' : ''}</div>
     <ul>${list(can, 'can', '✓', 'Nothing')}</ul>
     <div class="hp-head cant">Can't do</div>

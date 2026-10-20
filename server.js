@@ -34,7 +34,7 @@ app.use((req, res, next) => {
 // A user's roles (ids) and the permissions they give together; `all` is true when one of the roles is full access.
 const access = (u) => {
   const mine = db.roles.filter((r) => u.roles.includes(r.id));
-  return { roles: mine.map((r) => r.id), permissions: [...new Set(mine.flatMap((r) => permissions.expand(r)))], all: mine.some((r) => r.permissions.includes('*')) };
+  return { roles: mine.map((r) => r.id), roleNames: mine.map((r) => r.name), permissions: [...new Set(mine.flatMap((r) => permissions.expand(r)))], all: mine.some((r) => r.permissions.includes('*')) };
 };
 
 // ---- Sign-in ------------------------------------------------------------------------------
@@ -468,6 +468,7 @@ const shellWrap = (fn) => (req, res) => {
   try { fn(req, res); } catch (e) { res.status(e.status || 400).json({ error: firstLine(e.message) }); }
 };
 app.get('/api/shell', (req, res) => res.json(shell.open()));
+app.get('/api/shell/config', (req, res) => res.json(shell.config())); // what the Shell page needs from Shell Settings
 app.post('/api/shell', shellWrap((req, res) => res.json(shell.create(String(req.body.hostId || ''), { cols: Number(req.body.cols) || 100, rows: Number(req.body.rows) || 30 }))));
 app.get('/api/shell/:id/stream', shellWrap((req, res) => shell.stream(req.params.id, res)));
 app.post('/api/shell/:id/input', shellWrap((req, res) => { shell.write(req.params.id, req.body.data); res.json({ ok: true }); }));
@@ -509,6 +510,21 @@ app.get('/api/browse/download', browseWrap((req, res) => {
 app.use((err, req, res, next) => {
   res.status(err.status || 500).json({ error: err.status ? 'Bad request' : 'Internal error' });
 });
+
+// ---- Health Settings: how often hosts are checked and which hosts are checked (Settings > System > Health Settings) ----
+// The GET carries the host list too, so the page works for anyone who may view the system, not only those who may list hosts.
+app.get('/api/settings/health', (req, res) => res.json({
+  settings: monitor.settings(), defaults: monitor.DEFAULTS, limits: monitor.LIMITS,
+  hosts: db.hosts.map((h) => ({ id: h.id, name: h.name || h.hostname || h.address, address: h.address, protocol: h.protocol, os: h.os || null })),
+}));
+app.put('/api/settings/health', wrap((req, res) => { monitor.setSettings(req.body || {}); res.json({ settings: monitor.settings() }); }));
+
+// ---- Shell Settings: shell access on or off, which hosts, how many at once and the idle timeout (Settings > System > Shell Settings) ----
+app.get('/api/settings/shell', (req, res) => res.json({
+  settings: shell.settings(), defaults: shell.DEFAULTS, limits: shell.LIMITS, active: shell.config().active,
+  hosts: db.hosts.map((h) => ({ id: h.id, name: h.name || h.hostname || h.address, address: h.address, protocol: h.protocol, os: h.os || null })),
+}));
+app.put('/api/settings/shell', wrap((req, res) => { shell.setSettings(req.body || {}); res.json({ settings: shell.settings() }); }));
 
 // ---- Health monitor: ping every minute and the WinRM/SSH port every 5 minutes, for every saved host ----
 app.get('/api/monitor', (req, res) => res.json(monitor.snapshot()));

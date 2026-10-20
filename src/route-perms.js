@@ -31,6 +31,8 @@ const RULES = [
   ['*', /^\/api\/shell(\/|$)/, ['shell.open']],
 
   ['*', /^\/api\/monitor(\/|$)/, ['system.view']],
+  ['GET', /^\/api\/settings\/(health|shell)$/, ['system.view']],
+  ['*', /^\/api\/settings(\/|$)/, ['system.manage']],
 
   ['GET', /^\/api\/(users|roles)$/, ['users.view']],
   ['POST', /^\/api\/users$/, ['users.manage']],

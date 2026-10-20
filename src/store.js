@@ -5,7 +5,7 @@ const crypto = require('crypto');
 const { dataDir } = require('./config');
 
 const file = path.join(dataDir, 'db.json');
-const empty = () => ({ hosts: [], lists: [], runs: [], profiles: [], assignments: {}, users: [], roles: [], sessions: [] });
+const empty = () => ({ hosts: [], lists: [], runs: [], profiles: [], assignments: {}, users: [], roles: [], sessions: [], settings: {} });
 
 let db = empty();
 if (fs.existsSync(file)) db = { ...empty(), ...JSON.parse(fs.readFileSync(file, 'utf8')) };

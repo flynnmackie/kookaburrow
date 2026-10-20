@@ -31,14 +31,27 @@ if (!db.users.length) {
 if (!db.roles.some((r) => r.id === 'admin')) {
   db.roles.unshift({ id: 'admin', name: 'admin', description: 'Full access to everything, including permissions added in future.', builtin: true, permissions: ['*'] });
 }
-// A stripped-down role for day-to-day work: add hosts, run hunts, use shells and transfer files, read-only access to the
-// libraries, and no user, role, collection, action or system changes. It is not assigned to anyone by default.
-if (!db.roles.some((r) => r.id === 'user')) {
-  db.roles.push({
+// Roles that come with the platform. Each is added once (db.seededRoles remembers it), so a default role that is later
+// deleted stays deleted. None is assigned to anyone by default; they can be edited like any other custom role.
+//   user              stripped down, for day-to-day work: add hosts, run hunts, use shells, read-only libraries
+//   privileged-user   everything admin can do except manage users, roles and system settings (those can still be viewed)
+const DEFAULT_ROLES = [
+  {
     id: 'user', name: 'user', builtin: false,
     description: 'Day-to-day hunting: add hosts, run hunts, use shells. No user, role, library or system changes, and no running actions.',
     permissions: ['hosts.manage', 'hunts.run', 'hunts.export', 'shell.files', 'collections.view', 'actions.view', 'system.view'],
-  });
+  },
+  {
+    id: 'privileged-user', name: 'Privileged User', builtin: false,
+    description: 'Everything an admin can do except add, edit or delete users and roles and change system settings. Those can still be viewed.',
+    permissions: ['users.view', 'hosts.manage', 'collections.manage', 'actions.manage', 'actions.run', 'hunts.run', 'hunts.export', 'shell.files', 'system.view'],
+  },
+];
+db.seededRoles = Array.isArray(db.seededRoles) ? db.seededRoles : [];
+for (const r of DEFAULT_ROLES) {
+  if (db.seededRoles.includes(r.id)) continue;
+  if (!db.roles.some((x) => x.id === r.id)) db.roles.push(r);
+  db.seededRoles.push(r.id);
 }
 for (const u of db.users) if (!Array.isArray(u.roles)) u.roles = u.username === 'admin' ? ['admin'] : [];
 save();

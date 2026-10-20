@@ -1,16 +1,46 @@
 const net = require('net');
 const { execFile } = require('child_process');
-const { db } = require('./store');
+const { db, save } = require('./store');
 
 // Health monitor for every saved (authenticated) host. It runs in the server, so it keeps checking while no page is open.
-//   Host    ping every minute
-//   Remote  the host's remote-management port every 5 minutes: WinRM (5985 or 5986) for Windows hosts, SSH (22) for Linux
+//   Host    ping, every minute by default
+//   Remote  the host's remote-management port, every 5 minutes by default: WinRM (5985 or 5986) for Windows hosts, SSH (22) for Linux
+// Both intervals and the hosts that are checked (all of them by default) are set in Settings > System > Health Settings.
 // Results are kept in memory only; after a restart every host shows "unknown" until its first check (a few seconds).
-const PING_MS = 60 * 1000;
-const PORT_MS = 5 * 60 * 1000;
 const TICK_MS = 1000;
 const LIMIT = 16;          // checks in flight at once
 const PORT_TIMEOUT = 2000;
+
+// What can be changed in Health Settings (kept in db.settings.health). `excluded` lists the hosts that are not checked;
+// a host that is added later is checked until it is listed there.
+const DEFAULTS = { enabled: true, pingSeconds: 60, portSeconds: 5 * 60, excluded: [] };
+const LIMITS = { pingSeconds: [5, 3600], portSeconds: [10, 86400] };
+function settings() {
+  const s = (db.settings && db.settings.health) || {};
+  const known = new Set(db.hosts.map((h) => h.id));
+  return {
+    enabled: s.enabled !== false,
+    pingSeconds: Number.isInteger(s.pingSeconds) ? s.pingSeconds : DEFAULTS.pingSeconds,
+    portSeconds: Number.isInteger(s.portSeconds) ? s.portSeconds : DEFAULTS.portSeconds,
+    excluded: (Array.isArray(s.excluded) ? s.excluded : []).filter((id) => known.has(id)),
+  };
+}
+// Any field left out keeps its current value, so the on/off switch can be saved on its own.
+function setSettings(b) {
+  const cur = settings(), out = { enabled: b.enabled === undefined ? cur.enabled : !!b.enabled };
+  for (const [key, label] of [['pingSeconds', 'The ping interval'], ['portSeconds', 'The port check interval']]) {
+    const v = b[key] === undefined ? cur[key] : Number(b[key]), [lo, hi] = LIMITS[key];
+    if (!Number.isInteger(v) || v < lo || v > hi) throw new Error(`${label} must be a whole number of seconds from ${lo} to ${hi}`);
+    out[key] = v;
+  }
+  const known = new Set(db.hosts.map((h) => h.id));
+  out.excluded = b.excluded === undefined ? cur.excluded : [...new Set(Array.isArray(b.excluded) ? b.excluded.map(String) : [])].filter((id) => known.has(id));
+  db.settings = { ...(db.settings || {}), health: out };
+  save();
+  if (!out.enabled) queue.length = 0; // nothing waiting to run once monitoring is off
+  checkNow(); // new intervals, newly added hosts and switching back on take effect straight away
+}
+const monitoredHosts = (s = settings()) => db.hosts.filter((h) => !s.excluded.includes(h.id));
 
 const pings = new Map();   // address -> { up, rttMs, startedAt, checkedAt, since }
 const ports = new Map();   // `${address}:${port}` -> { open, startedAt, checkedAt, since }
@@ -52,17 +82,18 @@ function record(map, key, up, field, extra = {}) {
 function jobs(now) {
   const due = (m, key, every) => { const r = m.get(key); return !r || now - r.startedAt >= every - 500; };
   const out = [];
-  for (const address of new Set(db.hosts.map((h) => h.address))) {
+  const s = settings(), pingMs = s.pingSeconds * 1000, portMs = s.portSeconds * 1000, hostsNow = monitoredHosts(s);
+  for (const address of new Set(hostsNow.map((h) => h.address))) {
     const key = `ping|${address}`;
-    if (!inflight.has(key) && due(pings, address, PING_MS)) {
+    if (!inflight.has(key) && due(pings, address, pingMs)) {
       out.push({ key, run: async () => { const r = await ping(address); record(pings, address, r.up, 'up', { rttMs: r.rttMs ?? null }); } });
       pings.set(address, { ...(pings.get(address) || { up: false, since: now, checkedAt: 0 }), startedAt: now }); // marks it as started so it is not queued twice
     }
   }
-  for (const h of db.hosts) {
+  for (const h of hostsNow) {
     for (const port of portsFor(h)) {
       const k = `${h.address}:${port}`, key = `port|${k}`;
-      if (inflight.has(key) || !due(ports, k, PORT_MS) || out.some((j) => j.key === key)) continue;
+      if (inflight.has(key) || !due(ports, k, portMs) || out.some((j) => j.key === key)) continue;
       out.push({ key, run: async () => { const r = await probe(h.address, port); record(ports, k, r.open, 'open'); } });
       ports.set(k, { ...(ports.get(k) || { open: false, since: now, checkedAt: 0 }), startedAt: now });
     }
@@ -80,6 +111,7 @@ function pump() {
   }
 }
 function tick() {
+  if (!settings().enabled) return; // monitoring is switched off in Health Settings
   queue.push(...jobs(Date.now()));
   pump();
 }
@@ -92,7 +124,12 @@ function checkNow() {
 }
 
 function snapshot() {
-  const hosts = db.hosts.map((h) => {
+  const cfg = settings();
+  if (!cfg.enabled) {
+    return { enabled: false, hosts: [], summary: { enabled: false, total: 0, hostsUp: 0, remoteUp: 0, excluded: 0, pingEveryMs: cfg.pingSeconds * 1000, portsEveryMs: cfg.portSeconds * 1000 } };
+  }
+  const s = settings(), monitored = monitoredHosts(s);
+  const hosts = monitored.map((h) => {
     const pg = pings.get(h.address);
     const pgChecked = pg && pg.checkedAt > 0;
     const ps = portsFor(h).map((port) => ({ port, ...(ports.get(`${h.address}:${port}`) || {}) }));
@@ -111,12 +148,14 @@ function snapshot() {
     };
   });
   return {
+    enabled: true,
     hosts,
     summary: {
+      enabled: true,
       total: hosts.length,
       hostsUp: hosts.filter((h) => h.host.state === 'up').length,
       remoteUp: hosts.filter((h) => h.remote.state === 'up').length,
-      pingEveryMs: PING_MS, portsEveryMs: PORT_MS,
+      pingEveryMs: s.pingSeconds * 1000, portsEveryMs: s.portSeconds * 1000, excluded: db.hosts.length - monitored.length,
     },
   };
 }
@@ -126,4 +165,4 @@ function start() {
   setInterval(tick, TICK_MS).unref();
 }
 
-module.exports = { start, snapshot, checkNow };
+module.exports = { start, snapshot, checkNow, settings, setSettings, DEFAULTS, LIMITS };

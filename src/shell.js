@@ -5,7 +5,7 @@ const os = require('os');
 const path = require('path');
 const { StringDecoder } = require('string_decoder');
 const { Client } = require('ssh2');
-const { db } = require('./store');
+const { db, save } = require('./store');
 const { decrypt } = require('./crypto');
 const { evidenceDir } = require('./config');
 
@@ -14,13 +14,61 @@ const { evidenceDir } = require('./config');
 //   WinRM hosts  a line-by-line shell: src/remote/winrm-shell.ps1 keeps one remote PowerShell session and runs
 //                each line you enter in it (no pty, so full-screen programs do not work)
 // Output reaches the browser as a server-sent event stream and input arrives by POST; the page only talks to this
-// server, never to the host. Sessions close after 20 idle minutes or when the page ends them.
+// server, never to the host. Sessions close after the idle timeout in Shell Settings (20 minutes by default), or when the page
+// ends them. Shell Settings can also turn shells off, limit them to chosen hosts, and cap how many are open at once (8 at most).
 //
 // The same session also serves the Send file / Pull file buttons: it reports its current folder through hidden
 // markers in the output (ESC ] 7777 ; path BEL), which are stripped before the browser sees them, and lists,
 // downloads and uploads files (WinRM: control lines to the PowerShell shell; SSH: SFTP on the same connection).
-const MAX_SESSIONS = 8;
-const IDLE_MS = 20 * 60 * 1000;
+// What can be changed in Shell Settings (kept in db.settings.shell):
+//   enabled          shells can be turned off entirely (opening one is refused and open ones are closed)
+//   hostMode         'all' hosts, or only the 'selected' ones in allowedHosts (a host added later is not allowed until ticked)
+//   maxSessions      shells open at the same time; never more than HARD_MAX_SESSIONS
+//   timeoutMinutes   a shell is closed after this many minutes without input
+const HARD_MAX_SESSIONS = 8;
+const DEFAULTS = { enabled: true, hostMode: 'all', allowedHosts: [], maxSessions: HARD_MAX_SESSIONS, timeoutMinutes: 20 };
+const LIMITS = { maxSessions: [1, HARD_MAX_SESSIONS], timeoutMinutes: [1, 24 * 60] };
+function settings() {
+  const s = (db.settings && db.settings.shell) || {};
+  const known = new Set(db.hosts.map((h) => h.id));
+  const int = (v, d, [lo, hi]) => (Number.isInteger(v) && v >= lo && v <= hi ? v : d);
+  return {
+    enabled: s.enabled !== false,
+    hostMode: s.hostMode === 'selected' ? 'selected' : 'all',
+    allowedHosts: (Array.isArray(s.allowedHosts) ? s.allowedHosts : []).filter((id) => known.has(id)),
+    maxSessions: int(s.maxSessions, DEFAULTS.maxSessions, LIMITS.maxSessions),
+    timeoutMinutes: int(s.timeoutMinutes, DEFAULTS.timeoutMinutes, LIMITS.timeoutMinutes),
+  };
+}
+const allowed = (hostId, s = settings()) => s.enabled && (s.hostMode === 'all' || s.allowedHosts.includes(hostId));
+// Any field left out keeps its current value, so the on/off switch can be saved on its own.
+function setSettings(b) {
+  const cur = settings(), out = {};
+  out.enabled = b.enabled === undefined ? cur.enabled : !!b.enabled;
+  out.hostMode = b.hostMode === undefined ? cur.hostMode : b.hostMode;
+  if (!['all', 'selected'].includes(out.hostMode)) throw err('Shell hosts must be "all" or "selected"');
+  for (const [key, label] of [['maxSessions', 'The number of concurrent shells'], ['timeoutMinutes', 'The shell timeout']]) {
+    const v = b[key] === undefined ? cur[key] : Number(b[key]), [lo, hi] = LIMITS[key];
+    if (!Number.isInteger(v) || v < lo || v > hi) throw err(`${label} must be a whole number from ${lo} to ${hi}${key === 'maxSessions' ? ` (${HARD_MAX_SESSIONS} is the hard limit)` : ' minutes'}`);
+    out[key] = v;
+  }
+  const known = new Set(db.hosts.map((h) => h.id));
+  out.allowedHosts = b.allowedHosts === undefined ? cur.allowedHosts : [...new Set(Array.isArray(b.allowedHosts) ? b.allowedHosts.map(String) : [])].filter((id) => known.has(id));
+  if (out.hostMode === 'selected' && !out.allowedHosts.length) throw err('Choose at least one host, or allow shells to all hosts');
+  db.settings = { ...(db.settings || {}), shell: out };
+  save();
+  // shells that are no longer allowed are closed straight away; a lower limit or timeout only affects new shells and idle ones
+  for (const s of [...sessions.values()]) {
+    if (allowed(s.hostId, out)) continue;
+    s.notice(`\r\n[This shell was closed: ${out.enabled ? 'shells to this host are no longer allowed' : 'shell access was turned off'} in Shell Settings]\r\n`);
+    close(s.id);
+  }
+}
+// What the Shell page needs to know (it may not be allowed to read the full settings).
+const config = () => {
+  const s = settings();
+  return { enabled: s.enabled, allowedHosts: s.hostMode === 'all' ? null : s.allowedHosts, maxSessions: s.maxSessions, timeoutMinutes: s.timeoutMinutes, active: sessions.size };
+};
 const BUFFER_CAP = 256 * 1024; // output kept so a reloaded page can show what it missed
 const sessions = new Map();
 
@@ -71,7 +119,10 @@ function call(s, op, args, ms = 60000) {
 function create(hostId, { cols = 100, rows = 30 } = {}) {
   const host = db.hosts.find((h) => h.id === hostId);
   if (!host) throw err('Unknown host', 404);
-  if (sessions.size >= MAX_SESSIONS) throw err(`Too many open shells (max ${MAX_SESSIONS}). Close one first.`);
+  const cfg = settings();
+  if (!cfg.enabled) throw err('Shell access is turned off in Shell Settings', 403);
+  if (!allowed(hostId, cfg)) throw err('Shells to this host are not allowed in Shell Settings', 403);
+  if (sessions.size >= cfg.maxSessions) throw err(`Too many open shells (the limit is ${cfg.maxSessions}). Close one first.`, 429);
   for (const s of sessions.values()) if (s.hostId === hostId) throw err('A shell is already open for this host', 409);
 
   const s = {
@@ -99,6 +150,7 @@ function create(hostId, { cols = 100, rows = 30 } = {}) {
     sessions.delete(s.id);
   };
   s.end = end;
+  s.notice = notice;
   sessions.set(s.id, s);
 
   const password = decrypt(host.secret);
@@ -266,7 +318,15 @@ async function send(id, rel, localFile) {
   return { dest };
 }
 
-setInterval(() => { for (const s of [...sessions.values()]) if (Date.now() - s.last > IDLE_MS && !s.clients.size) close(s.id); }, 60 * 1000).unref();
+// A shell with no input for the configured number of minutes is closed (the limit is read each time, so a change applies at once).
+setInterval(() => {
+  const minutes = settings().timeoutMinutes;
+  for (const s of [...sessions.values()]) {
+    if (Date.now() - s.last <= minutes * 60 * 1000) continue;
+    s.notice(`\r\n[Shell closed after ${minutes} minute${minutes === 1 ? '' : 's'} without input]\r\n`);
+    close(s.id);
+  }
+}, 30 * 1000).unref();
 process.on('exit', () => { for (const s of sessions.values()) { try { s.kill(); } catch { /* ignore */ } } });
 
-module.exports = { create, stream, write, resize, close, open, list, pull, send, sendTarget };
+module.exports = { create, stream, write, resize, close, open, list, pull, send, sendTarget, settings, setSettings, config, DEFAULTS, LIMITS };
