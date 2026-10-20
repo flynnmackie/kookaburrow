@@ -20,8 +20,93 @@ window.fetch = async (...args) => {
 async function api(method, url, body) {
   const r = await fetch(url, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined });
   const data = await r.json();
+  if (r.status === 403 && data.permission !== undefined) showDenied({ permission: data.permission, needed: data.needed, what: 'do that' });
   if (!r.ok) throw new Error(data.error || r.statusText);
   return data;
+}
+
+// ---- Access: what the signed-in user may do ----
+// The server refuses anything the user's roles don't allow (src/route-perms.js); this is the part the user sees. A page, tab
+// or button that needs a permission the user doesn't have gets a padlock, and using it opens a "Permission denied" popup
+// instead of doing anything. Elements opt in with data-perm="<permission>" (several, separated by commas, mean any of them)
+// and an optional data-perm-what="add hosts" that completes the sentence "You don't have permission to ...".
+let access = { username: '', roles: [], permissions: new Set(), all: false, options: {} };
+const can = (perm) => {
+  if (!perm) return true;
+  const list = Array.isArray(perm) ? perm : String(perm).split(',');
+  return access.all || list.some((p) => access.permissions.has(p.trim()));
+};
+const LOCK = '<svg class="lock" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
+async function loadAccess() {
+  try {
+    const [me, groups] = await Promise.all([api('GET', '/api/auth/me'), api('GET', '/api/permissions')]);
+    access = { username: me.username, roles: me.roles, permissions: new Set(me.permissions), all: me.all, options: Object.fromEntries(groups.flatMap((g) => g.permissions).map((p) => [p.key, p])) };
+  } catch { /* a 401 already redirected to the sign-in page */ }
+}
+const permLabel = (key) => access.options[key]?.label || key;
+
+// The popup. `needed` is the list of labels the server sent (any one of them would have been enough).
+function showDenied({ permission, needed, what } = {}) {
+  if (!$('denyModal').hidden) return; // one popup at a time
+  const labels = needed?.length ? needed : permission ? String(permission).split(',').map(permLabel) : [];
+  $('denyBody').innerHTML = `<p>You don't have permission to ${what ? esc(what) : 'do that'}.</p>
+    ${labels.length ? `<p class="dim">This needs <b>${labels.map(esc).join('</b> or <b>')}</b>.</p>` : ''}
+    <p class="dim">Your role${access.roles.length === 1 ? '' : 's'}: ${access.roles.length ? access.roles.map(esc).join(', ') : 'none'}. Ask an administrator if you need access.</p>`;
+  $('denyModal').hidden = false;
+  $('denyOk').focus();
+}
+const closeDenied = () => { $('denyModal').hidden = true; };
+$('denyOk').onclick = closeDenied; $('denyX').onclick = closeDenied;
+$('denyModal').onclick = (e) => { if (e.target.id === 'denyModal') closeDenied(); };
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('denyModal').hidden) closeDenied(); });
+
+// Padlocks on every [data-perm] element the user can't use, including ones the page adds later.
+function decorateLocks(root = document) {
+  const els = [...(root.matches?.('[data-perm]') ? [root] : []), ...(root.querySelectorAll ? root.querySelectorAll('[data-perm]') : [])];
+  for (const el of els) {
+    const ok = can(el.dataset.perm);
+    el.classList.toggle('locked', !ok);
+    const lock = [...el.children].find((c) => c.matches?.('svg.lock'));
+    if (ok) { lock?.remove(); continue; }
+    if (!lock && !/^(SELECT|INPUT|TEXTAREA)$/.test(el.tagName)) el.insertAdjacentHTML('afterbegin', LOCK);
+    el.title = `Locked: needs ${el.dataset.perm.split(',').map((p) => permLabel(p.trim())).join(' or ')}`;
+  }
+}
+// Only changes that add (or retext) something with data-perm trigger a pass, so the busy terminal output costs nothing.
+let lockFrame = 0;
+new MutationObserver((muts) => {
+  const hit = muts.some((m) => [...m.addedNodes].some((n) => (n.nodeType === 1 ? n.matches('[data-perm]') || n.querySelector('[data-perm]') : n.nodeType === 3 && n.parentElement?.closest('[data-perm]'))));
+  if (hit) { cancelAnimationFrame(lockFrame); lockFrame = requestAnimationFrame(() => decorateLocks()); }
+}).observe(document.body, { childList: true, subtree: true });
+// Using a locked element does nothing but show the popup. This runs before the element's own handlers.
+const lockedTarget = (e) => { const el = e.target.closest?.('[data-perm]'); return el && !can(el.dataset.perm) ? el : null; };
+function denyElement(e, el) {
+  e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+  showDenied({ permission: el.dataset.perm, what: el.dataset.permWhat || `use "${el.textContent.trim() || 'this'}"` });
+}
+document.addEventListener('click', (e) => { const el = lockedTarget(e); if (el) denyElement(e, el); }, true);
+document.addEventListener('mousedown', (e) => { const el = lockedTarget(e); if (el && el.matches('select')) denyElement(e, el); }, true);
+
+// Which permission each page needs. The top-bar tab for an area is locked when every page in it is.
+const PAGE_PERM = {
+  'settings/user-management': 'users.view', 'settings/shell-settings': 'system.manage', 'settings/health-settings': 'system.manage',
+  'settings/view-collections': 'collections.view', 'settings/add-collections': 'collections.manage', 'settings/binaries': 'collections.manage',
+  'settings/view-actions': 'actions.view', 'settings/add-actions': 'actions.manage',
+  'hosts/view-hosts': 'hosts.view', 'hosts/profiles': 'hosts.view', 'hosts/groups': 'hosts.view', 'hosts/discover': 'hosts.manage', 'hosts/manual': 'hosts.manage',
+  'burrow/hunt': 'hunts.view', 'burrow/respond': 'actions.view',
+  'output/log': 'hunts.view', 'output/report': 'hunts.view', 'output/json': 'hunts.view', 'browse/files': 'hunts.view',
+  'shell/shell': 'shell.open', 'health/monitor': 'system.view',
+};
+const pageAllowed = (slug) => can(PAGE_PERM[slug]);
+function refreshTopLocks() {
+  for (const t of NAV) {
+    const b = document.querySelector(`#topnav button[data-tab="${t.id}"]`); if (!b) continue;
+    const pages = t.pages.filter(Array.isArray);
+    const locked = pages.length > 0 && pages.every((p) => !pageAllowed(`${t.id}/${p[0]}`));
+    b.classList.toggle('locked', locked);
+    b.querySelector(':scope > svg.lock')?.remove();
+    if (locked) { b.insertAdjacentHTML('afterbegin', LOCK); b.title = 'Locked: you do not have permission to use this area'; } else b.removeAttribute('title');
+  }
 }
 
 // ---- navigation: top tabs -> left menu -> page (page ids are "tab/page" slugs) ----
@@ -98,15 +183,28 @@ function renderSide() {
     if (group && group !== last) heading(group);
     last = group || null;
     if (key && !openGroups.has(key)) continue;
-    html += `<button data-tab="${tab.id}" data-page="${pid}" class="${group ? 'sub' : ''} ${currentSlug === `${tab.id}/${pid}` ? 'on' : ''}">${esc(label)}</button>`;
+    const locked = !pageAllowed(`${tab.id}/${pid}`);
+    html += `<button data-tab="${tab.id}" data-page="${pid}" class="${group ? 'sub' : ''} ${currentSlug === `${tab.id}/${pid}` ? 'on' : ''} ${locked ? 'locked' : ''}"${locked ? ` title="Locked: needs ${esc(permLabel(PAGE_PERM[`${tab.id}/${pid}`]))}"` : ''}>${locked ? LOCK : ''}${esc(label)}</button>`;
   }
   $('sidenav').innerHTML = html;
 }
 
+// A page the user may not open: say so and stay where they are (or go home if they have nowhere yet, e.g. a bookmarked link).
+function denyPage(tab, page) {
+  showDenied({ permission: PAGE_PERM[`${tab.id}/${page[0]}`], what: `open ${page[1]}` });
+  if (!currentSlug) go('home', 'home');
+  else if (location.hash !== `#${currentSlug}`) location.hash = currentSlug;
+}
 function go(tabId, pageId) {
   const tab = NAV.find((t) => t.id === tabId) || NAV[0];
   const real = tab.pages.filter(Array.isArray); // skip headings that have no pages yet
-  const page = real.find((p) => p[0] === pageId) || real[0];
+  let page = pageId ? real.find((p) => p[0] === pageId) : null;
+  if (page) {
+    if (!pageAllowed(`${tab.id}/${page[0]}`)) return denyPage(tab, page);
+  } else {
+    page = real.find((p) => pageAllowed(`${tab.id}/${p[0]}`)); // the first page the user may open
+    if (!page && real.length) return denyPage(tab, real[0]);
+  }
   const slug = page ? `${tab.id}/${page[0]}` : null;
 
   document.querySelectorAll('#topnav button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab.id));
@@ -312,7 +410,7 @@ function renderProfiles() {
       <a class="pname os ${p.kind.startsWith('Windows') ? 'windows' : 'unix'}" data-edit="${p.id}" title="Click to edit">${esc(p.name)}</a>
       <div class="dim pkind">${esc(p.kind)}</div>
     </div>
-    <button class="del" data-del="${p.id}">Delete</button></div>`).join('') || '<p class="dim" style="margin:0">No profiles yet.</p>';
+    <button class="del" data-del="${p.id}" data-perm="hosts.manage" data-perm-what="delete credential profiles">Delete</button></div>`).join('') || '<p class="dim" style="margin:0">No profiles yet.</p>';
 }
 $('profileList').onclick = async (e) => {
   const { edit, del } = e.target.dataset;
@@ -371,7 +469,7 @@ function renderHosts() {
   const groupCell = (h) => {
     const mine = lists.filter((l) => l.hostIds.includes(h.id)), rest = lists.filter((l) => !l.hostIds.includes(h.id));
     const group = (label, items, prefix) => items.length ? `<optgroup label="${label}">${items.map((l) => `<option value="${prefix}${l.id}">${esc(l.name)}</option>`).join('')}</optgroup>` : '';
-    return `<div class="gcell"><select class="gsel" data-host="${h.id}" ${lists.length ? '' : 'disabled'}>
+    return `<div class="gcell"><select class="gsel" data-host="${h.id}" data-perm="hosts.manage" data-perm-what="change host groups" ${lists.length ? '' : 'disabled'}>
         <option value="">${lists.length ? 'Groups' : 'None yet'}</option>
         ${group('Add to', rest, 'add:')}${group('Remove from', mine, 'remove:')}</select>
       <div class="gchips" title="${mine.length ? esc(mine.map((l) => l.name).join(', ')) : 'Not in any group'}">${mine.map((l) => `<span class="tagchip on">${esc(l.name)}</span>`).join('')}</div></div>`;
@@ -385,7 +483,7 @@ function renderHosts() {
     <td>${esc(h.name)}</td><td>${esc(h.address)}</td><td class="${pc}" title="${esc(h.os)}">${esc(String(h.os || '').replace(/^Microsoft /, '').replace(/\s*\(\d[\d.]*\)$/, ''))}</td><td class="${pc}">${h.protocol === 'ssh' ? 'SSH' : 'WinRM'}</td>
     <td class="dim">${new Date(h.verifiedAt).toLocaleString([], { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</td>
     <td>${groupCell(h)}</td>
-    <td><a data-del-host="${h.id}">Delete</a></td></tr>`;
+    <td><a data-del-host="${h.id}" data-perm="hosts.manage" data-perm-what="delete hosts">Delete</a></td></tr>`;
   }).join('') || `<tr><td colspan="8" class="dim">${hosts.length ? 'No hosts match' : 'No hosts saved'}</td></tr>`;
 
   $('groupBox').innerHTML = groupsHtml(hosts, lists);
@@ -400,7 +498,7 @@ function groupsHtml(hosts, lists, { deletable = false } = {}) {
     const members = l.hostIds.map((i) => byId[i]).filter(Boolean);
     const folded = foldedGroups.has(l.id);
     return `<div class="grp ${folded ? 'folded' : ''}">
-      <div class="grp-row"><button class="grp-head" data-fold="${l.id}" aria-expanded="${!folded}"><span class="chev">${folded ? '▸' : '▾'}</span><span class="grp-name">${esc(l.name)}</span><span class="grp-count">${members.length}</span></button>${deletable && l.id !== UNASSIGNED ? `<a class="grp-del" data-del-list="${l.id}" title="Delete this group (the hosts stay saved)">Delete</a>` : ''}</div>
+      <div class="grp-row"><button class="grp-head" data-fold="${l.id}" aria-expanded="${!folded}"><span class="chev">${folded ? '▸' : '▾'}</span><span class="grp-name">${esc(l.name)}</span><span class="grp-count">${members.length}</span></button>${deletable && l.id !== UNASSIGNED ? `<a class="grp-del" data-del-list="${l.id}" data-perm="hosts.manage" data-perm-what="delete groups" title="Delete this group (the hosts stay saved)">Delete</a>` : ''}</div>
       <div class="grp-body">${members.length ? `<ul>${members.map((m) => `<li>${esc(m.name)}<span class="dim">${esc(m.address)}</span></li>`).join('')}</ul>` : '<div class="dim">No members</div>'}</div>
     </div>`;
   }).join('') || '<p class="dim" style="margin:0">No groups yet. Create one above.</p>';
@@ -455,6 +553,7 @@ function mnRenderLog() {
 }
 async function mnSubmit() {
   if (mnBusy) return;
+  if (!can('hosts.manage')) return showDenied({ permission: 'hosts.manage', what: 'add hosts' });
   const body = {
     protocol: mnProto, address: $('mnAddr').value.trim(), name: $('mnName').value.trim(), domain: $('mnDomain').value.trim(),
     username: $('mnUser').value.trim(), password: $('mnPass').value, port: $('mnPort').value.trim(), useSsl: $('mnSsl').checked,
@@ -774,7 +873,7 @@ function makeEditor({ P, url, noun, folder, items, hints }) {
     el('List').innerHTML = mine.map((h) => `<div class="uh" data-id="${esc(h.id)}">
       <div class="uh-top">
         <div class="uh-main"><div class="hn">${esc(h.name)}</div><div class="uh-file">${esc(h.id)}</div>${metaIcons(h)}</div>
-        <div class="uh-btns"><button class="tagchip" data-act="view">${viewing === h.id ? 'Hide' : 'View'}</button><button class="tagchip" data-act="edit">Edit</button><button class="del" data-act="delete">Delete</button></div>
+        <div class="uh-btns"><button class="tagchip" data-act="view">${viewing === h.id ? 'Hide' : 'View'}</button><button class="tagchip" data-act="edit" data-perm="${noun === 'collection' ? 'collections.manage' : 'actions.manage'}" data-perm-what="edit ${noun}s">Edit</button><button class="del" data-act="delete" data-perm="${noun === 'collection' ? 'collections.manage' : 'actions.manage'}" data-perm-what="delete ${noun}s">Delete</button></div>
       </div>
       <div class="hd" title="${esc(h.description)}">${esc(h.description)}</div>
       ${h.tags.length ? `<div class="htags">${h.tags.map((t) => `<span class="htag">${esc(t)}</span>`).join('')}</div>` : ''}
@@ -996,68 +1095,172 @@ $('bbList').onclick = async (e) => {
     const body = f.binary ? `<p class="dim">Binary file (${bbFmt(f.size)}); no preview. Use Download to save it.</p>`
       : `<pre class="code">${ext === 'ps1' ? highlight(f.text, 'powershell') : ext === 'sh' ? highlight(f.text, 'bash') : ext === 'json' ? highlightJson(f.text) : esc(f.text)}</pre>${f.truncated ? `<p class="dim" style="margin-top:6px">Showing the first 512 KB of ${bbFmt(f.size)}.</p>` : ''}`;
     $('bbPreview').innerHTML = `<div class="bb-head"><div><div class="bb-title">${esc(f.name)}</div><div class="hd-file">${esc(f.path)} · ${bbFmt(f.size)} · ${esc(new Date(f.modified).toLocaleString())}</div></div>
-      <a class="act sec" href="/api/browse/download?path=${encodeURIComponent(f.path)}" download>Download</a></div>${body}`;
+      <a class="act sec" href="/api/browse/download?path=${encodeURIComponent(f.path)}" download data-perm="hunts.export" data-perm-what="download evidence files">Download</a></div>${body}`;
   } catch (err) { $('bbPreview').innerHTML = `<p class="bad">${esc(err.message)}</p>`; }
 };
 
 // ---- Settings: User Management ----
-// Two tabs. Users: click a user to see their roles and the permissions those roles give them. Roles: click a role to see its
-// permissions as tick boxes and who is in it. Read-only for now. The built-in admin role is locked: it always has every
-// permission, and admin users can't be taken out of it.
-const um = { tab: 'users', users: [], roles: [], groups: [], sel: { users: null, roles: null } };
+// Two tabs. Users: click a user to see (and, with Manage roles, change) their roles and the permissions those give them, or
+// add a new user. Roles: click a role to see its permissions as tick boxes and who is in it, or create or edit one.
+// Permissions build on each other: ticking an option also ticks the lower options it includes, and unticking a lower option
+// unticks the ones that depend on it. The built-in admin role is locked (full access, always ticked) and admin users can't be
+// taken out of it. You can only hand out permissions you hold yourself; the server checks that too.
+const um = { tab: 'users', users: [], roles: [], groups: [], sel: { users: null, roles: null }, mode: 'view', draft: null };
+let umInfo = {}; // permission key -> { label, desc, implies }
+const umIncluded = (k, seen = new Set()) => { for (const i of umInfo[k]?.implies || []) if (!seen.has(i)) { seen.add(i); umIncluded(i, seen); } return [...seen]; };
+const umGrantable = (key) => access.all || access.permissions.has(key);
+const umRoleGrantable = (r) => access.all || r.permissions.every((p) => access.permissions.has(p));
+
 async function loadUserMgmt() {
   try { [um.users, um.roles, um.groups] = await Promise.all([api('GET', '/api/users'), api('GET', '/api/roles'), api('GET', '/api/permissions')]); }
   catch (e) { $('umDetail').innerHTML = `<p class="bad">${esc(e.message)}</p>`; return; }
+  umInfo = Object.fromEntries(um.groups.flatMap((g) => g.permissions).map((p) => [p.key, p]));
   for (const t of ['users', 'roles']) if (!um[t].some((x) => x.id === um.sel[t])) um.sel[t] = um[t][0]?.id ?? null;
+  um.mode = 'view'; um.draft = null;
   renderUserMgmt();
 }
 const umChip = (t, cls = '') => `<span class="um-chip ${cls}">${esc(t)}</span>`;
-// Permission tick boxes by area. Options build on each other: an option that includes lower ones says so ("Includes: ...").
-// All are locked (disabled) for now; `tip` says why on hover.
-function umPerms(granted, tip) {
-  const all = Object.fromEntries(um.groups.flatMap((g) => g.permissions).map((p) => [p.key, p]));
-  // everything an option brings with it, including what the included options include
-  const included = (k, seen = new Set()) => { for (const i of all[k].implies) if (!seen.has(i)) { seen.add(i); included(i, seen); } return [...seen]; };
+
+// Permission tick boxes by area. `editable` boxes can be changed (when the user may grant them); the rest are locked, and
+// `tip` says why on hover. Options that include others say so ("Includes: ...").
+function umPerms(granted, tip, editable = false) {
   return um.groups.map((g) => {
     const have = g.permissions.filter((p) => granted.has(p.key)).length;
-    return `<div class="um-group"><div class="um-ghead"><label title="${esc(tip)}"><input type="checkbox" disabled ${have === g.permissions.length ? 'checked' : ''}> <b>${esc(g.name)}</b></label><span class="dim">${have}/${g.permissions.length}</span></div>
-      <div class="um-perms">${g.permissions.map((p) => `<label class="um-perm" title="${esc(tip)}"><input type="checkbox" disabled ${granted.has(p.key) ? 'checked' : ''}>
-        <span><b>${esc(p.label)}</b> <span class="dim">${esc(p.desc)}</span>${p.implies.length ? `<span class="um-inc">Includes: ${included(p.key).map((k) => esc(all[k].label)).join(', ')}</span>` : ''}</span></label>`).join('')}</div></div>`;
+    return `<div class="um-group"><div class="um-ghead"><label title="${esc(tip)}"><input type="checkbox" disabled data-ghead="${esc(g.id)}" ${have === g.permissions.length ? 'checked' : ''}> <b>${esc(g.name)}</b></label><span class="dim" data-gcount="${esc(g.id)}">${have}/${g.permissions.length}</span></div>
+      <div class="um-perms">${g.permissions.map((p) => {
+        const off = !editable || !umGrantable(p.key);
+        const why = !editable ? tip : !umGrantable(p.key) ? "You can't grant a permission you don't have" : '';
+        const inc = umIncluded(p.key);
+        return `<label class="um-perm ${off ? '' : 'um-on'}" title="${esc(why)}"><input type="checkbox" data-pk="${esc(p.key)}" ${off ? 'disabled' : ''} ${granted.has(p.key) ? 'checked' : ''}>
+        <span><b>${esc(p.label)}</b> <span class="dim">${esc(p.desc)}</span>${inc.length ? `<span class="um-inc">Includes: ${inc.map((k) => esc(umInfo[k].label)).join(', ')}</span>` : ''}</span></label>`;
+      }).join('')}</div></div>`;
   }).join('');
 }
+// Brings the tick boxes and the per-area counts in line with the draft without re-drawing the form.
+function umRefreshTicks() {
+  $('umDetail').querySelectorAll('input[data-pk]').forEach((i) => { i.checked = um.draft.has(i.dataset.pk); });
+  for (const g of um.groups) {
+    const have = g.permissions.filter((p) => um.draft.has(p.key)).length;
+    const c = $('umDetail').querySelector(`[data-gcount="${g.id}"]`), h = $('umDetail').querySelector(`[data-ghead="${g.id}"]`);
+    if (c) c.textContent = `${have}/${g.permissions.length}`;
+    if (h) h.checked = have === g.permissions.length;
+  }
+}
+const umMsg = '<span class="um-msg" id="umMsg"></span>';
+
 function renderUserMgmt() {
   document.querySelectorAll('#umTabs button').forEach((b) => b.classList.toggle('on', b.dataset.t === um.tab));
   const users = um.tab === 'users', items = users ? um.users : um.roles, sel = items.find((x) => x.id === um.sel[um.tab]);
-  $('umList').innerHTML = items.map((x) => `<div class="um-item ${x.id === um.sel[um.tab] ? 'on' : ''}" data-id="${esc(x.id)}">
-      <div class="um-name">${esc(x.name || x.username)}</div>
+  const nb = $('umNew');
+  nb.textContent = users ? 'New user' : 'New role';
+  nb.dataset.perm = users ? 'users.manage' : 'roles.manage';
+  nb.dataset.permWhat = users ? 'create users' : 'create roles';
+  nb.classList.toggle('on', um.mode === 'new');
+  decorateLocks(nb);
+  $('umList').innerHTML = items.map((x) => `<div class="um-item ${um.mode === 'view' && x.id === um.sel[um.tab] ? 'on' : ''}" data-id="${esc(x.id)}">
+      <div class="um-name">${esc(x.name || x.username)}${x.username === access.username ? ' <span class="dim">(you)</span>' : ''}</div>
       <div class="um-sub">${users ? (x.roles.length ? x.roles.map((r) => umChip(r)).join('') : '<span class="dim">No roles</span>')
         : `${x.members.length} member${x.members.length === 1 ? '' : 's'} · ${x.all ? 'full access' : `${x.permissions.length} permissions`}`}</div></div>`).join('')
     || `<p class="dim" style="margin:6px 10px">No ${um.tab} yet.</p>`;
+  if (um.mode === 'new') return users ? renderNewUser() : renderRoleForm(null);
   if (!sel) { $('umDetail').innerHTML = ''; return; }
-  if (users) {
-    $('umDetail').innerHTML = `<div class="um-title">${esc(sel.username)}</div>
-      <div class="dim" style="margin-bottom:10px">Account created ${esc(new Date(sel.createdAt).toLocaleString())}</div>
-      <div class="hd-label hd-label-dep">Roles</div>
-      <div class="um-roles">${um.roles.map((r) => {
-        const has = sel.roles.includes(r.id);
-        const tip = r.builtin && has ? 'Locked: an admin always keeps the admin role' : 'Changing roles is not available yet';
-        return `<label class="um-perm" title="${esc(tip)}"><input type="checkbox" disabled ${has ? 'checked' : ''}> <b>${esc(r.name)}</b> <span class="dim">${esc(r.description)}</span></label>`;
-      }).join('')}</div>
-      <div class="hd-label hd-label-dep">Permissions <span class="dim">${sel.all ? '(full access through the admin role)' : `(${sel.permissions.length} granted by their roles)`}</span></div>
-      ${umPerms(new Set(sel.permissions), sel.all ? 'Locked: the admin role has every permission' : 'Permissions come from roles and cannot be changed here')}`;
-  } else {
-    $('umDetail').innerHTML = `<div class="um-title">${esc(sel.name)} ${sel.builtin ? '<span class="badge grey">Built-in</span>' : ''}</div>
-      <div class="dim" style="margin-bottom:10px">${esc(sel.description)}</div>
-      ${sel.builtin ? '<div class="um-lock">This role has full access to everything and cannot be changed or removed. Admin members cannot be taken out of it.</div>' : ''}
-      <div class="hd-label hd-label-dep">Members</div>
-      <div class="um-chips">${sel.members.length ? sel.members.map((m) => umChip(m)).join('') : '<span class="dim">No members</span>'}</div>
-      <div class="hd-label hd-label-dep">Permissions</div>
-      <label class="um-perm um-master" title="Locked: the admin role has every permission"><input type="checkbox" disabled ${sel.all ? 'checked' : ''}> <b>Full access to everything</b> <span class="dim">including permissions added in future</span></label>
-      ${umPerms(new Set(sel.permissions), sel.builtin ? 'Locked: the admin role has every permission' : 'Permission changes are not available yet')}`;
-  }
+  if (users) renderUserDetail(sel); else if (sel.builtin) renderBuiltinRole(sel); else renderRoleForm(sel);
 }
-$('umTabs').onclick = (e) => { if (e.target.dataset.t) { um.tab = e.target.dataset.t; renderUserMgmt(); } };
-$('umList').onclick = (e) => { const it = e.target.closest('.um-item'); if (it) { um.sel[um.tab] = it.dataset.id; renderUserMgmt(); } };
+
+// A list of roles as tick boxes for a user. `locked` (an admin) or a missing Manage roles permission turns them off.
+function umRoleBoxes(draft, locked) {
+  return um.roles.map((r) => {
+    const has = draft.has(r.id), manage = can('roles.manage');
+    const off = locked || !manage || (!has && !umRoleGrantable(r));
+    const why = locked ? 'Locked: an admin keeps every role' : !manage ? 'Changing roles needs Manage roles' : !has && !umRoleGrantable(r) ? "You can't grant permissions you don't have" : '';
+    return `<label class="um-perm ${off ? '' : 'um-on'}" title="${esc(why)}"><input type="checkbox" data-rid="${esc(r.id)}" ${off ? 'disabled' : ''} ${has ? 'checked' : ''}> <b>${esc(r.name)}</b> <span class="dim">${esc(r.description)}</span></label>`;
+  }).join('');
+}
+
+function renderNewUser() {
+  um.draft = um.draft || new Set();
+  $('umDetail').innerHTML = `<div class="um-title">New user</div>
+    <div class="dim" style="margin-bottom:8px">The new user signs in with this username and password.</div>
+    <span class="fl">Username</span><input id="umUser" type="text" autocomplete="off" spellcheck="false" placeholder="e.g. jsmith">
+    <span class="fl">Password <span class="dim">(at least 8 characters)</span></span><input id="umPass" type="password" autocomplete="new-password">
+    <div class="hd-label hd-label-dep">Roles</div>
+    <div class="um-roles">${umRoleBoxes(um.draft, false)}</div>
+    <div class="um-actions"><button class="act" type="button" data-uma="create-user" data-perm="users.manage" data-perm-what="create users">Create user</button><button class="act sec" type="button" data-uma="cancel">Cancel</button>${umMsg}</div>`;
+}
+function renderUserDetail(sel) {
+  um.draft = um.draft || new Set(sel.roles);
+  const locked = sel.all, me = sel.username === access.username;
+  $('umDetail').innerHTML = `<div class="um-title">${esc(sel.username)}${me ? ' <span class="dim">(you)</span>' : ''}</div>
+    <div class="dim" style="margin-bottom:10px">Account created ${esc(new Date(sel.createdAt).toLocaleString())}</div>
+    <div class="hd-label hd-label-dep">Roles</div>
+    <div class="um-roles">${umRoleBoxes(um.draft, locked)}</div>
+    ${locked ? '<div class="um-lock">This user is an admin. Admins keep the admin role and every other role, and can\'t be deleted here.</div>'
+      : `<div class="um-actions"><button class="act" type="button" data-uma="save-roles" data-perm="roles.manage" data-perm-what="change roles">Save roles</button>${me ? '' : '<button class="del" type="button" data-uma="delete-user" data-perm="users.manage" data-perm-what="delete users">Delete user</button>'}${umMsg}</div>`}
+    <div class="hd-label hd-label-dep">Permissions <span class="dim">${sel.all ? '(full access through the admin role)' : `(${sel.permissions.length} granted by their roles)`}</span></div>
+    ${umPerms(new Set(sel.permissions), sel.all ? 'Locked: the admin role has every permission' : 'These come from the roles above')}`;
+}
+function renderBuiltinRole(sel) {
+  $('umDetail').innerHTML = `<div class="um-title">${esc(sel.name)} <span class="badge grey">Built-in</span></div>
+    <div class="dim" style="margin-bottom:10px">${esc(sel.description)}</div>
+    <div class="um-lock">This role has full access to everything and cannot be changed or removed. Admin members cannot be taken out of it.</div>
+    <div class="hd-label hd-label-dep">Members</div>
+    <div class="um-chips">${sel.members.length ? sel.members.map((m) => umChip(m)).join('') : '<span class="dim">No members</span>'}</div>
+    <div class="hd-label hd-label-dep">Permissions</div>
+    <label class="um-perm um-master" title="Locked: the admin role has every permission"><input type="checkbox" disabled checked> <b>Full access to everything</b> <span class="dim">including permissions added in future</span></label>
+    ${umPerms(new Set(sel.permissions), 'Locked: the admin role has every permission')}`;
+}
+// New role (sel is null) or an existing custom role.
+function renderRoleForm(sel) {
+  um.draft = um.draft || new Set(sel ? sel.permissions : []);
+  const manage = can('roles.manage');
+  $('umDetail').innerHTML = `<div class="um-title">${sel ? esc(sel.name) : 'New role'}</div>
+    ${sel ? '' : '<div class="dim" style="margin-bottom:8px">Choose what people with this role can do.</div>'}
+    ${sel ? '' : '<span class="fl">Name</span><input id="umRoleName" type="text" autocomplete="off" spellcheck="false" placeholder="e.g. analyst">'}
+    <span class="fl">Description</span><input id="umRoleDesc" type="text" autocomplete="off" maxlength="200" placeholder="What this role is for" value="${esc(sel ? sel.description : '')}">
+    ${sel ? `<div class="hd-label hd-label-dep">Members</div><div class="um-chips">${sel.members.length ? sel.members.map((m) => umChip(m)).join('') : '<span class="dim">No members</span>'}</div>` : ''}
+    <div class="hd-label hd-label-dep">Permissions</div>
+    ${umPerms(um.draft, manage ? '' : 'Changing roles needs Manage roles', manage)}
+    <div class="um-actions"><button class="act" type="button" data-uma="${sel ? 'save-role' : 'create-role'}" data-perm="roles.manage" data-perm-what="${sel ? 'change roles' : 'create roles'}">${sel ? 'Save role' : 'Create role'}</button>${sel ? '<button class="del" type="button" data-uma="delete-role" data-perm="roles.manage" data-perm-what="delete roles">Delete role</button>' : '<button class="act sec" type="button" data-uma="cancel">Cancel</button>'}${umMsg}</div>`;
+}
+
+const umSay = (t, cls = 'bad') => { const m = $('umMsg'); if (m) { m.textContent = t; m.className = `um-msg ${cls}`; } };
+async function umAct(act) {
+  const sel = (um.tab === 'users' ? um.users : um.roles).find((x) => x.id === um.sel[um.tab]);
+  try {
+    if (act === 'cancel') { um.mode = 'view'; um.draft = null; renderUserMgmt(); return; }
+    if (act === 'create-user') {
+      const r = await api('POST', '/api/users', { username: $('umUser').value.trim(), password: $('umPass').value, roles: [...um.draft] });
+      toast(`User ${r.username} created`); um.sel.users = r.id;
+    } else if (act === 'save-roles') {
+      await api('PUT', `/api/users/${sel.id}`, { roles: [...um.draft] }); toast(`Roles saved for ${sel.username}`);
+    } else if (act === 'delete-user') {
+      if (!confirm(`Delete the user ${sel.username}? They will be signed out and can no longer sign in.`)) return;
+      await api('DELETE', `/api/users/${sel.id}`); toast(`User ${sel.username} deleted`); um.sel.users = null;
+    } else if (act === 'create-role') {
+      const r = await api('POST', '/api/roles', { name: $('umRoleName').value.trim(), description: $('umRoleDesc').value, permissions: [...um.draft] });
+      toast(`Role ${r.name} created`); um.sel.roles = r.id;
+    } else if (act === 'save-role') {
+      await api('PUT', `/api/roles/${sel.id}`, { description: $('umRoleDesc').value, permissions: [...um.draft] }); toast(`Role ${sel.name} saved`);
+    } else if (act === 'delete-role') {
+      if (!confirm(`Delete the role ${sel.name}?`)) return;
+      await api('DELETE', `/api/roles/${sel.id}`); toast(`Role ${sel.name} deleted`); um.sel.roles = null;
+    }
+  } catch (e) { umSay(e.message); return; }
+  await loadUserMgmt();
+}
+$('umTabs').onclick = (e) => { if (e.target.dataset.t) { um.tab = e.target.dataset.t; um.mode = 'view'; um.draft = null; renderUserMgmt(); } };
+$('umNew').onclick = () => { um.mode = 'new'; um.draft = null; renderUserMgmt(); };
+$('umList').onclick = (e) => { const it = e.target.closest('.um-item'); if (it) { um.sel[um.tab] = it.dataset.id; um.mode = 'view'; um.draft = null; renderUserMgmt(); } };
+$('umDetail').onclick = (e) => { const b = e.target.closest('[data-uma]'); if (b) umAct(b.dataset.uma); };
+$('umDetail').onchange = (e) => {
+  const t = e.target;
+  if (t.dataset.rid) { t.checked ? um.draft.add(t.dataset.rid) : um.draft.delete(t.dataset.rid); return; }
+  if (!t.dataset.pk) return;
+  const k = t.dataset.pk;
+  if (t.checked) { um.draft.add(k); umIncluded(k).forEach((i) => um.draft.add(i)); } // ticking an option ticks what it includes
+  else { um.draft.delete(k); for (const o of Object.keys(umInfo)) if (umIncluded(o).includes(k)) um.draft.delete(o); } // unticking removes what depends on it
+  umRefreshTicks();
+};
 
 // ---- Health: monitor ----
 // One box per saved host. Host is the ping result (checked every minute); Remote is the WinRM or SSH port (checked every
@@ -1065,6 +1268,7 @@ $('umList').onclick = (e) => { const it = e.target.closest('.um-item'); if (it) 
 // this page only shows the latest results. The Shell tab shows the same counts as X/Y.
 let monSnap = null, monTimer;
 async function fetchMonitor(force = false) {
+  if (!can('system.view')) { monSnap = null; if ($('navStats')) $('navStats').innerHTML = ''; return null; }
   try { monSnap = await api(force ? 'POST' : 'GET', force ? '/api/monitor/check' : '/api/monitor'); } catch { /* keep the last results */ }
   renderNavStats();
   return monSnap;
@@ -1167,7 +1371,7 @@ function renderShellMain() {
   const [cls, label] = !sh ? ['grey', 'Not connected'] : { connecting: ['grey', 'Connecting…'], connected: ['green', 'Connected'], ended: ['red', 'Session ended'] }[sh.status];
   $('shellHead').innerHTML = h
     ? `<span class="sh-title">${esc(h.hostname || h.name)}</span><span class="dim">${esc(h.address)} · ${h.protocol === 'ssh' ? 'SSH' : 'WinRM'}</span><span class="badge ${cls}">${label}</span>
-       <span class="shell-actions"><button class="act sec" data-shell-act="Send file">Send file</button><button class="act sec" data-shell-act="Pull file">Pull file</button><button class="act sec" data-shell-act="Quick hunt">Quick hunt</button><button class="act sec" data-shell-act="Quick response">Quick response</button></span>`
+       <span class="shell-actions"><button class="act sec" data-shell-act="Send file" data-perm="shell.files" data-perm-what="send files to hosts">Send file</button><button class="act sec" data-shell-act="Pull file" data-perm="shell.files" data-perm-what="pull files from hosts">Pull file</button><button class="act sec" data-shell-act="Quick hunt" data-perm="hunts.run" data-perm-what="run hunts">Quick hunt</button><button class="act sec" data-shell-act="Quick response" data-perm="actions.run" data-perm-what="run actions">Quick response</button></span>`
     : '<span class="dim">Select a host on the left, then press Start shell.</span>';
   for (const [id, s] of shells) s.el.hidden = id !== shellHost;
   $('termEmpty').hidden = !!sh;
@@ -1397,11 +1601,25 @@ async function loadHome() {
       ['Saved', `${a.hosts} hosts · ${a.profiles} profiles · ${a.runs} runs`]);
   } catch (e) { rows.push(['Server', `<span class="bad">${esc(e.message)}</span>`]); }
   try {
-    const me = (await api('GET', '/api/auth/me')).username;
-    rows.push(['Signed in as', esc(me)]);
-    $('signOutMsg').textContent = me; // shown beside the Sign out button
+    const me = await api('GET', '/api/auth/me');
+    const who = me.roles.length ? `${me.username} (${me.roles.join(', ')})` : me.username; // e.g. admin (admin)
+    rows.push(['Signed in as', esc(who)]);
+    $('signOutMsg').textContent = who; // shown beside the Sign out button
+    renderHomeAccess(me, await api('GET', '/api/permissions'));
   } catch { /* a 401 already redirected */ }
   $('homeInfo').innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
+}
+// Right of the logo: the signed-in user's roles, what they can do (green) and what they can't (red).
+function renderHomeAccess(me, groups) {
+  const options = groups.flatMap((g) => g.permissions), has = new Set(me.permissions);
+  const can = options.filter((p) => has.has(p.key)), cant = options.filter((p) => !has.has(p.key));
+  const list = (items, cls, mark, empty) => (items.length ? items.map((p) => `<li class="${cls}" title="${esc(p.desc)}"><i>${mark}</i>${esc(p.label)}</li>`).join('') : `<li class="dim">${empty}</li>`);
+  $('homePerms').innerHTML = `<div class="hp-title">Your access</div>
+    <div class="hp-roles">${me.roles.length ? me.roles.map((r) => `<span class="um-chip">${esc(r)}</span>`).join('') : '<span class="dim">No roles</span>'}</div>
+    <div class="hp-head can">Can do${me.all ? ' <span class="dim">(full access)</span>' : ''}</div>
+    <ul>${list(can, 'can', '✓', 'Nothing')}</ul>
+    <div class="hp-head cant">Can't do</div>
+    <ul>${list(cant, 'cant', '✗', 'Nothing is restricted')}</ul>`;
 }
 $('signOut').onclick = async () => {
   try { await api('POST', '/api/auth/logout'); } catch { /* signing out anyway */ }
@@ -1520,7 +1738,7 @@ function renderLog() {
       <div class="lg-head" data-toggle="${r.id}" role="button" tabindex="0" aria-expanded="${open}"><span class="chev">${open ? '▾' : '▸'}</span>
         <span class="lg-name">${esc(r.name || r.collectionName)}</span><span class="badge ${badge}">${esc(r.status.replaceAll('_', ' '))}</span>
         <span class="dim">${esc(new Date(r.startedAt).toLocaleString())}</span><span class="dim">${ok}/${r.results.length} ok · ${r.eventCount} event${r.eventCount === 1 ? '' : 's'}</span>
-        <span class="lg-btns"><a href="/api/runs/${r.id}/log.csv" download data-stop="1" title="Download this hunt's log as CSV">Export CSV</a><a data-del="${r.id}" data-stop="1">Delete</a></span></div>
+        <span class="lg-btns"><a href="/api/runs/${r.id}/log.csv" download data-stop="1" data-perm="hunts.export" data-perm-what="export logs" title="Download this hunt's log as CSV">Export CSV</a><a data-del="${r.id}" data-stop="1" data-perm="hunts.run" data-perm-what="delete hunt records">Delete</a></span></div>
       ${open ? `<div class="lg-body">${table}</div>` : ''}</div>`;
   }).join('') || '<p class="dim" style="margin:0">No hunts yet. Use Burrow → Hunt to run collections against your hosts.</p>';
 }
@@ -1604,5 +1822,8 @@ window.addEventListener('hashchange', () => {
   if (t && `${t}/${p}` !== currentSlug) go(t, p);
 });
 const [startTab, startPage] = location.hash.slice(1).split('/');
-go(startTab || 'hosts', startPage);
-pollNavStats();
+loadAccess().then(() => {
+  refreshTopLocks(); decorateLocks();
+  go(startTab || 'hosts', startPage);
+  pollNavStats();
+});

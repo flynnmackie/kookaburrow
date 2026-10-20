@@ -107,17 +107,27 @@
   .home-main { flex:1; min-height:0; display:flex; flex-direction:column; align-items:center; justify-content:safe center; gap:8px; text-align:center; padding-bottom:24px; }
   /* info on the left, bird in the true centre (the empty third column balances the first), big */
   .home-hero { display:grid; grid-template-columns:minmax(230px, 1fr) auto minmax(230px, 1fr); align-items:center; gap:28px; width:100%; margin-bottom:6px; }
-  .home-hero::after { content:''; }
   .home-logo { max-height:min(62vh, 560px); max-width:100%; height:auto; width:auto; justify-self:center; }
   .home-info { display:grid; grid-template-columns:auto 1fr; gap:6px 16px; margin:0; padding:0 0 0 8px; justify-self:start; text-align:left; font-size:12.5px; }
   .home-info dt { color:var(--faint); white-space:nowrap; }
-  .home-info dd { margin:0; word-break:break-word; color:var(--ok); }
+  .home-info dd { margin:0; word-break:break-word; color:#fff; }
+  /* the signed-in user's access, to the right of the logo */
+  .home-perms { justify-self:end; text-align:left; font-size:12.5px; padding-right:8px; min-width:0; }
+  .home-perms ul { list-style:none; margin:0 0 8px; padding:0; }
+  .home-perms li { display:flex; gap:7px; align-items:baseline; line-height:1.55; cursor:help; }
+  .home-perms li i { font-style:normal; font-weight:700; width:11px; flex-shrink:0; }
+  .home-perms li.can { color:var(--ok); } .home-perms li.cant { color:var(--bad); }
+  .hp-title { font:600 10.5px var(--f-ui); letter-spacing:.05em; text-transform:uppercase; color:var(--faint); margin-bottom:4px; }
+  .hp-roles { display:flex; flex-wrap:wrap; gap:4px; margin-bottom:8px; }
+  .hp-head { font:600 11px var(--f-ui); letter-spacing:.04em; text-transform:uppercase; margin:2px 0 1px; }
+  .hp-head.can { color:var(--ok); } .hp-head.cant { color:var(--bad); }
+  .hp-head .dim { text-transform:none; letter-spacing:0; font-weight:400; }
   .home-info dd .dim, .home-info dd .bad { color:var(--dim); }
   @media (max-width:1000px) {
     .home-hero { grid-template-columns:1fr; justify-items:center; gap:14px; }
-    .home-hero::after { display:none; }
     .home-logo { order:-1; max-height:44vh; }
     .home-info { justify-self:center; padding:0; }
+    .home-perms { justify-self:center; padding:0; }
   }
   .home-name { font:600 24px var(--f-ui); letter-spacing:.01em; }
   .home-tag { color:var(--dim); font-size:13.5px; margin-bottom:10px; }
@@ -344,7 +354,21 @@
   .hostsearch { width:100%; margin-bottom:8px; padding:3px 8px; font-size:12.5px; }
   #hostTable td.rown, #hostTable th.rown { width:1%; text-align:right; color:var(--faint); font-variant-numeric:tabular-nums; }
   .proto-winrm { color:var(--blue); } .proto-ssh { color:var(--orange); }
+  /* Permissions: padlocks and the denied popup */
+  svg.lock { vertical-align:-1px; margin-right:5px; flex-shrink:0; }
+  .locked { opacity:.6; cursor:not-allowed !important; }
+  #topnav button.locked, #sidenav button.locked { color:var(--faint); }
+  #sidenav button.locked { white-space:nowrap; } #sidenav button.locked svg.lock { width:11px; height:11px; margin-right:4px; }
+  #topnav button.right.locked svg.lock { margin-right:4px; }
+  .modal .dlg.deny { width:min(420px, 100%); height:auto; }
+  .deny-body { padding:12px 16px 4px; font-size:13px; } .deny-body p { margin:0 0 8px; }
+  .deny .dlg-head h2 { display:flex; align-items:center; gap:7px; color:var(--bad); } .deny .dlg-head svg.lock { margin:0; }
   /* User management */
+  #umNew { padding:2px 12px; margin-left:auto; } #umNew + #umTabs { margin-left:0; }
+  .um-actions { display:flex; align-items:center; gap:8px; margin:10px 0 4px; } .um-msg { font-size:12.5px; } .um-msg.ok { color:var(--ok); } .um-msg.bad { color:var(--bad); }
+  .um-detail .fl { display:block; font:600 10.5px var(--f-ui); text-transform:uppercase; letter-spacing:.05em; color:var(--dim); margin:9px 0 4px; }
+  .um-detail input[type=text], .um-detail input[type=password] { display:block; } .um-detail input[type=text], .um-detail input[type=password] { width:100%; max-width:420px; }
+  .um-perm.um-on { cursor:pointer; }
   .um-top { display:flex; align-items:center; gap:14px; margin-bottom:2px; } .um-top h2 { margin-bottom:2px; }
   #umTabs { margin:0 0 0 auto; width:180px; }
   .um-layout { display:grid; grid-template-columns:minmax(200px, 260px) 1fr; gap:12px; align-items:start; margin-top:8px; }
@@ -587,7 +611,7 @@
           </div>
           <span class="fl">Script</span>
           <textarea class="scriptbox" id="ahScript" rows="12" spellcheck="false"></textarea>
-          <div class="formfoot"><button type="button" class="act" id="ahSubmit">Add Collection</button><button type="button" class="act sec" id="ahCancel" hidden>Cancel</button><span id="ahMsg"></span></div>
+          <div class="formfoot"><button type="button" class="act" id="ahSubmit" data-perm="collections.manage" data-perm-what="add or change collections">Add Collection</button><button type="button" class="act sec" id="ahCancel" hidden>Cancel</button><span id="ahMsg"></span></div>
         </div>
         <div class="card">
           <h2>Your collections</h2>
@@ -601,7 +625,7 @@
         <div class="card">
           <h2>Hunt</h2>
           <p class="dim">Run collections against hosts or groups and keep the results.</p>
-          <button class="act" id="bhNew">New Hunt</button>
+          <button class="act" id="bhNew" data-perm="hunts.run" data-perm-what="run hunts">New Hunt</button>
         </div>
         <div class="card">
           <h2>Previous hunts</h2>
@@ -648,7 +672,7 @@
           </div>
           <span class="fl">Script</span>
           <textarea class="scriptbox" id="aaScript" rows="12" spellcheck="false"></textarea>
-          <div class="formfoot"><button type="button" class="act" id="aaSubmit">Add Action</button><button type="button" class="act sec" id="aaCancel" hidden>Cancel</button><span id="aaMsg"></span></div>
+          <div class="formfoot"><button type="button" class="act" id="aaSubmit" data-perm="actions.manage" data-perm-what="add or change actions">Add Action</button><button type="button" class="act sec" id="aaCancel" hidden>Cancel</button><span id="aaMsg"></span></div>
         </div>
         <div class="card">
           <h2>Your actions</h2>
@@ -658,7 +682,7 @@
     </section>
     <section class="page" id="settings/user-management">
       <div class="card">
-        <div class="um-top"><h2>User Management</h2><div class="toggle" id="umTabs"><button type="button" data-t="users" class="on">Users</button><button type="button" data-t="roles">Roles</button></div></div>
+        <div class="um-top"><h2>User Management</h2><button class="act" id="umNew" type="button">New user</button><div class="toggle" id="umTabs"><button type="button" data-t="users" class="on">Users</button><button type="button" data-t="roles">Roles</button></div></div>
         <div class="um-layout">
           <div class="um-list" id="umList"></div>
           <div class="um-detail" id="umDetail"></div>
@@ -710,7 +734,7 @@
             <input id="pUser" placeholder="Username" autocomplete="off">
             <input id="pPass" type="password" placeholder="Password" autocomplete="new-password">
             <input id="pSudo" type="password" placeholder="Sudo password (optional)" autocomplete="new-password">
-            <button class="act" id="pSave">Add/Update profile</button>
+            <button class="act" id="pSave" data-perm="hosts.manage" data-perm-what="change credential profiles">Add/Update profile</button>
             <span id="pMsg"></span>
           </div>
         </div>
@@ -725,7 +749,7 @@
         <h2>Subnet scan</h2>
         <div class="row">
           <input id="cidr" placeholder="192.168.50.0/24, 10.0.0.5-20, 172.16.1.7,8,9" size="46" title="Subnets (192.168.50.0/24), ranges (192.168.50.10-20), lists (192.168.50.5,6,7) or single addresses. Chain several with commas." spellcheck="false" autocomplete="off">
-          <button class="act" id="scanBtn">Scan</button>
+          <button class="act" id="scanBtn" data-perm="hosts.manage" data-perm-what="run discovery scans">Scan</button>
           <button class="act sec" id="scanStop" hidden>Cancel</button>
           <span class="dim" id="scanStatus"></span>
         </div>
@@ -736,7 +760,7 @@
         <p class="dim">Results of the last scan. OS is assumed from open ports until a host is authenticated.</p>
         <table id="authTable"><thead><tr><th>Host</th><th>Hostname</th><th>OS (assumed)</th><th>Open ports</th><th>Profile</th><th>WinRM</th><th>SSH</th></tr></thead><tbody></tbody></table>
         <div class="row" style="margin-top:12px">
-          <button class="act" id="authBtn">Authenticate</button> <span id="authMsg"></span>
+          <button class="act" id="authBtn" data-perm="hosts.manage" data-perm-what="authenticate hosts">Authenticate</button> <span id="authMsg"></span>
         </div>
       </div>
     </section>
@@ -761,7 +785,7 @@
           <input id="mnPass" type="password" autocomplete="new-password">
           <span class="fl">Port <span class="dim">(optional)</span></span>
           <div class="mnport"><input id="mnPort" type="number" min="1" max="65535" placeholder="5985, then 5986"><label id="mnSslBox" class="mnssl"><input id="mnSsl" type="checkbox"> Use HTTPS</label></div>
-          <div class="formfoot"><button type="button" class="act" id="mnSubmit">Authenticate and add</button><span id="mnMsg"></span></div>
+          <div class="formfoot"><button type="button" class="act" id="mnSubmit" data-perm="hosts.manage" data-perm-what="add hosts">Authenticate and add</button><span id="mnMsg"></span></div>
         </div>
         <div class="card">
           <h2>This session</h2>
@@ -774,7 +798,7 @@
         <h2>New group</h2>
         <div class="row">
           <input id="listName" placeholder="Group name">
-          <button class="act" id="mkList">Create group</button>
+          <button class="act" id="mkList" data-perm="hosts.manage" data-perm-what="create groups">Create group</button>
           <span id="listMsg" class="bad"></span>
         </div>
         <div class="checks" id="listHosts"></div>
@@ -812,6 +836,7 @@
           <div class="home-hero">
             <dl class="home-info" id="homeInfo"></dl>
             <img class="home-logo" src="logo.png" alt="Kookaburrow">
+            <div class="home-perms" id="homePerms"></div>
           </div>
           <div class="home-name">Kookaburrow</div>
           <div class="home-tag">Threat hunting for Windows and Linux hosts</div>
@@ -845,7 +870,7 @@
         <div class="row">
           <select id="jsonRun" style="min-width:280px; max-width:100%"></select>
           <button class="act sec" id="jsonCopy" disabled>Copy</button>
-          <button class="act sec" id="jsonSave" disabled>Download</button>
+          <button class="act sec" id="jsonSave" data-perm="hunts.export" data-perm-what="export collected data" disabled>Download</button>
           <span class="dim" id="jsonSize"></span>
         </div>
         <pre id="jsonOut" class="code"></pre>
@@ -877,7 +902,7 @@
       </div>
       <div class="coll-detail" id="hmDetail"></div>
     </div>
-    <div class="dlg-foot"><button class="act" id="hmRun">Run Hunt</button><button class="act sec" id="hmCancel">Cancel</button><span id="hmMsg"></span><span class="sum" id="hmSummary"></span></div>
+    <div class="dlg-foot"><button class="act" id="hmRun" data-perm="hunts.run" data-perm-what="run hunts">Run Hunt</button><button class="act sec" id="hmCancel">Cancel</button><span id="hmMsg"></span><span class="sum" id="hmSummary"></span></div>
   </div>
 </div>
 <div class="menu" id="sendMenu" hidden><button type="button" id="sendPickFiles">Choose files…</button><button type="button" id="sendPickFolder">Choose a folder…</button></div>
@@ -889,6 +914,13 @@
     <div class="pm-bar"><button class="act sec" id="pmUp" type="button" title="Up one folder">↑ Up</button><input id="pmPath" type="text" spellcheck="false" autocomplete="off"><button class="act sec" id="pmGo" type="button">Go</button></div>
     <div class="dlg-body pm-body" id="pmList"></div>
     <div class="dlg-foot"><button class="act" id="pmPull" type="button" disabled>Pull</button><button class="act sec" id="pmCancel" type="button">Cancel</button><span id="pmMsg"></span><span class="sum" id="pmSel"></span></div>
+  </div>
+</div>
+<div class="modal" id="denyModal" hidden role="alertdialog" aria-modal="true" aria-labelledby="denyTitle">
+  <div class="dlg deny">
+    <div class="dlg-head"><h2 id="denyTitle"><svg class="lock" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg> Permission denied</h2><button class="dlg-x" id="denyX" aria-label="Close">×</button></div>
+    <div class="dlg-body deny-body" id="denyBody"></div>
+    <div class="dlg-foot"><button class="act" id="denyOk" type="button">OK</button></div>
   </div>
 </div>
 <div id="toasts" aria-live="polite"></div>

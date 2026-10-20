@@ -94,4 +94,10 @@ function logout(req) {
   return `${COOKIE}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0`;
 }
 
-module.exports = { sessionFrom, login, logout };
+// Signs a user out everywhere (used when the account is deleted).
+function endSessions(username) {
+  db.sessions = db.sessions.filter((s) => s.user !== username);
+  save();
+}
+
+module.exports = { sessionFrom, login, logout, makeUser, endSessions };

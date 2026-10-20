@@ -16,6 +16,7 @@ const shell = require('./src/shell');
 const monitor = require('./src/monitor');
 const auth = require('./src/auth');
 const permissions = require('./src/permissions');
+const routePerms = require('./src/route-perms');
 
 const app = express();
 app.use(express.json({ limit: '400kb' }));
@@ -29,6 +30,12 @@ app.use((req, res, next) => {
   if (origin && !allowed.has(new URL(origin).host)) return res.status(403).json({ error: 'Bad Origin' });
   next();
 });
+
+// A user's roles (ids) and the permissions they give together; `all` is true when one of the roles is full access.
+const access = (u) => {
+  const mine = db.roles.filter((r) => u.roles.includes(r.id));
+  return { roles: mine.map((r) => r.id), permissions: [...new Set(mine.flatMap((r) => permissions.expand(r)))], all: mine.some((r) => r.permissions.includes('*')) };
+};
 
 // ---- Sign-in ------------------------------------------------------------------------------
 // Everything except the sign-in page (and the images and fonts it uses) needs a session. Pages redirect to /login.html;
@@ -48,7 +55,23 @@ app.post('/api/auth/login', async (req, res) => {
   } catch (e) { res.status(e.status || 400).json({ error: e.message }); }
 });
 app.post('/api/auth/logout', (req, res) => { res.set('Set-Cookie', auth.logout(req)).json({ ok: true }); });
-app.get('/api/auth/me', (req, res) => res.json({ username: req.user }));
+// Who is signed in, with their roles and what those roles allow (the Home page shows this).
+app.get('/api/auth/me', (req, res) => {
+  const u = db.users.find((x) => x.username === req.user);
+  res.json({ username: req.user, ...(u ? access(u) : { roles: [], permissions: [], all: false }) });
+});
+
+// ---- Permissions: every API route needs the permission listed in src/route-perms.js (admin has all of them) ----
+const labelOf = Object.fromEntries(permissions.GROUPS.flatMap((g) => g.permissions).map((p) => [p.key, p.label]));
+app.use((req, res, next) => {
+  if (!req.path.startsWith('/api/')) return next();
+  const need = routePerms.required(req.method, req.path);
+  if (need === 'open') return next();
+  const u = db.users.find((x) => x.username === req.user);
+  const a = u ? access(u) : { all: false, permissions: [] };
+  if (need !== 'deny' && (a.all || need.some((p) => a.permissions.includes(p)))) return next();
+  res.status(403).json({ error: 'Permission denied', permission: need === 'deny' ? null : need[0], needed: need === 'deny' ? [] : need.map((p) => labelOf[p]) });
+});
 
 // no-cache: the browser always checks for a newer copy, so an updated page or script is never served stale
 app.use(express.static(config.publicDir, { setHeaders: (res) => res.set('Cache-Control', 'no-cache') }));
@@ -309,17 +332,106 @@ app.delete('/api/runs/:id', (req, res) => {
 
 // ---- Users, roles and permissions (read-only for now; Settings > System > User Management) ----
 app.get('/api/permissions', (req, res) => res.json(permissions.GROUPS));
-app.get('/api/roles', (req, res) => res.json(db.roles.map((r) => ({
+const roleView = (r) => ({
   id: r.id, name: r.name, description: r.description, builtin: !!r.builtin, all: r.permissions.includes('*'),
   permissions: permissions.expand(r), members: db.users.filter((u) => u.roles.includes(r.id)).map((u) => u.username),
-}))));
-app.get('/api/users', (req, res) => res.json(db.users.map((u) => {
-  const mine = db.roles.filter((r) => u.roles.includes(r.id));
-  return {
-    id: u.id, username: u.username, createdAt: u.createdAt, roles: mine.map((r) => r.id),
-    permissions: [...new Set(mine.flatMap((r) => permissions.expand(r)))], all: mine.some((r) => r.permissions.includes('*')),
-  };
-})));
+});
+const userView = (u) => ({ id: u.id, username: u.username, createdAt: u.createdAt, ...access(u) });
+app.get('/api/roles', (req, res) => res.json(db.roles.map(roleView)));
+app.get('/api/users', (req, res) => res.json(db.users.map(userView)));
+
+// Creating and changing users and roles. Nobody can hand out more than they have: the permissions of the roles you grant
+// or create must all be ones you hold yourself (admin holds everything).
+const caller = (req) => db.users.find((u) => u.username === req.user);
+function checkGrantable(req, perms) {
+  const a = access(caller(req));
+  if (a.all) return;
+  const missing = perms.filter((p) => !a.permissions.includes(p));
+  if (missing.length) throw new Error(`You can't grant permissions you don't have: ${[...new Set(missing)].map((p) => labelOf[p]).join(', ')}`);
+}
+const rolesFromBody = (v) => {
+  const ids = [...new Set(Array.isArray(v) ? v.map(String) : [])];
+  for (const id of ids) if (!db.roles.some((r) => r.id === id)) throw new Error(`Unknown role: ${id}`);
+  return ids;
+};
+const permsOf = (roleIds) => [...new Set(db.roles.filter((r) => roleIds.includes(r.id)).flatMap((r) => permissions.expand(r)))];
+// The permissions chosen for a role, with everything each one includes added, in the standard order.
+const permsFromBody = (v) => {
+  const keys = Array.isArray(v) ? v.map(String) : [];
+  for (const k of keys) if (!permissions.ALL.includes(k)) throw new Error(`Unknown permission: ${k}`);
+  const set = new Set(permissions.withIncluded(keys));
+  return permissions.ALL.filter((k) => set.has(k));
+};
+
+app.post('/api/users', wrap(async (req, res) => {
+  const username = String(req.body.username || '').trim();
+  if (!/^[A-Za-z0-9._-]{2,32}$/.test(username)) throw new Error('A username is 2 to 32 letters, numbers, dots, dashes or underscores');
+  if (db.users.some((u) => u.username.toLowerCase() === username.toLowerCase())) throw new Error('That username is already taken');
+  const password = String(req.body.password ?? '');
+  if (password.length < 8) throw new Error('The password must be at least 8 characters');
+  const roles = rolesFromBody(req.body.roles);
+  checkGrantable(req, permsOf(roles));
+  const user = { ...auth.makeUser(username, password), roles };
+  db.users.push(user);
+  save();
+  res.json(userView(user));
+}));
+app.put('/api/users/:id', wrap((req, res) => {
+  const u = db.users.find((x) => x.id === req.params.id);
+  if (!u) throw new Error('User not found');
+  if (access(u).all) throw new Error("An admin's roles can't be changed here");
+  const roles = rolesFromBody(req.body.roles);
+  checkGrantable(req, permsOf(roles));
+  u.roles = roles;
+  save();
+  res.json(userView(u));
+}));
+app.delete('/api/users/:id', wrap((req, res) => {
+  const u = db.users.find((x) => x.id === req.params.id);
+  if (!u) throw new Error('User not found');
+  if (u.username === req.user) throw new Error("You can't delete the account you are signed in with");
+  if (access(u).all) throw new Error("An admin can't be deleted here");
+  db.users = db.users.filter((x) => x !== u);
+  auth.endSessions(u.username);
+  save();
+  res.json({ ok: true });
+}));
+
+app.post('/api/roles', wrap((req, res) => {
+  const name = String(req.body.name || '').trim();
+  if (!/^[A-Za-z0-9][A-Za-z0-9 ._-]{0,30}[A-Za-z0-9]$/.test(name)) throw new Error('A role name is 2 to 32 letters, numbers, spaces, dots, dashes or underscores');
+  const id = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  if (db.roles.some((r) => r.id === id || r.name.toLowerCase() === name.toLowerCase())) throw new Error('A role with that name already exists');
+  const perms = permsFromBody(req.body.permissions);
+  if (!perms.length) throw new Error('Tick at least one permission');
+  checkGrantable(req, perms);
+  const role = { id, name, description: String(req.body.description || '').trim().slice(0, 200) || 'No description.', builtin: false, permissions: perms };
+  db.roles.push(role);
+  save();
+  res.json(roleView(role));
+}));
+app.put('/api/roles/:id', wrap((req, res) => {
+  const r = db.roles.find((x) => x.id === req.params.id);
+  if (!r) throw new Error('Role not found');
+  if (r.builtin) throw new Error("The built-in role can't be changed");
+  const perms = permsFromBody(req.body.permissions);
+  if (!perms.length) throw new Error('Tick at least one permission');
+  checkGrantable(req, perms);
+  r.permissions = perms;
+  if (req.body.description !== undefined) r.description = String(req.body.description).trim().slice(0, 200) || 'No description.';
+  save();
+  res.json(roleView(r));
+}));
+app.delete('/api/roles/:id', wrap((req, res) => {
+  const r = db.roles.find((x) => x.id === req.params.id);
+  if (!r) throw new Error('Role not found');
+  if (r.builtin) throw new Error("The built-in role can't be deleted");
+  const members = db.users.filter((u) => u.roles.includes(r.id));
+  if (members.length) throw new Error(`Remove this role from ${members.map((u) => u.username).join(', ')} first`);
+  db.roles = db.roles.filter((x) => x !== r);
+  save();
+  res.json({ ok: true });
+}));
 
 // Server facts for the home page. Nothing secret: no keys, paths outside the app, or credentials.
 app.get('/api/about', (req, res) => {
