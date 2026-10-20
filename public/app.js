@@ -10,6 +10,13 @@ function toast(text, kind = 'ok') {
 }
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+// A request that comes back 401 means the session has ended (or never existed): go to the sign-in page.
+const rawFetch = window.fetch.bind(window);
+window.fetch = async (...args) => {
+  const r = await rawFetch(...args);
+  if (r.status === 401) location.replace('/login.html');
+  return r;
+};
 async function api(method, url, body) {
   const r = await fetch(url, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined });
   const data = await r.json();
@@ -22,12 +29,9 @@ const NAV = [
   // A third entry puts a page under a titled dropdown in the side menu (the titles are not pages).
   // { heading: 'Name' } is a titled dropdown with no pages yet.
   { id: 'settings', label: 'Settings', pages: [
-    { heading: 'System' },
+    ['user-management', 'User Management', 'System'], ['shell-settings', 'Shell Settings', 'System'], ['health-settings', 'Health Settings', 'System'],
     ['view-collections', 'View Collections', 'Collections'], ['add-collections', 'Add Collections', 'Collections'], ['binaries', 'Binaries', 'Collections'],
     ['view-actions', 'View Actions', 'Actions'], ['add-actions', 'Add Actions', 'Actions'],
-    { heading: 'User Management' },
-    { heading: 'Shell Settings' },
-    { heading: 'Health Settings' },
   ] },
   { id: 'hosts', label: 'Host Management', pages: [
     ['view-hosts', 'View Hosts', 'Hosts'], ['profiles', 'Profiles', 'Hosts'], ['groups', 'Groups', 'Hosts'],
@@ -50,6 +54,7 @@ const loaders = {
   'home/home': loadHome,
   'shell/shell': loadShell,
   'health/monitor': loadMonitor,
+  'settings/user-management': loadUserMgmt,
   'settings/add-collections': () => addCollections(),
   'settings/add-actions': () => addActions(),
   'settings/binaries': loadBinaries,
@@ -995,6 +1000,65 @@ $('bbList').onclick = async (e) => {
   } catch (err) { $('bbPreview').innerHTML = `<p class="bad">${esc(err.message)}</p>`; }
 };
 
+// ---- Settings: User Management ----
+// Two tabs. Users: click a user to see their roles and the permissions those roles give them. Roles: click a role to see its
+// permissions as tick boxes and who is in it. Read-only for now. The built-in admin role is locked: it always has every
+// permission, and admin users can't be taken out of it.
+const um = { tab: 'users', users: [], roles: [], groups: [], sel: { users: null, roles: null } };
+async function loadUserMgmt() {
+  try { [um.users, um.roles, um.groups] = await Promise.all([api('GET', '/api/users'), api('GET', '/api/roles'), api('GET', '/api/permissions')]); }
+  catch (e) { $('umDetail').innerHTML = `<p class="bad">${esc(e.message)}</p>`; return; }
+  for (const t of ['users', 'roles']) if (!um[t].some((x) => x.id === um.sel[t])) um.sel[t] = um[t][0]?.id ?? null;
+  renderUserMgmt();
+}
+const umChip = (t, cls = '') => `<span class="um-chip ${cls}">${esc(t)}</span>`;
+// Permission tick boxes by area. Options build on each other: an option that includes lower ones says so ("Includes: ...").
+// All are locked (disabled) for now; `tip` says why on hover.
+function umPerms(granted, tip) {
+  const all = Object.fromEntries(um.groups.flatMap((g) => g.permissions).map((p) => [p.key, p]));
+  // everything an option brings with it, including what the included options include
+  const included = (k, seen = new Set()) => { for (const i of all[k].implies) if (!seen.has(i)) { seen.add(i); included(i, seen); } return [...seen]; };
+  return um.groups.map((g) => {
+    const have = g.permissions.filter((p) => granted.has(p.key)).length;
+    return `<div class="um-group"><div class="um-ghead"><label title="${esc(tip)}"><input type="checkbox" disabled ${have === g.permissions.length ? 'checked' : ''}> <b>${esc(g.name)}</b></label><span class="dim">${have}/${g.permissions.length}</span></div>
+      <div class="um-perms">${g.permissions.map((p) => `<label class="um-perm" title="${esc(tip)}"><input type="checkbox" disabled ${granted.has(p.key) ? 'checked' : ''}>
+        <span><b>${esc(p.label)}</b> <span class="dim">${esc(p.desc)}</span>${p.implies.length ? `<span class="um-inc">Includes: ${included(p.key).map((k) => esc(all[k].label)).join(', ')}</span>` : ''}</span></label>`).join('')}</div></div>`;
+  }).join('');
+}
+function renderUserMgmt() {
+  document.querySelectorAll('#umTabs button').forEach((b) => b.classList.toggle('on', b.dataset.t === um.tab));
+  const users = um.tab === 'users', items = users ? um.users : um.roles, sel = items.find((x) => x.id === um.sel[um.tab]);
+  $('umList').innerHTML = items.map((x) => `<div class="um-item ${x.id === um.sel[um.tab] ? 'on' : ''}" data-id="${esc(x.id)}">
+      <div class="um-name">${esc(x.name || x.username)}</div>
+      <div class="um-sub">${users ? (x.roles.length ? x.roles.map((r) => umChip(r)).join('') : '<span class="dim">No roles</span>')
+        : `${x.members.length} member${x.members.length === 1 ? '' : 's'} · ${x.all ? 'full access' : `${x.permissions.length} permissions`}`}</div></div>`).join('')
+    || `<p class="dim" style="margin:6px 10px">No ${um.tab} yet.</p>`;
+  if (!sel) { $('umDetail').innerHTML = ''; return; }
+  if (users) {
+    $('umDetail').innerHTML = `<div class="um-title">${esc(sel.username)}</div>
+      <div class="dim" style="margin-bottom:10px">Account created ${esc(new Date(sel.createdAt).toLocaleString())}</div>
+      <div class="hd-label hd-label-dep">Roles</div>
+      <div class="um-roles">${um.roles.map((r) => {
+        const has = sel.roles.includes(r.id);
+        const tip = r.builtin && has ? 'Locked: an admin always keeps the admin role' : 'Changing roles is not available yet';
+        return `<label class="um-perm" title="${esc(tip)}"><input type="checkbox" disabled ${has ? 'checked' : ''}> <b>${esc(r.name)}</b> <span class="dim">${esc(r.description)}</span></label>`;
+      }).join('')}</div>
+      <div class="hd-label hd-label-dep">Permissions <span class="dim">${sel.all ? '(full access through the admin role)' : `(${sel.permissions.length} granted by their roles)`}</span></div>
+      ${umPerms(new Set(sel.permissions), sel.all ? 'Locked: the admin role has every permission' : 'Permissions come from roles and cannot be changed here')}`;
+  } else {
+    $('umDetail').innerHTML = `<div class="um-title">${esc(sel.name)} ${sel.builtin ? '<span class="badge grey">Built-in</span>' : ''}</div>
+      <div class="dim" style="margin-bottom:10px">${esc(sel.description)}</div>
+      ${sel.builtin ? '<div class="um-lock">This role has full access to everything and cannot be changed or removed. Admin members cannot be taken out of it.</div>' : ''}
+      <div class="hd-label hd-label-dep">Members</div>
+      <div class="um-chips">${sel.members.length ? sel.members.map((m) => umChip(m)).join('') : '<span class="dim">No members</span>'}</div>
+      <div class="hd-label hd-label-dep">Permissions</div>
+      <label class="um-perm um-master" title="Locked: the admin role has every permission"><input type="checkbox" disabled ${sel.all ? 'checked' : ''}> <b>Full access to everything</b> <span class="dim">including permissions added in future</span></label>
+      ${umPerms(new Set(sel.permissions), sel.builtin ? 'Locked: the admin role has every permission' : 'Permission changes are not available yet')}`;
+  }
+}
+$('umTabs').onclick = (e) => { if (e.target.dataset.t) { um.tab = e.target.dataset.t; renderUserMgmt(); } };
+$('umList').onclick = (e) => { const it = e.target.closest('.um-item'); if (it) { um.sel[um.tab] = it.dataset.id; renderUserMgmt(); } };
+
 // ---- Health: monitor ----
 // One box per saved host. Host is the ping result (checked every minute); Remote is the WinRM or SSH port (checked every
 // 5 minutes). Green is up, red is not responding, grey is not checked yet. The checks run in the server (src/monitor.js);
@@ -1332,10 +1396,17 @@ async function loadHome() {
       ['Library', `${a.collections} collections · ${a.actions} actions`],
       ['Saved', `${a.hosts} hosts · ${a.profiles} profiles · ${a.runs} runs`]);
   } catch (e) { rows.push(['Server', `<span class="bad">${esc(e.message)}</span>`]); }
-  rows.push(['Signed in as', '<span class="dim">Not signed in (sign-in is not set up yet)</span>']);
+  try {
+    const me = (await api('GET', '/api/auth/me')).username;
+    rows.push(['Signed in as', esc(me)]);
+    $('signOutMsg').textContent = me; // shown beside the Sign out button
+  } catch { /* a 401 already redirected */ }
   $('homeInfo').innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
 }
-$('signOut').onclick = () => { $('signOutMsg').textContent = 'Sign-in is not set up yet, so there is nothing to sign out of.'; };
+$('signOut').onclick = async () => {
+  try { await api('POST', '/api/auth/logout'); } catch { /* signing out anyway */ }
+  location.replace('/login.html');
+};
 
 // Small syntax highlighter for the two collection languages. Each alternative is one capture group.
 const HL = {

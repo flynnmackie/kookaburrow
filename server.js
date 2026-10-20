@@ -14,6 +14,8 @@ const authTest = require('./src/auth-test');
 const huntRunner = require('./src/hunt-runner');
 const shell = require('./src/shell');
 const monitor = require('./src/monitor');
+const auth = require('./src/auth');
+const permissions = require('./src/permissions');
 
 const app = express();
 app.use(express.json({ limit: '400kb' }));
@@ -27,7 +29,29 @@ app.use((req, res, next) => {
   if (origin && !allowed.has(new URL(origin).host)) return res.status(403).json({ error: 'Bad Origin' });
   next();
 });
-app.use(express.static(config.publicDir));
+
+// ---- Sign-in ------------------------------------------------------------------------------
+// Everything except the sign-in page (and the images and fonts it uses) needs a session. Pages redirect to /login.html;
+// API calls and other files answer 401, which the app turns into a redirect to the sign-in page.
+const PUBLIC_FILES = new Set(['/login.html', '/fonts.css', '/favicon.ico', '/logo.png', '/logo-sm.png', '/bg-kookaburrow.png']);
+app.use((req, res, next) => {
+  if (PUBLIC_FILES.has(req.path) || req.path.startsWith('/fonts/') || req.path === '/api/auth/login') return next();
+  const s = auth.sessionFrom(req);
+  if (s) { req.user = s.user; return next(); }
+  if (req.method === 'GET' && (req.path === '/' || req.path === '/index.html')) return res.redirect('/login.html');
+  res.status(401).json({ error: 'Sign in required' });
+});
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const r = await auth.login(req.body?.username, req.body?.password);
+    res.set('Set-Cookie', r.cookie).json({ ok: true, username: r.user });
+  } catch (e) { res.status(e.status || 400).json({ error: e.message }); }
+});
+app.post('/api/auth/logout', (req, res) => { res.set('Set-Cookie', auth.logout(req)).json({ ok: true }); });
+app.get('/api/auth/me', (req, res) => res.json({ username: req.user }));
+
+// no-cache: the browser always checks for a newer copy, so an updated page or script is never served stale
+app.use(express.static(config.publicDir, { setHeaders: (res) => res.set('Cache-Control', 'no-cache') }));
 
 // async so synchronous throws inside handlers also become JSON 400s instead of HTML stack traces
 const wrap = (fn) => async (req, res) => {
@@ -282,6 +306,20 @@ app.delete('/api/runs/:id', (req, res) => {
   save();
   res.json({ ok: true });
 });
+
+// ---- Users, roles and permissions (read-only for now; Settings > System > User Management) ----
+app.get('/api/permissions', (req, res) => res.json(permissions.GROUPS));
+app.get('/api/roles', (req, res) => res.json(db.roles.map((r) => ({
+  id: r.id, name: r.name, description: r.description, builtin: !!r.builtin, all: r.permissions.includes('*'),
+  permissions: permissions.expand(r), members: db.users.filter((u) => u.roles.includes(r.id)).map((u) => u.username),
+}))));
+app.get('/api/users', (req, res) => res.json(db.users.map((u) => {
+  const mine = db.roles.filter((r) => u.roles.includes(r.id));
+  return {
+    id: u.id, username: u.username, createdAt: u.createdAt, roles: mine.map((r) => r.id),
+    permissions: [...new Set(mine.flatMap((r) => permissions.expand(r)))], all: mine.some((r) => r.permissions.includes('*')),
+  };
+})));
 
 // Server facts for the home page. Nothing secret: no keys, paths outside the app, or credentials.
 app.get('/api/about', (req, res) => {
