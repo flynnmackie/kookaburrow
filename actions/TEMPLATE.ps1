@@ -17,8 +17,9 @@ $Tags = @('containment', 'process')
 #   * $Dependencies: external binaries the action needs (see the collection template). @() for none.
 #   * $Parameters: the names of the inputs the action needs, for example @('ProcessName').
 #     The platform will define a variable of the same name ($ProcessName) before the script
-#     starts, so use it directly. Use @() when the action needs no input. (Entering values and
-#     running actions is not wired up yet.)
+#     starts, so use it directly. Use @() when the action needs no input. Put a ? on the end of a
+#     name to make it optional, for example @('UserName', 'Group?'); an optional input the user
+#     leaves blank is an empty string, so test it ($Group) before using it.
 #   * $Tags: short lowercase labels. Common ones: containment, process, accounts, network,
 #     firewall, services, persistence, remediation, filesystem.
 #

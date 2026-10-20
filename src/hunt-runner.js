@@ -77,7 +77,7 @@ function combine(parts) { // parts: [{ hostname, address, csv }]
   return { csv: out.map(csvRow).join('\r\n') + '\r\n', columns: all, rows, records };
 }
 
-function startHunt({ name, collectionIds, hosts }) {
+function startHunt({ name, collectionIds, hosts, startedBy, scheduleId }) {
   const chosen = collectionIds.map((cid) => {
     const c = collections.resolveCollection(cid);
     if (!c) throw new Error(`Unknown collection: ${cid}`);
@@ -93,7 +93,7 @@ function startHunt({ name, collectionIds, hosts }) {
   const label = (h) => h.hostname || h.name || h.address;
 
   const run = {
-    id: id(), kind: 'hunt', name: huntName,
+    id: id(), kind: 'hunt', name: huntName, startedBy: startedBy || null, ...(scheduleId ? { scheduleId } : {}),
     collectionIds: chosen.map((c) => c.id), collectionNames: chosen.map((c) => c.name),
     collectionName: chosen.map((c) => c.name).join(', '),
     evidenceDir: folder, status: 'running', startedAt: started.toISOString(),
@@ -104,7 +104,7 @@ function startHunt({ name, collectionIds, hosts }) {
   db.runs.unshift(run);
   save();
   const audit = createAudit(run, path.join(evidenceDir, folder, 'hunt-log.csv'));
-  audit.log({ kind: 'hunt', action: 'Hunt started', detail: `${huntName}: ${chosen.length} collection${chosen.length === 1 ? '' : 's'} (${run.collectionName}) on ${hosts.length} host${hosts.length === 1 ? '' : 's'}` });
+  audit.log({ kind: 'hunt', action: 'Hunt started', detail: `${huntName}: ${chosen.length} collection${chosen.length === 1 ? '' : 's'} (${run.collectionName}) on ${hosts.length} host${hosts.length === 1 ? '' : 's'}${startedBy ? `, started by ${startedBy}` : ''}` });
   const proto = (h) => (h.protocol === 'ssh' ? 'SSH' : 'WinRM');
 
   const data = new Map(); // `${collectionId}|${hostId}` -> csv text
@@ -184,7 +184,7 @@ function startHunt({ name, collectionIds, hosts }) {
     run.status = run.results.some((r) => r.status === 'error') ? 'completed_with_errors' : 'completed';
     run.finishedAt = new Date().toISOString();
     const huntJson = JSON.stringify({
-      name: huntName, folder, status: run.status, startedAt: run.startedAt, finishedAt: run.finishedAt,
+      name: huntName, startedBy: startedBy || null, folder, status: run.status, startedAt: run.startedAt, finishedAt: run.finishedAt,
       hosts: hosts.map((h) => ({ hostname: label(h), address: h.address, os: h.os || null, protocol: h.protocol })),
       collections: details,
     }, null, 2) + '\n';
@@ -203,4 +203,4 @@ function startHunt({ name, collectionIds, hosts }) {
   return run;
 }
 
-module.exports = { startHunt, parseCsv };
+module.exports = { startHunt, parseCsv, createHuntFolder };

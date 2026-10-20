@@ -87,6 +87,7 @@ function readArray(s, i, type) {
   return null;
 }
 
+const rawParams = (fields) => (Array.isArray(fields.parameters) ? fields.parameters : String(fields.parameters ?? '').split(/[,;]/)).map((x) => x.trim()).filter(Boolean);
 function parseCollection(text, type, isAction = false) {
   const s = text.replace(/^\uFEFF/, '');
   const ps = type === 'powershell';
@@ -123,7 +124,8 @@ function parseCollection(text, type, isAction = false) {
     dependencies,
     ...describe(fields, dependencies, isAction),
     // Actions only: names of the inputs the script expects, e.g. $Parameters = @('ProcessName').
-    parameters: (Array.isArray(fields.parameters) ? fields.parameters : String(fields.parameters ?? '').split(/[,;]/)).map((x) => x.trim()).filter(Boolean),
+    parameters: rawParams(fields).map((x) => x.replace(/\?$/, '')),
+    optionalParameters: rawParams(fields).filter((x) => x.endsWith('?')).map((x) => x.slice(0, -1)), // written with a trailing ? in the header
     tags: [...new Set(tags.map((t) => t.trim().toLowerCase()).filter(Boolean))],
     body: s.slice(end).replace(/^(?:[ \t]*\r?\n)+/, '').replace(/\s+$/, ''),
     warnings: FIELDS.filter((f) => fields[f] === undefined).map((f) => `Missing ${label(f)} variable at the top of the script`),
@@ -149,7 +151,7 @@ function listScripts(root, query, tags = [], requiresDeps = false) {
       const collection = {
         id: `${type}/${f}`, type, file: f,
         name: p.name || f.slice(0, -ext.length), description: p.description,
-        dependencies: p.dependencies, footprint: p.footprint, returns: p.returns, kind: p.kind, parameters: p.parameters, tags: p.tags, warnings: p.warnings,
+        dependencies: p.dependencies, footprint: p.footprint, returns: p.returns, kind: p.kind, parameters: p.parameters, optionalParameters: p.optionalParameters, tags: p.tags, warnings: p.warnings,
         verified: verified[`${type}/${f}`] === hashText(text),
       };
       if (!wanted.every((t) => collection.tags.includes(t))) continue;

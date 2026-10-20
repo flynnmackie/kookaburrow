@@ -38,7 +38,7 @@ function makeFiles({ root, noun, listAll, resolve }) {
     if (isAction) {
       parameters = list(b.parameters);
       for (const p of parameters) {
-        if (!PARAM_RE[type].test(p)) throw new Error(`Invalid parameter "${p}": ${type === 'bash' ? 'use UPPER_SNAKE_CASE such as PROCESS_NAME' : 'use letters and numbers such as ProcessName'}`);
+        if (!PARAM_RE[type].test(p.replace(/\?$/, ''))) throw new Error(`Invalid parameter "${p}": ${type === 'bash' ? 'use UPPER_SNAKE_CASE such as PROCESS_NAME' : 'use letters and numbers such as ProcessName'} (add ? on the end if it is optional)`);
       }
     } else {
       dependencies = list(b.dependencies);
@@ -56,7 +56,7 @@ function makeFiles({ root, noun, listAll, resolve }) {
 
   function build({ type, name, description, tags, dependencies, parameters, footprint, returns, kind, script }) {
     const ps = type === 'powershell';
-    const arr = (items) => (ps ? `@(${items.map((i) => quote(i, type)).join(', ')})` : `(${items.join(' ')})`);
+    const arr = (items) => (ps ? `@(${items.map((i) => quote(i, type)).join(', ')})` : `(${items.map((i) => (/[?*]/.test(i) ? `'${i}'` : i)).join(' ')})`);
     const head = ps
       ? [`$Name = ${quote(name, type)}`, `$Description = ${quote(description, type)}`, `$Dependencies = ${arr(dependencies)}`]
       : [`NAME=${quote(name, type)}`, `DESCRIPTION=${quote(description, type)}`, `DEPENDENCIES=${arr(dependencies)}`];
@@ -83,7 +83,7 @@ function makeFiles({ root, noun, listAll, resolve }) {
     const p = collections.parseCollection(text, f.type, isAction);
     const same = p.name === f.name && p.description === f.description
       && p.dependencies.join('\n') === f.dependencies.join('\n') && p.tags.join('\n') === f.tags.join('\n')
-      && (isAction ? p.parameters.join('\n') === f.parameters.join('\n') : p.footprint === f.footprint && p.returns === f.returns && p.kind === f.kind)
+      && (isAction ? p.parameters.join('\n') === f.parameters.map((x) => x.replace(/\?$/, '')).join('\n') && p.optionalParameters.join('\n') === f.parameters.filter((x) => x.endsWith('?')).map((x) => x.slice(0, -1)).join('\n') : p.footprint === f.footprint && p.returns === f.returns && p.kind === f.kind)
       && p.body === f.script;
     if (!same) throw new Error(`Could not write this ${noun} safely; check the name, description and script for unusual characters`);
     fs.mkdirSync(path.dirname(full), { recursive: true });

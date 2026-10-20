@@ -17,8 +17,9 @@ TAGS=(containment process)
 #   * DEPENDENCIES: external binaries the action needs. () for none.
 #   * PARAMETERS: names of the inputs the action needs, UPPER_SNAKE_CASE, for example
 #     (PROCESS_NAME). The platform will define a shell variable of the same name before the
-#     script starts, so use it directly. () when the action needs no input. (Entering values and
-#     running actions is not wired up yet.)
+#     script starts, so use it directly. () when the action needs no input. Put a ? on the end of a
+#     name, in quotes, to make it optional, for example (USER_NAME 'GROUP?'); an optional input
+#     the user leaves blank is an empty string, so test it ([ -n "$GROUP" ]) before using it.
 #   * TAGS: short lowercase labels. Common ones: containment, process, accounts, network,
 #     firewall, services, persistence, remediation, filesystem.
 #

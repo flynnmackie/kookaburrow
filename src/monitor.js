@@ -11,18 +11,21 @@ const TICK_MS = 1000;
 const LIMIT = 16;          // checks in flight at once
 const PORT_TIMEOUT = 2000;
 
-// What can be changed in Health Settings (kept in db.settings.health). `excluded` lists the hosts that are not checked;
-// a host that is added later is checked until it is listed there.
-const DEFAULTS = { enabled: true, pingSeconds: 60, portSeconds: 5 * 60, excluded: [] };
+// What can be changed in Health Settings (kept in db.settings.health). `pingOff` and `remoteOff` list the hosts whose ping, or whose
+// WinRM/SSH port, is not checked; a host that is added later is checked both ways until it is listed. (Older settings had one
+// `excluded` list, which switched both off; it is read as both lists.)
+const DEFAULTS = { enabled: true, pingSeconds: 60, portSeconds: 5 * 60, pingOff: [], remoteOff: [] };
 const LIMITS = { pingSeconds: [5, 3600], portSeconds: [10, 86400] };
+const knownIds = () => new Set(db.hosts.map((h) => h.id));
+const idList = (v, known) => [...new Set(Array.isArray(v) ? v.map(String) : [])].filter((id) => known.has(id));
 function settings() {
-  const s = (db.settings && db.settings.health) || {};
-  const known = new Set(db.hosts.map((h) => h.id));
+  const s = (db.settings && db.settings.health) || {}, known = knownIds();
   return {
     enabled: s.enabled !== false,
     pingSeconds: Number.isInteger(s.pingSeconds) ? s.pingSeconds : DEFAULTS.pingSeconds,
     portSeconds: Number.isInteger(s.portSeconds) ? s.portSeconds : DEFAULTS.portSeconds,
-    excluded: (Array.isArray(s.excluded) ? s.excluded : []).filter((id) => known.has(id)),
+    pingOff: idList(s.pingOff ?? s.excluded, known),
+    remoteOff: idList(s.remoteOff ?? s.excluded, known),
   };
 }
 // Any field left out keeps its current value, so the on/off switch can be saved on its own.
@@ -33,14 +36,16 @@ function setSettings(b) {
     if (!Number.isInteger(v) || v < lo || v > hi) throw new Error(`${label} must be a whole number of seconds from ${lo} to ${hi}`);
     out[key] = v;
   }
-  const known = new Set(db.hosts.map((h) => h.id));
-  out.excluded = b.excluded === undefined ? cur.excluded : [...new Set(Array.isArray(b.excluded) ? b.excluded.map(String) : [])].filter((id) => known.has(id));
+  const known = knownIds();
+  out.pingOff = b.pingOff !== undefined ? idList(b.pingOff, known) : b.excluded !== undefined ? idList(b.excluded, known) : cur.pingOff;
+  out.remoteOff = b.remoteOff !== undefined ? idList(b.remoteOff, known) : b.excluded !== undefined ? idList(b.excluded, known) : cur.remoteOff;
   db.settings = { ...(db.settings || {}), health: out };
   save();
   if (!out.enabled) queue.length = 0; // nothing waiting to run once monitoring is off
   checkNow(); // new intervals, newly added hosts and switching back on take effect straight away
 }
-const monitoredHosts = (s = settings()) => db.hosts.filter((h) => !s.excluded.includes(h.id));
+const pingHosts = (s = settings()) => db.hosts.filter((h) => !s.pingOff.includes(h.id));
+const remoteHosts = (s = settings()) => db.hosts.filter((h) => !s.remoteOff.includes(h.id));
 
 const pings = new Map();   // address -> { up, rttMs, startedAt, checkedAt, since }
 const ports = new Map();   // `${address}:${port}` -> { open, startedAt, checkedAt, since }
@@ -82,15 +87,15 @@ function record(map, key, up, field, extra = {}) {
 function jobs(now) {
   const due = (m, key, every) => { const r = m.get(key); return !r || now - r.startedAt >= every - 500; };
   const out = [];
-  const s = settings(), pingMs = s.pingSeconds * 1000, portMs = s.portSeconds * 1000, hostsNow = monitoredHosts(s);
-  for (const address of new Set(hostsNow.map((h) => h.address))) {
+  const s = settings(), pingMs = s.pingSeconds * 1000, portMs = s.portSeconds * 1000;
+  for (const address of new Set(pingHosts(s).map((h) => h.address))) {
     const key = `ping|${address}`;
     if (!inflight.has(key) && due(pings, address, pingMs)) {
       out.push({ key, run: async () => { const r = await ping(address); record(pings, address, r.up, 'up', { rttMs: r.rttMs ?? null }); } });
       pings.set(address, { ...(pings.get(address) || { up: false, since: now, checkedAt: 0 }), startedAt: now }); // marks it as started so it is not queued twice
     }
   }
-  for (const h of hostsNow) {
+  for (const h of remoteHosts(s)) {
     for (const port of portsFor(h)) {
       const k = `${h.address}:${port}`, key = `port|${k}`;
       if (inflight.has(key) || !due(ports, k, portMs) || out.some((j) => j.key === key)) continue;
@@ -126,24 +131,26 @@ function checkNow() {
 function snapshot() {
   const cfg = settings();
   if (!cfg.enabled) {
-    return { enabled: false, hosts: [], summary: { enabled: false, total: 0, hostsUp: 0, remoteUp: 0, excluded: 0, pingEveryMs: cfg.pingSeconds * 1000, portsEveryMs: cfg.portSeconds * 1000 } };
+    return { enabled: false, hosts: [], summary: { enabled: false, total: 0, pingTotal: 0, remoteTotal: 0, hostsUp: 0, remoteUp: 0, excluded: 0, pingEveryMs: cfg.pingSeconds * 1000, portsEveryMs: cfg.portSeconds * 1000 } };
   }
-  const s = settings(), monitored = monitoredHosts(s);
-  const hosts = monitored.map((h) => {
+  // A host appears here if at least one of its two checks is on; the one that is off says "not monitored".
+  const shown = db.hosts.filter((h) => !cfg.pingOff.includes(h.id) || !cfg.remoteOff.includes(h.id));
+  const hosts = shown.map((h) => {
+    const pingOn = !cfg.pingOff.includes(h.id), remoteOn = !cfg.remoteOff.includes(h.id);
     const pg = pings.get(h.address);
-    const pgChecked = pg && pg.checkedAt > 0;
+    const pgChecked = pingOn && pg && pg.checkedAt > 0;
     const ps = portsFor(h).map((port) => ({ port, ...(ports.get(`${h.address}:${port}`) || {}) }));
-    const checked = ps.filter((p) => p.checkedAt > 0);
+    const checked = remoteOn ? ps.filter((p) => p.checkedAt > 0) : [];
     const anyOpen = checked.some((p) => p.open);
-    const remote = anyOpen ? 'up' : checked.length === ps.length ? 'down' : 'unknown';
+    const remote = !remoteOn ? 'off' : anyOpen ? 'up' : checked.length === ps.length ? 'down' : 'unknown';
     const rSince = anyOpen ? Math.min(...checked.filter((p) => p.open).map((p) => p.since)) : checked.length ? Math.max(...checked.map((p) => p.since)) : null;
     return {
       id: h.id, name: h.name || h.hostname || h.address, hostname: h.hostname || null, address: h.address, protocol: h.protocol, os: h.os || null,
-      host: { state: pgChecked ? (pg.up ? 'up' : 'down') : 'unknown', rttMs: pgChecked ? pg.rttMs ?? null : null, since: pgChecked ? pg.since : null, checkedAt: pgChecked ? pg.checkedAt : null },
+      host: { state: !pingOn ? 'off' : pgChecked ? (pg.up ? 'up' : 'down') : 'unknown', rttMs: pgChecked ? pg.rttMs ?? null : null, since: pgChecked ? pg.since : null, checkedAt: pgChecked ? pg.checkedAt : null },
       remote: {
         label: remoteLabel(h), state: remote, since: rSince,
         checkedAt: checked.length ? Math.max(...checked.map((p) => p.checkedAt)) : null,
-        ports: ps.map((p) => ({ port: p.port, state: p.checkedAt > 0 ? (p.open ? 'open' : 'closed') : 'unknown' })),
+        ports: ps.map((p) => ({ port: p.port, state: !remoteOn ? 'off' : p.checkedAt > 0 ? (p.open ? 'open' : 'closed') : 'unknown' })),
       },
     };
   });
@@ -153,9 +160,11 @@ function snapshot() {
     summary: {
       enabled: true,
       total: hosts.length,
+      pingTotal: hosts.filter((h) => h.host.state !== 'off').length,
+      remoteTotal: hosts.filter((h) => h.remote.state !== 'off').length,
       hostsUp: hosts.filter((h) => h.host.state === 'up').length,
       remoteUp: hosts.filter((h) => h.remote.state === 'up').length,
-      pingEveryMs: s.pingSeconds * 1000, portsEveryMs: s.portSeconds * 1000, excluded: db.hosts.length - monitored.length,
+      pingEveryMs: cfg.pingSeconds * 1000, portsEveryMs: cfg.portSeconds * 1000, excluded: db.hosts.length - shown.length,
     },
   };
 }

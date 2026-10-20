@@ -1,7 +1,7 @@
 $Name = 'Create local user'
 $Description = 'Creates a local account with the given password, optionally adding it to a local group such as Administrators.'
 $Dependencies = @()
-$Parameters = @('UserName', 'Password', 'Group')
+$Parameters = @('UserName', 'Password', 'Group?')
 $Tags = @('accounts', 'remediation')
 
 if (-not $UserName -or -not $Password) { throw 'UserName and Password are required' }

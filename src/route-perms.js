@@ -6,8 +6,9 @@ const OPEN = 'open';
 const RULES = [
   ['*', /^\/api\/auth\/(login|logout|me)$/, OPEN],
   ['GET', /^\/api\/(permissions|about)$/, OPEN],
+  ['PUT', /^\/api\/users\/[^/]+\/password$/, OPEN], // checked in the handler: your own needs the current password, others need Manage users
 
-  ['GET', /^\/api\/(hosts|lists)$/, ['hosts.view', 'shell.open', 'hunts.run']],
+  ['GET', /^\/api\/(hosts|lists)$/, ['hosts.view', 'shell.open', 'hunts.run', 'actions.run']],
   ['GET', /^\/api\/(profiles|assignments)$/, ['hosts.view']],
   ['*', /^\/api\/(scans|profiles|assignments|lists|hosts|auth\/test)(\/|$)/, ['hosts.manage']],
 
@@ -20,9 +21,14 @@ const RULES = [
   ['GET', /^\/api\/actions(\/|$)/, ['actions.view']],
   ['*', /^\/api\/actions(\/|$)/, ['actions.manage']],
 
+  ['POST', /^\/api\/responses$/, ['actions.run']],
+  ['DELETE', /^\/api\/responses\/[^/]+$/, ['actions.run']],
+  ['GET', /^\/api\/schedules$/, ['hunts.view', 'actions.view']],
+  ['DELETE', /^\/api\/schedules\/[^/]+$/, ['hunts.run', 'actions.run']], // the kind of schedule is checked in the handler
+  ['GET', /^\/api\/responses(\/|$)/, ['actions.view']],
   ['POST', /^\/api\/(runs|hunts)$/, ['hunts.run']],
   ['DELETE', /^\/api\/runs\/[^/]+$/, ['hunts.run']],
-  ['GET', /^\/api\/runs\/[^/]+\/log\.csv$/, ['hunts.export']],
+  ['GET', /^\/api\/runs\/[^/]+\/(log\.csv|download)$/, ['hunts.export']],
   ['GET', /^\/api\/runs(\/|$)/, ['hunts.view']],
   ['GET', /^\/api\/browse\/download$/, ['hunts.export']],
   ['GET', /^\/api\/browse(\/|$)/, ['hunts.view']],

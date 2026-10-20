@@ -77,6 +77,13 @@ function sessionFrom(req) {
   return { user: s.user };
 }
 
+// Counts a failed attempt; MAX_FAILS in a row lock the name for LOCK_MS. A finished lockout starts the count again.
+function recordFailure(name, f) {
+  const lockEnded = f && f.until && f.until <= Date.now();
+  const n = (lockEnded ? 0 : f?.n || 0) + 1;
+  fails.set(name, { n, until: n >= MAX_FAILS ? Date.now() + LOCK_MS : 0 });
+}
+
 // Returns the Set-Cookie header value for a new session, or throws with a message for the sign-in form.
 async function login(username, password) {
   const name = String(username || '').trim().toLowerCase();
@@ -86,9 +93,7 @@ async function login(username, password) {
   // The same work is done whether or not the user exists, so timing does not reveal valid usernames.
   const ok = user ? checkPassword(user, password) : (scrypt(password, Buffer.alloc(16)), false);
   if (!ok) {
-    const lockEnded = f && f.until && f.until <= Date.now(); // a finished lockout starts the count again
-    const n = (lockEnded ? 0 : f?.n || 0) + 1;
-    fails.set(name, { n, until: n >= MAX_FAILS ? Date.now() + LOCK_MS : 0 });
+    recordFailure(name, f);
     await new Promise((r) => setTimeout(r, 400));
     throw Object.assign(new Error('Incorrect username or password'), { status: 401 });
   }
@@ -113,4 +118,25 @@ function endSessions(username) {
   save();
 }
 
-module.exports = { sessionFrom, login, logout, makeUser, endSessions };
+// ---- Changing passwords ----
+// The current password must be right to change your own (it counts towards the same lockout as a failed sign-in).
+async function confirmPassword(user, password) {
+  const name = user.username.toLowerCase(), f = fails.get(name);
+  if (f && f.until > Date.now()) throw Object.assign(new Error(`Too many attempts. Try again in ${Math.ceil((f.until - Date.now()) / 1000)} seconds.`), { status: 429 });
+  if (checkPassword(user, String(password ?? ''))) { fails.delete(name); return; }
+  recordFailure(name, f);
+  await new Promise((r) => setTimeout(r, 400));
+  throw Object.assign(new Error('The current password is wrong'), { status: 400 });
+}
+// Stores a new password and signs the user out everywhere, except the session named in keepSession.
+function setPassword(user, password, { keepSession } = {}) {
+  const salt = crypto.randomBytes(16);
+  user.salt = salt.toString('hex');
+  user.hash = scrypt(password, salt).toString('hex');
+  delete user.defaultPassword;
+  db.sessions = db.sessions.filter((s) => s.user !== user.username || (keepSession && s.h === keepSession));
+  save();
+}
+const sessionHash = (req) => { const t = cookieOf(req); return /^[0-9a-f]{64}$/.test(t) ? sha256(t) : null; };
+
+module.exports = { sessionFrom, login, logout, makeUser, endSessions, confirmPassword, setPassword, sessionHash };

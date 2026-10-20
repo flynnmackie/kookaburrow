@@ -40,7 +40,7 @@ const LOCK = '<svg class="lock" viewBox="0 0 24 24" width="12" height="12" fill=
 async function loadAccess() {
   try {
     const [me, groups] = await Promise.all([api('GET', '/api/auth/me'), api('GET', '/api/permissions')]);
-    access = { username: me.username, roles: me.roleNames, permissions: new Set(me.permissions), all: me.all, options: Object.fromEntries(groups.flatMap((g) => g.permissions).map((p) => [p.key, p])) };
+    access = { id: me.id, username: me.username, roles: me.roleNames, permissions: new Set(me.permissions), all: me.all, options: Object.fromEntries(groups.flatMap((g) => g.permissions).map((p) => [p.key, p])) };
   } catch { /* a 401 already redirected to the sign-in page */ }
 }
 const permLabel = (key) => access.options[key]?.label || key;
@@ -93,7 +93,7 @@ const PAGE_PERM = {
   'settings/view-collections': 'collections.view', 'settings/add-collections': 'collections.manage', 'settings/binaries': 'collections.manage',
   'settings/view-actions': 'actions.view', 'settings/add-actions': 'actions.manage',
   'hosts/view-hosts': 'hosts.view', 'hosts/profiles': 'hosts.view', 'hosts/groups': 'hosts.view', 'hosts/discover': 'hosts.manage', 'hosts/manual': 'hosts.manage',
-  'burrow/hunt': 'hunts.view', 'burrow/respond': 'actions.view',
+  'burrow/hunt': 'hunts.view', 'burrow/respond': 'actions.view', 'burrow/recurring': 'hunts.view,actions.view',
   'output/log': 'hunts.view', 'output/report': 'hunts.view', 'output/json': 'hunts.view', 'browse/files': 'hunts.view',
   'shell/shell': 'shell.open', 'health/monitor': 'system.view',
 };
@@ -122,7 +122,7 @@ const NAV = [
     ['view-hosts', 'View Hosts', 'Hosts'], ['profiles', 'Profiles', 'Hosts'], ['groups', 'Groups', 'Hosts'],
     ['discover', 'Discover', 'Add Hosts'], ['manual', 'Manually Add', 'Add Hosts'],
   ] },
-  { id: 'burrow', label: 'Burrow!', accent: true, pages: [['hunt', 'Hunt'], ['respond', 'Respond']] },
+  { id: 'burrow', label: 'Burrow!', accent: true, pages: [['hunt', 'Hunt'], ['respond', 'Respond'], ['recurring', 'Recurring']] },
   { id: 'output', label: 'Output', pages: [['log', 'Log'], ['report', 'Report'], ['json', 'JSON']] },
   { id: 'browse', label: 'Browse', pages: [['files', 'Files']] },
   // The logo in the header opens this landing page. It has no tab of its own and no side menu.
@@ -135,6 +135,8 @@ const loaders = {
   'settings/view-collections': () => loadCollectionList(),
   'settings/view-actions': () => loadActionList(),
   'burrow/hunt': loadBurrowHunts,
+  'burrow/recurring': () => window.loadRecurring?.(),
+  'burrow/respond': () => window.loadRespond?.(), // respond.js loads after this file
   'browse/files': () => loadBrowse('/'),
   'home/home': loadHome,
   'shell/shell': loadShell,
@@ -773,7 +775,7 @@ function makeLibrary({ id, url, noun, folder, showParams }) {
     <div class="hd-label hd-label-desc">Description</div>
     <div class="hd-desc">${h.description ? esc(h.description) : '<span class="dim">-</span>'}</div>
     ${showParams ? `<div class="hd-label hd-label-dep">Parameters</div>
-    <div class="hd-deps">${h.parameters.length ? h.parameters.map((p) => `<span class="dep have">${esc(p)}</span>`).join('') : '<span class="dim">None</span>'}</div>` : ''}
+    <div class="hd-deps">${h.parameters.length ? h.parameters.map((p) => `<span class="dep have">${esc(p)}${h.optionalParameters.includes(p) ? ' (optional)' : ''}</span>`).join('') : '<span class="dim">None</span>'}</div>` : ''}
     <div class="hd-label hd-label-dep">Dependencies</div>
     <div class="hd-deps">${deps}</div>
     <div class="hd-label hd-label-tags">Tags</div>
@@ -857,7 +859,7 @@ function makeEditor({ P, url, noun, folder, items, hints }) {
     el('Name').value = h.name; el('Desc').value = h.description;
     el('Tags').value = h.tags.join(', ');
     el('Script').value = h.body;
-    list = [...h[itemKey]];
+    list = itemKey === 'parameters' ? h.parameters.map((p) => (h.optionalParameters.includes(p) ? `${p}?` : p)) : [...h[itemKey]];
     setItemsOn(list.length > 0);
     if (hasMeta) for (const g of Object.keys(META)) setMeta(g, h[g]);
     el('Title').textContent = `Editing ${h.file}`;
@@ -879,7 +881,7 @@ function makeEditor({ P, url, noun, folder, items, hints }) {
       </div>
       <div class="hd" title="${esc(h.description)}">${esc(h.description)}</div>
       ${h.tags.length ? `<div class="htags">${h.tags.map((t) => `<span class="htag">${esc(t)}</span>`).join('')}</div>` : ''}
-      ${h[itemKey].length ? `<div class="uh-deps">${items.label}: ${h[itemKey].map(esc).join(', ')}</div>` : ''}
+      ${h[itemKey].length ? `<div class="uh-deps">${items.label}: ${(itemKey === 'parameters' ? h.parameters.map((p) => (h.optionalParameters.includes(p) ? `${p} (optional)` : p)) : h[itemKey]).map(esc).join(', ')}</div>` : ''}
       ${viewing === h.id ? `<pre class="code">${highlight(h.body, h.type)}</pre>` : ''}</div>`).join('')
       || `<p class="dim" style="margin:0">You have not added any ${noun}s yet. Use the form on the left; ${noun}s you add are saved to <code>${folder}/powershell</code> or <code>${folder}/bash</code>.</p>`;
   }
@@ -930,37 +932,147 @@ const addCollections = makeEditor({
 });
 const addActions = makeEditor({
   P: 'aa', url: '/api/actions', noun: 'action', folder: 'actions',
-  items: { key: 'parameters', label: 'Parameters', placeholder: { powershell: 'ProcessName', bash: 'PROCESS_NAME' } },
+  items: { key: 'parameters', label: 'Parameters', placeholder: { powershell: 'ProcessName  (end with ? if optional)', bash: 'PROCESS_NAME  (end with ? if optional)' } },
   hints: {
     powershell: "# Each parameter becomes a variable of the same name, e.g. $ProcessName.\nif (-not $ProcessName) { throw 'ProcessName is required' }\nStop-Process -Name $ProcessName -Force",
     bash: '# Each parameter becomes a variable of the same name, e.g. $PROCESS_NAME.\n[ -n "$PROCESS_NAME" ] || { echo "PROCESS_NAME is required" >&2; exit 2; }\npkill -x -- "$PROCESS_NAME"',
   },
 });
 
+// ---- Shared by Hunt and Respond ----
+// A green R after a name marks a run that came from a recurring schedule.
+const schedTag = (r) => (r.scheduleId ? '<span class="rtag" title="Ran on a recurring schedule">R</span>' : '');
+// Confirms, then deletes a hunt or response: its record and its evidence folder. A running one can't be deleted.
+async function confirmDeleteRun(r, url, noun) {
+  if (r.status === 'running') { toast(`That ${noun} is still running. Wait for it to finish.`); return false; }
+  if (!confirm(`Delete the ${noun} "${huntName(r)}"?\n\nThis removes it from the list and deletes its evidence folder${r.evidenceDir ? ` (evidence/${r.evidenceDir})` : ''}. This cannot be undone.`)) return false;
+  try { await api('DELETE', url); return true; } catch (e) { toast(e.message); return false; }
+}
+
+// The recurring options in the New Hunt and New Response dialogs (prefix 'hm' or 'rm'): run every X minutes, until a time or until
+// it is turned off, with the number of runs worked out from the system clock as you type.
+const recHtml = (p) => `<div class="rec-row"><span>Run every</span><input type="number" id="${p}Every" min="1" step="1" value="60"><span>minutes</span></div>
+  <div class="rec-row"><span>Until</span><label class="rec-opt"><input type="radio" name="${p}Until" id="${p}UntilTime" checked> <input type="datetime-local" id="${p}UntilAt"></label>
+    <label class="rec-opt"><input type="radio" name="${p}Until" id="${p}UntilForever"> Until I turn it off</label></div>
+  <div class="rec-sum" id="${p}RecSum"></div>`;
+const recLocal = (d) => { const z = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}T${z(d.getHours())}:${z(d.getMinutes())}`; };
+const recFmt = (d) => d.toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
+function recRead(p) {
+  const every = Number($(p + 'Every').value), now = Date.now(), s = every === 1 ? '' : 's';
+  if (!Number.isInteger(every) || every < 1) return { error: 'Enter a whole number of minutes (1 or more).' };
+  if ($(p + 'UntilForever').checked) return { schedule: { everyMinutes: every, until: { type: 'forever' } }, text: `Runs now, then every ${every} minute${s}. It runs indefinitely until you turn it off.` };
+  const at = new Date($(p + 'UntilAt').value).getTime();
+  if (!Number.isFinite(at)) return { error: 'Pick the date and time it should run until.' };
+  if (at <= now) return { error: 'The end time must be in the future.' };
+  const n = Math.floor((at - now) / (every * 60000)) + 1, last = new Date(now + (n - 1) * every * 60000);
+  return { schedule: { everyMinutes: every, until: { type: 'time', at: new Date(at).toISOString() } },
+    text: `Runs now, then every ${every} minute${s} until ${recFmt(new Date(at))}. That is ${n} run${n === 1 ? '' : 's'} in total${n > 1 ? `, the last at ${recFmt(last)}` : ''}.` };
+}
+function recUpdate(p) {
+  const r = recRead(p), el = $(p + 'RecSum');
+  el.textContent = r.error || r.text; el.className = `rec-sum ${r.error ? 'bad' : ''}`;
+  $(p + 'UntilAt').disabled = $(p + 'UntilForever').checked;
+}
+function recToggle(p, on) {
+  $(p + 'RecBox').hidden = !on;
+  if (on) { if (!$(p + 'UntilAt').value) $(p + 'UntilAt').value = recLocal(new Date(Date.now() + 86400000)); recUpdate(p); }
+}
+function recInit(p) {
+  $(p + 'RecBox').innerHTML = recHtml(p);
+  $(p + 'RecBox').oninput = $(p + 'RecBox').onchange = () => recUpdate(p);
+  setInterval(() => { if (!$(p + 'RecBox').hidden) recUpdate(p); }, 10000); // the count follows the clock
+}
+
 // ---- Burrow: Hunt ----
-// Left: start a new hunt. Right: previous hunts. A hunt runs one or more collections on hosts/groups.
-// The dialog is in place; starting a hunt from it is not wired up yet.
+// Top: the previous hunts (name, who ran it, status, started, finished, elapsed). Click one to fill the box below it with what it
+// ran, the files it pulled back, its errors and downloads. New Hunt opens a dialog in three steps: who, which collections, name.
+const bh = { runs: [], sel: null };
+const fmtDur = (ms) => {
+  if (ms == null || !(ms >= 0)) return '';
+  const s = Math.round(ms / 1000), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+  return h ? `${h}h ${m}m ${s % 60}s` : m ? `${m}m ${s % 60}s` : `${s}s`;
+};
+const huntElapsed = (r) => fmtDur((r.finishedAt ? new Date(r.finishedAt) : Date.now()) - new Date(r.startedAt));
+const huntStatus = (r) => {
+  const text = r.status.replaceAll('_', ' ');
+  return `<span class="${r.status === 'completed' ? 'ok' : r.status === 'running' ? 'st-run' : r.status === 'completed_with_errors' ? 'st-warn' : 'bad'}">${esc(text[0].toUpperCase() + text.slice(1))}</span>`;
+};
+const huntName = (r) => r.name || r.collectionName || 'Hunt';
+
 async function loadBurrowHunts() {
   let runs = [];
-  try { runs = await api('GET', '/api/runs'); } catch (e) { $('bhList').innerHTML = `<p class="bad">${esc(e.message)}</p>`; return; }
-  $('bhList').innerHTML = runs.length
-    ? `<table><thead><tr><th>Hunt</th><th>Collections</th><th>Hosts</th><th>Status</th><th>Started</th><th>Evidence</th></tr></thead><tbody>${runs.map((r) => `<tr>
-        <td>${esc(r.name || r.collectionName)}</td><td>${esc((r.collectionNames || [r.collectionName]).join(', '))}</td><td>${new Set(r.results.map((x) => x.hostId)).size}${r.results.some((x) => x.status === 'error') ? ` <span class="bad">(${r.results.filter((x) => x.status === 'error').length} failed)</span>` : ''}</td>
-        <td class="${r.status === 'completed' ? 'ok' : r.status === 'running' ? '' : 'bad'}">${esc(r.status.replaceAll('_', ' '))}</td>
-        <td class="dim">${esc(new Date(r.startedAt).toLocaleString())}</td>
-        <td>${r.evidenceDir ? `<a data-evidence="/evidence/${esc(r.evidenceDir)}">${esc(r.evidenceDir)}</a>` : ''}</td></tr>`).join('')}</tbody></table>`
-    : '<p class="dim" style="margin:0">No hunts yet. Use New Hunt to run collections against your hosts.</p>';
+  try { runs = (await api('GET', '/api/runs')).filter((r) => r.kind !== 'response'); } catch (e) { $('bhList').innerHTML = `<p class="bad">${esc(e.message)}</p>`; return; }
+  bh.runs = runs;
+  if (bh.sel && !runs.some((r) => r.id === bh.sel)) { bh.sel = null; $('bhDetail').innerHTML = BH_HINT; }
+  renderHuntList();
   clearTimeout(huntPoll);
+  if (bh.sel && runs.find((r) => r.id === bh.sel)?.status === 'running') showHunt(bh.sel);
   if (runs.some((r) => r.status === 'running') && isActive('burrow/hunt')) huntPoll = setTimeout(loadBurrowHunts, 2000);
 }
 let huntPoll;
-$('bhList').onclick = (e) => {
+const BH_HINT = '<p class="dim" style="margin:0">Click a hunt above to see what it ran, the files it pulled back, any errors, and to download its results.</p>';
+function renderHuntList() {
+  $('bhList').innerHTML = bh.runs.length
+    ? `<table class="bh"><thead><tr><th>Hunt</th><th>Run by</th><th>Status</th><th>Started</th><th>Finished</th><th>Elapsed</th><th></th></tr></thead><tbody>${bh.runs.map((r) => `<tr class="bh-row ${r.id === bh.sel ? 'on' : ''}" data-id="${esc(r.id)}">
+        <td class="bh-name">${esc(huntName(r))}${schedTag(r)}</td><td>${r.startedBy ? esc(r.startedBy) : '<span class="dim">-</span>'}</td><td>${huntStatus(r)}</td>
+        <td class="dim">${esc(new Date(r.startedAt).toLocaleString())}</td><td class="dim">${r.finishedAt ? esc(new Date(r.finishedAt).toLocaleString()) : '-'}</td><td class="dim">${esc(huntElapsed(r))}</td><td class="bh-del"><a class="dl bad" data-del="${esc(r.id)}" data-perm="hunts.run" data-perm-what="delete hunts" title="Delete this hunt and its evidence folder">Delete</a></td></tr>`).join('')}</tbody></table>`
+    : '<p class="dim" style="margin:0">No hunts yet. Use New Hunt to run collections against your hosts.</p>';
+}
+// Every file in a hunt's evidence folder: the hunt log at the top, then All-Hosts, then a folder per host.
+async function huntFiles(r) {
+  if (!r.evidenceDir) return [];
+  const base = `/evidence/${r.evidenceDir}`, get = (p) => api('GET', `/api/browse?path=${encodeURIComponent(p)}`).then((x) => x.entries).catch(() => []);
+  const top = await get(base), files = top.filter((e) => !e.dir).map((e) => ({ folder: '', name: e.name, size: e.size, path: `${base}/${e.name}` }));
+  const subs = await Promise.all(top.filter((e) => e.dir).map(async (d) => (await get(`${base}/${d.name}`)).filter((e) => !e.dir).map((e) => ({ folder: d.name, name: e.name, size: e.size, path: `${base}/${d.name}/${e.name}` }))));
+  const rank = (f) => (f.folder === '' ? 0 : f.folder === 'All-Hosts' ? 1 : 2);
+  return [...files, ...subs.flat()].sort((a, b) => rank(a) - rank(b) || a.folder.localeCompare(b.folder, undefined, { numeric: true }) || a.name.localeCompare(b.name));
+}
+async function showHunt(id) {
+  bh.sel = id; renderHuntList();
+  const r = bh.runs.find((x) => x.id === id), box = $('bhDetail'); if (!r) return;
+  let events, files;
+  try { [events, files] = await Promise.all([api('GET', `/api/runs/${id}/events`), huntFiles(r)]); } catch (e) { box.innerHTML = `<p class="bad">${esc(e.message)}</p>`; return; }
+  if (bh.sel !== id) return; // another hunt was clicked while this loaded
+  const hosts = new Set(r.results.map((x) => x.hostId)).size;
+  const cols = [...new Map(r.results.map((x) => [x.collectionId, x.collectionName])).entries()].map(([cid, name]) => {
+    const mine = r.results.filter((x) => x.collectionId === cid), ok = mine.filter((x) => x.status === 'ok').length, bad = mine.filter((x) => x.status === 'error').length;
+    return `<tr><td>${esc(name)}</td><td>${ok} of ${mine.length}</td><td class="${bad ? 'bad' : 'dim'}">${bad}</td><td class="num">${mine.reduce((n, x) => n + (x.rows || 0), 0)}</td></tr>`;
+  }).join('');
+  const problems = events.filter((e) => e.kind === 'error' || e.kind === 'warn' || /^(error|warning|unconfirmed)/.test(e.outcome || ''));
+  const dl = (path, text, cls = 'act sec') => `<a class="${cls}" href="/api/browse/download?path=${encodeURIComponent(path)}" download data-perm="hunts.export" data-perm-what="download hunt results">${text}</a>`;
+  const json = files.find((f) => f.folder === 'All-Hosts' && f.name === 'hunt.json');
+  box.innerHTML = `<div class="bd-head"><div><div class="hd-name">${esc(huntName(r))}${schedTag(r)}</div><div class="hd-file">${esc(r.evidenceDir ? `evidence/${r.evidenceDir}` : 'No evidence folder')}</div></div>
+      <div class="bd-btns">${r.evidenceDir ? `<a class="act" href="/api/runs/${esc(r.id)}/download" download data-perm="hunts.export" data-perm-what="download hunt results" title="The whole hunt folder as one zip file">Download all (zip)</a>` : ''}<a class="act sec" href="/api/runs/${esc(r.id)}/log.csv" download data-perm="hunts.export" data-perm-what="export logs">Download log (CSV)</a>${json ? dl(json.path, 'Download hunt.json') : ''}${r.evidenceDir ? `<a class="act sec" data-evidence="/evidence/${esc(r.evidenceDir)}">Open in Browse</a>` : ''}</div></div>
+    <div class="bd-facts"><div><span>Status</span>${huntStatus(r)}</div><div><span>Run by</span>${r.startedBy ? esc(r.startedBy) : '-'}</div><div><span>Started</span>${esc(new Date(r.startedAt).toLocaleString())}</div>
+      <div><span>Finished</span>${r.finishedAt ? esc(new Date(r.finishedAt).toLocaleString()) : '-'}</div><div><span>Elapsed</span>${esc(huntElapsed(r))}</div><div><span>Hosts</span>${hosts}</div></div>
+    ${r.error ? `<div class="hd-unmet">${esc(r.error)}</div>` : ''}
+    <div class="hd-label">Collections run</div>
+    <table class="bh"><thead><tr><th>Collection</th><th>Hosts ok</th><th>Failed</th><th class="num">Rows</th></tr></thead><tbody>${cols || '<tr><td colspan="4" class="dim">None</td></tr>'}</tbody></table>
+    <div class="hd-label">Files pulled back <span class="dim">(${files.length})</span></div>
+    ${files.length ? `<table class="bh"><thead><tr><th>Folder</th><th>File</th><th class="num">Size</th><th></th></tr></thead><tbody>${files.map((f) => `<tr><td class="dim">${esc(f.folder || '/')}</td><td>${esc(f.name)}</td><td class="num dim">${bbFmt(f.size)}</td><td class="num">${dl(f.path, 'Download', 'dl')}</td></tr>`).join('')}</tbody></table>`
+      : `<p class="dim" style="margin:0">${r.status === 'running' ? 'Nothing yet. Files appear as hosts finish.' : 'No files were saved.'}</p>`}
+    <div class="hd-label">Error log <span class="dim">(${problems.length})</span></div>
+    ${problems.length ? `<table class="bh"><thead><tr><th>Time</th><th>Host</th><th>Action</th><th>Collection</th><th>Detail</th></tr></thead><tbody>${problems.map((e) => `<tr class="${e.kind === 'warn' ? 'st-warn' : 'bad'}"><td class="dim">${esc(new Date(e.t).toLocaleTimeString())}</td><td>${esc(e.host)}</td><td>${esc(e.action)}</td><td>${esc(e.artefact)}</td><td class="bh-wrap">${esc(e.detail)}</td></tr>`).join('')}</tbody></table>`
+      : '<p class="ok" style="margin:0">No errors.</p>'}`;
+}
+$('bhList').onclick = async (e) => {
+  const del = e.target.closest('[data-del]');
+  if (del) {
+    const r = bh.runs.find((x) => x.id === del.dataset.del);
+    if (r && await confirmDeleteRun(r, `/api/runs/${r.id}?evidence=1`, 'hunt')) { if (bh.sel === r.id) { bh.sel = null; $('bhDetail').innerHTML = BH_HINT; } loadBurrowHunts(); }
+    return;
+  }
+  const tr = e.target.closest('.bh-row'); if (tr) showHunt(tr.dataset.id);
+};
+$('bhDetail').onclick = (e) => {
   const p = e.target.dataset.evidence; if (!p) return;
   go('browse', 'files');
   loadBrowse(p);
 };
 
-const hm = { collections: [], hosts: [], lists: [], selC: new Set(), selH: new Set(), selL: new Set(), q: '', shown: null };
+// ---- New hunt dialog ----
+// 1. who (groups and hosts)  2. which collections (the View Collections list, with the full detail on the right)  3. name, and the recurring switch.
+const hm = { collections: [], hosts: [], lists: [], selC: new Set(), selH: new Set(), selL: new Set(), q: '', type: 'powershell', shown: null, recurring: false };
 const hmEl = (s) => $('hm' + s);
 function hmCount() {
   const ids = new Set(hm.selH);
@@ -970,15 +1082,17 @@ function hmCount() {
 function hmSummary() {
   const c = hm.selC.size, h = hmCount();
   hmEl('Summary').textContent = `${c} collection${c === 1 ? '' : 's'} · ${h} host${h === 1 ? '' : 's'}`;
-  hmEl('TabColl').textContent = c ? `Collections (${c})` : 'Collections';
+  hmEl('TabWho').lastChild.textContent = h ? `Who (${h})` : 'Who';
+  hmEl('TabColl').lastChild.textContent = c ? `Collections (${c})` : 'Collections';
 }
-// Collections tab: tick the ones to run; click a name to read its description and script on the right.
 function hmRenderCollections() {
-  const q = hm.q.toLowerCase();
-  const shown = hm.collections.filter((c) => !q || [c.name, c.file, c.description, ...c.tags].some((s) => s.toLowerCase().includes(q)));
-  hmEl('Collections').innerHTML = shown.map((c) => `<div class="pick ${c.id === hm.shown ? 'on' : ''}" data-view="${esc(c.id)}">
+  const q = hm.q.toLowerCase(), inType = hm.collections.filter((c) => c.type === hm.type);
+  const shown = inType.filter((c) => !q || [c.name, c.file, c.description, ...c.tags].some((s) => String(s).toLowerCase().includes(q)));
+  document.querySelectorAll('#hmToggle button').forEach((b) => b.classList.toggle('on', b.dataset.type === hm.type));
+  hmEl('Collections').innerHTML = shown.map((c) => `<div class="collection-item ${c.id === hm.shown ? 'on' : ''}" data-view="${esc(c.id)}">
       <input type="checkbox" data-c="${esc(c.id)}" ${hm.selC.has(c.id) ? 'checked' : ''} aria-label="Include ${esc(c.name)}">
-      <span class="pn">${esc(c.name)}</span>${metaIcons(c)}<span class="pt">${c.type === 'bash' ? 'Linux' : 'PowerShell'}</span></div>`).join('')
+      <div class="ci-main">${c.verified ? VERIFIED : ''}${metaIcons(c)}<div class="hn">${esc(c.name)}</div><div class="hd" title="${esc(c.description)}">${esc(c.description)}</div>
+      ${c.tags.length ? `<div class="htags">${c.tags.map((t) => `<span class="htag">${esc(t)}</span>`).join('')}</div>` : ''}</div></div>`).join('')
     || '<p class="dim" style="margin:6px 10px">No collections match.</p>';
 }
 async function hmShow(id) {
@@ -994,26 +1108,32 @@ async function hmShow(id) {
       <div class="hd-label hd-label-code">Collection</div><pre class="code">${highlight(h.body, h.type)}</pre>`;
   } catch (e) { hmEl('Detail').innerHTML = `<p class="bad">${esc(e.message)}</p>`; }
 }
-function hmTab(name) {
-  document.querySelectorAll('#hmTabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === name));
-  hmEl('PaneDetails').hidden = name !== 'details';
-  hmEl('PaneColl').hidden = name !== 'collections';
-}
 function hmRenderTargets() {
   hmEl('Groups').innerHTML = hm.lists.map((l) => `<label class="pick"><input type="checkbox" data-l="${esc(l.id)}" ${hm.selL.has(l.id) ? 'checked' : ''}>
       <span class="pn">${esc(l.name)}</span><span class="pt">${l.hostIds.length} host${l.hostIds.length === 1 ? '' : 's'}</span></label>`).join('')
-    || '<p class="dim" style="margin:6px 0">No groups yet.</p>';
+    || '<p class="dim" style="margin:6px 10px">No groups yet.</p>';
   hmEl('Hosts').innerHTML = hm.hosts.map((h) => `<label class="pick"><input type="checkbox" data-h="${esc(h.id)}" ${hm.selH.has(h.id) ? 'checked' : ''}>
       <span class="pn">${esc(h.name)}</span><span class="pt">${esc(h.address)}</span></label>`).join('')
-    || '<p class="dim" style="margin:6px 0">No saved hosts yet.</p>';
+    || '<p class="dim" style="margin:6px 10px">No saved hosts yet.</p>';
+}
+function hmTab(name) {
+  document.querySelectorAll('#hmTabs button').forEach((b) => b.classList.toggle('on', b.dataset.pane === name));
+  document.querySelectorAll('#huntModal .hsec').forEach((p) => { p.hidden = p.dataset.pane !== name; });
+  if (name === 'name') hmEl('Name').focus();
+}
+function hmSetRecurring(on) {
+  hm.recurring = on;
+  hmEl('Recurring').setAttribute('aria-checked', on);
+  hmEl('RecurringLabel').textContent = `Recurring hunt: ${on ? 'On' : 'Off'}`;
+  recToggle('hm', on);
 }
 async function openHuntModal() {
-  hm.selC.clear(); hm.selH.clear(); hm.selL.clear(); hm.q = '';
-  hm.shown = null; hmEl('Detail').innerHTML = '<p class="dim">Click a collection to see what it does.</p>'; hmTab('details');
+  hm.selC.clear(); hm.selH.clear(); hm.selL.clear(); hm.q = ''; hm.type = 'powershell';
+  hm.shown = null; hmEl('Detail').innerHTML = '<p class="dim">Click a collection to see what it does.</p>';
   hmEl('Name').value = ''; hmEl('Search').value = ''; hmEl('Msg').textContent = '';
-  hmEl('Msg').className = '';
+  hmEl('Msg').className = ''; hmSetRecurring(false);
+  hmTab('who');
   $('huntModal').hidden = false;
-  hmEl('Name').focus();
   try {
     [hm.collections, hm.hosts, hm.lists] = await Promise.all([api('GET', '/api/collections'), api('GET', '/api/hosts'), api('GET', '/api/lists')]);
   } catch (e) { hmEl('Msg').textContent = e.message; hmEl('Msg').className = 'bad'; }
@@ -1025,7 +1145,10 @@ $('hmCancel').onclick = closeHuntModal;
 $('hmClose').onclick = closeHuntModal;
 $('huntModal').onclick = (e) => { if (e.target.id === 'huntModal') closeHuntModal(); };
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('huntModal').hidden) closeHuntModal(); });
-$('hmTabs').onclick = (e) => { if (e.target.dataset.tab) hmTab(e.target.dataset.tab); };
+$('hmTabs').onclick = (e) => { const b = e.target.closest('button[data-pane]'); if (b) hmTab(b.dataset.pane); };
+$('hmToggle').onclick = (e) => { if (e.target.dataset.type) { hm.type = e.target.dataset.type; hmRenderCollections(); } };
+recInit('hm');
+hmEl('Recurring').onclick = () => hmSetRecurring(!hm.recurring);
 $('hmCollections').onclick = (e) => {
   const row = e.target.closest('[data-view]');
   if (row && !e.target.matches('input')) hmShow(row.dataset.view);
@@ -1037,19 +1160,58 @@ $('huntModal').onchange = (e) => {
   if (e.target.checked) set[0].add(set[1]); else set[0].delete(set[1]);
   hmSummary();
 };
+// Rerun past hunt: pick an earlier hunt and its hosts and collections are ticked, the name becomes "<name>_rerun", and the dialog moves
+// to the Name tab. Nothing runs until Run Hunt is pressed.
+const rr = { runs: [], sel: null };
+const closeRerun = () => { $('rerunModal').hidden = true; };
+function rrRender() {
+  $('rrList').innerHTML = rr.runs.length
+    ? `<table class="bh"><thead><tr><th>Hunt</th><th>Run by</th><th>Status</th><th>Started</th><th>Hosts</th><th>Collections</th></tr></thead><tbody>${rr.runs.map((r) => `<tr data-id="${esc(r.id)}" class="${r.id === rr.sel ? 'on' : ''}">
+        <td class="bh-name">${esc(huntName(r))}${schedTag(r)}</td><td>${r.startedBy ? esc(r.startedBy) : '<span class="dim">-</span>'}</td><td>${huntStatus(r)}</td><td class="dim">${esc(new Date(r.startedAt).toLocaleString())}</td>
+        <td>${new Set(r.results.map((x) => x.hostId)).size}</td><td>${esc((r.collectionNames || [r.collectionName]).join(', '))}</td></tr>`).join('')}</tbody></table>`
+    : '<p class="dim">No previous hunts.</p>';
+  $('rrUse').disabled = !rr.sel;
+}
+hmEl('Rerun').onclick = async () => {
+  rr.sel = null; $('rrMsg').textContent = ''; $('rrList').innerHTML = '<p class="dim">Loading…</p>'; $('rerunModal').hidden = false;
+  try { rr.runs = (await api('GET', '/api/runs')).filter((r) => r.kind !== 'response'); } catch (e) { $('rrList').innerHTML = `<p class="bad">${esc(e.message)}</p>`; return; }
+  rrRender();
+};
+$('rrList').onclick = (e) => { const tr = e.target.closest('tr[data-id]'); if (tr) { rr.sel = tr.dataset.id; rrRender(); } };
+$('rrList').ondblclick = (e) => { if (e.target.closest('tr[data-id]')) $('rrUse').click(); };
+$('rrClose').onclick = $('rrCancel').onclick = closeRerun;
+$('rerunModal').onclick = (e) => { if (e.target.id === 'rerunModal') closeRerun(); };
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('rerunModal').hidden) { e.stopImmediatePropagation(); closeRerun(); } }, true);
+$('rrUse').onclick = () => {
+  const r = rr.runs.find((x) => x.id === rr.sel); if (!r) return;
+  const hostIds = new Set(r.results.map((x) => x.hostId)), cids = r.collectionIds || [r.collectionId].filter(Boolean);
+  hm.selH = new Set(hm.hosts.filter((h) => hostIds.has(h.id)).map((h) => h.id)); hm.selL.clear();
+  hm.selC = new Set(cids.filter((c) => hm.collections.some((x) => x.id === c)));
+  const lostH = hostIds.size - hm.selH.size, lostC = cids.length - hm.selC.size;
+  hm.shown = null; hmEl('Detail').innerHTML = '<p class="dim">Click a collection to see what it does.</p>';
+  hmEl('Name').value = `${huntName(r)}_rerun`;
+  hmRenderTargets(); hmRenderCollections(); hmSummary(); hmSetRecurring(false);
+  const gone = [lostH && `${lostH} host${lostH === 1 ? ' is' : 's are'}`, lostC && `${lostC} collection${lostC === 1 ? ' is' : 's are'}`].filter(Boolean).join(' and ');
+  hmEl('Msg').textContent = gone ? `${gone} no longer available and left out.` : ''; hmEl('Msg').className = gone ? 'bad' : '';
+  closeRerun(); hmTab('name');
+};
 hmEl('Run').onclick = async () => {
   const msg = (t, cls) => { hmEl('Msg').textContent = t; hmEl('Msg').className = cls; };
-  if (!hmEl('Name').value.trim()) return msg('Give the hunt a name.', 'bad');
-  if (!hm.selC.size) return msg('Select at least one collection.', 'bad');
-  if (!hmCount()) return msg('Select at least one host or group.', 'bad');
+  if (!hmCount()) { hmTab('who'); return msg('Select at least one host or group.', 'bad'); }
+  if (!hm.selC.size) { hmTab('coll'); return msg('Select at least one collection.', 'bad'); }
+  if (!hmEl('Name').value.trim()) { hmTab('name'); return msg('Give the hunt a name.', 'bad'); }
+  const rec = hm.recurring ? recRead('hm') : null;
+  if (rec?.error) { hmTab('name'); return msg(rec.error, 'bad'); }
   hmEl('Run').disabled = true;
   try {
     const run = await api('POST', '/api/hunts', {
-      name: hmEl('Name').value.trim(), collectionIds: [...hm.selC], hostIds: [...hm.selH], listIds: [...hm.selL],
+      name: hmEl('Name').value.trim(), collectionIds: [...hm.selC], hostIds: [...hm.selH], listIds: [...hm.selL], schedule: rec?.schedule,
     });
     closeHuntModal();
-    toast(`Hunt "${run.name}" started. Results go to ${run.evidenceDir}`);
-    loadBurrowHunts();
+    toast(`Hunt "${run.name}" started${rec ? ` and scheduled: ${rec.text.replace(/^Runs now, then /, '')}` : `. Results go to ${run.evidenceDir}`}`);
+    bh.sel = run.id;
+    await loadBurrowHunts();
+    showHunt(run.id);
   } catch (e) { msg(e.message, 'bad'); }
   hmEl('Run').disabled = false;
 };
@@ -1196,8 +1358,12 @@ function renderUserDetail(sel) {
     <div class="dim" style="margin-bottom:10px">Account created ${esc(new Date(sel.createdAt).toLocaleString())}</div>
     <div class="hd-label hd-label-dep">Roles</div>
     <div class="um-roles">${umRoleBoxes(um.draft, locked)}</div>
-    ${locked ? '<div class="um-lock">This user is an admin. Admins keep the admin role and every other role, and can\'t be deleted here.</div>'
+    ${locked ? `<div class="um-lock">This user is an admin. Admins keep the admin role and every other role.${me ? '' : ' Another admin can delete this account.'}</div>${me || !access.all ? '' : `<div class="um-actions"><button class="del" type="button" data-uma="delete-user" data-perm="users.manage" data-perm-what="delete users">Delete admin</button>${umMsg}</div>`}`
       : `<div class="um-actions"><button class="act" type="button" data-uma="save-roles" data-perm="roles.manage" data-perm-what="change roles">Save roles</button>${me ? '' : '<button class="del" type="button" data-uma="delete-user" data-perm="users.manage" data-perm-what="delete users">Delete user</button>'}${umMsg}</div>`}
+    <div class="hd-label hd-label-dep">Password</div>
+    ${me ? '<div class="um-actions" style="margin-top:2px"><button class="act sec" type="button" data-uma="change-own-password">Change my password</button><span class="dim">You will need your current password.</span></div>'
+      : `<div class="um-pw"><input id="umNewPw" type="password" autocomplete="new-password" placeholder="New password (at least 8 characters)"><input id="umNewPw2" type="password" autocomplete="new-password" placeholder="Confirm new password"><button class="act" type="button" data-uma="set-password" data-perm="users.manage" data-perm-what="change passwords">Set password</button></div><div class="dim">${sel.all ? 'This is another admin. ' : ''}They are signed out everywhere and use the new password next time they sign in.</div>`}
+    <div class="um-msg" id="umPwMsg" style="margin:4px 0 0"></div>
     <div class="hd-label hd-label-dep">Permissions <span class="dim">${sel.all ? '(full access through the admin role)' : `(${sel.permissions.length} granted by their roles)`}</span></div>
     ${umPerms(new Set(sel.permissions), sel.all ? 'Locked: the admin role has every permission' : 'These come from the roles above')}`;
 }
@@ -1226,7 +1392,21 @@ function renderRoleForm(sel) {
 }
 
 const umSay = (t, cls = 'bad') => { const m = $('umMsg'); if (m) { m.textContent = t; m.className = `um-msg ${cls}`; } };
+async function umSetPassword() {
+  const sel = um.users.find((x) => x.id === um.sel.users); if (!sel) return;
+  const say = (t) => { const m = $('umPwMsg'); if (m) { m.textContent = t; m.className = 'um-msg bad'; } };
+  const p = $('umNewPw').value;
+  if (p.length < 8) return say('The password must be at least 8 characters');
+  if (p !== $('umNewPw2').value) return say('The passwords do not match');
+  try {
+    await api('PUT', `/api/users/${sel.id}/password`, { password: p });
+    $('umNewPw').value = $('umNewPw2').value = ''; say('');
+    toast(`Password changed for ${sel.username}. They have been signed out everywhere.`);
+  } catch (e) { say(e.message); }
+}
 async function umAct(act) {
+  if (act === 'change-own-password') return openPassword();
+  if (act === 'set-password') return umSetPassword();
   const sel = (um.tab === 'users' ? um.users : um.roles).find((x) => x.id === um.sel[um.tab]);
   try {
     if (act === 'cancel') { um.mode = 'view'; um.draft = null; renderUserMgmt(); return; }
@@ -1236,7 +1416,7 @@ async function umAct(act) {
     } else if (act === 'save-roles') {
       await api('PUT', `/api/users/${sel.id}`, { roles: [...um.draft] }); toast(`Roles saved for ${sel.username}`);
     } else if (act === 'delete-user') {
-      if (!confirm(`Delete the user ${sel.username}? They will be signed out and can no longer sign in.`)) return;
+      if (!confirm(sel.all ? `Delete the ADMIN ${sel.username}? They will be signed out, can no longer sign in, and lose all access.` : `Delete the user ${sel.username}? They will be signed out and can no longer sign in.`)) return;
       await api('DELETE', `/api/users/${sel.id}`); toast(`User ${sel.username} deleted`); um.sel.users = null;
     } else if (act === 'create-role') {
       const r = await api('POST', '/api/roles', { name: $('umRoleName').value.trim(), description: $('umRoleDesc').value, permissions: [...um.draft] });
@@ -1267,7 +1447,7 @@ $('umDetail').onchange = (e) => {
 // ---- Settings: Health Settings ----
 // How often the monitor pings hosts and checks their WinRM/SSH port, and which hosts it checks (all of them by default;
 // untick a host to take it out, tick it to put it back). Anyone who can view the system sees this; changing it needs Manage system.
-const hs = { defaults: null, limits: null, hosts: [], monitored: new Set(), enabled: true };
+const hs = { defaults: null, limits: null, hosts: [], pingOn: new Set(), remoteOn: new Set(), enabled: true };
 const HS_UNITS = [['seconds', 1], ['minutes', 60], ['hours', 3600]];
 function hsSetInterval(inputId, selectId, seconds) {
   // shown in the largest unit that divides it exactly, e.g. 300 seconds as 5 minutes
@@ -1287,12 +1467,14 @@ function hsHints() {
 }
 const fmtSecs = (s) => (s % 3600 === 0 ? `${s / 3600} hour${s === 3600 ? '' : 's'}` : s % 60 === 0 ? `${s / 60} minute${s === 60 ? '' : 's'}` : `${s} seconds`);
 function renderHsHosts() {
-  const editable = can('system.manage');
-  $('hsHosts').innerHTML = hs.hosts.map((h) => `<label class="hs-host ${hs.monitored.has(h.id) ? '' : 'off'}" title="${editable ? '' : 'Changing this needs Manage system'}">
-      <input type="checkbox" data-host="${esc(h.id)}" ${hs.monitored.has(h.id) ? 'checked' : ''} ${editable ? '' : 'disabled'}>
-      <span class="hs-name">${esc(h.name)}</span><span class="hs-addr">${esc(h.address)}</span><span class="proto-${h.protocol === 'ssh' ? 'ssh' : 'winrm'}">${h.protocol === 'ssh' ? 'SSH' : 'WinRM'}</span><span class="hs-os">${esc(String(h.os || '').replace(/^Microsoft /, '').replace(/\s*\(\d[\d.]*\)$/, ''))}</span></label>`).join('')
+  const editable = can('system.manage'), dis = editable ? '' : 'disabled';
+  const head = `<div class="hs-colhead"><span class="hs-col">Ping<br><a data-col="ping" data-set="all">all</a> <a data-col="ping" data-set="none">none</a></span><span class="hs-col">Remote<br><a data-col="remote" data-set="all">all</a> <a data-col="remote" data-set="none">none</a></span><span>Host</span></div>`;
+  $('hsHosts').innerHTML = head + hs.hosts.map((h) => `<div class="hs-host ${hs.pingOn.has(h.id) || hs.remoteOn.has(h.id) ? '' : 'off'}" title="${editable ? '' : 'Changing this needs Manage system'}">
+      <label class="hs-chk" title="Ping this host"><input type="checkbox" data-host="${esc(h.id)}" data-what="ping" ${hs.pingOn.has(h.id) ? 'checked' : ''} ${dis}></label>
+      <label class="hs-chk" title="Check this host's ${h.protocol === 'ssh' ? 'SSH' : 'WinRM'} port"><input type="checkbox" data-host="${esc(h.id)}" data-what="remote" ${hs.remoteOn.has(h.id) ? 'checked' : ''} ${dis}></label>
+      <span class="hs-name">${esc(h.name)}</span><span class="hs-addr">${esc(h.address)}</span><span class="proto-${h.protocol === 'ssh' ? 'ssh' : 'winrm'}">${h.protocol === 'ssh' ? 'SSH' : 'WinRM'}</span><span class="hs-os">${esc(String(h.os || '').replace(/^Microsoft /, '').replace(/\s*\(\d[\d.]*\)$/, ''))}</span></div>`).join('')
     || '<p class="dim" style="margin:8px 10px">No saved hosts yet.</p>';
-  $('hsCount').textContent = `${hs.monitored.size} of ${hs.hosts.length} monitored`;
+  $('hsCount').textContent = `Ping ${hs.pingOn.size} of ${hs.hosts.length} · Remote ${hs.remoteOn.size} of ${hs.hosts.length}`;
 }
 async function loadHealthSettings() {
   let r;
@@ -1302,7 +1484,8 @@ async function loadHealthSettings() {
   $('hsEnabledLabel').textContent = `Health monitoring: ${hs.enabled ? 'On' : 'Off'}`;
   $('hsEnabledNote').textContent = hs.enabled ? 'Hosts are being checked' : 'No checks are running and the Health page and top-bar counts are off';
   $('hsBody').classList.toggle('hs-off', !hs.enabled);
-  hs.monitored = new Set(r.hosts.filter((h) => !r.settings.excluded.includes(h.id)).map((h) => h.id));
+  hs.pingOn = new Set(r.hosts.filter((h) => !r.settings.pingOff.includes(h.id)).map((h) => h.id));
+  hs.remoteOn = new Set(r.hosts.filter((h) => !r.settings.remoteOff.includes(h.id)).map((h) => h.id));
   hsSetInterval('hsPing', 'hsPingUnit', r.settings.pingSeconds);
   hsSetInterval('hsPort', 'hsPortUnit', r.settings.portSeconds);
   const editable = can('system.manage');
@@ -1318,16 +1501,23 @@ $('hsEnabled').onclick = async () => {
   catch (e) { $('hsMsg').textContent = e.message; $('hsMsg').className = 'um-msg bad'; }
 };
 $('hsHosts').onchange = (e) => {
-  const id = e.target.dataset.host; if (!id) return;
-  e.target.checked ? hs.monitored.add(id) : hs.monitored.delete(id);
+  const id = e.target.dataset.host, set = e.target.dataset.what === 'ping' ? hs.pingOn : hs.remoteOn; if (!id) return;
+  e.target.checked ? set.add(id) : set.delete(id);
   renderHsHosts();
 };
-$('hsAll').onclick = () => { if (!can('system.manage')) return showDenied({ permission: 'system.manage', what: 'change health settings' }); hs.monitored = new Set(hs.hosts.map((h) => h.id)); renderHsHosts(); };
-$('hsNone').onclick = () => { if (!can('system.manage')) return showDenied({ permission: 'system.manage', what: 'change health settings' }); hs.monitored = new Set(); renderHsHosts(); };
+$('hsHosts').onclick = (e) => {
+  const a = e.target.closest('a[data-col]'); if (!a) return;
+  if (!can('system.manage')) return showDenied({ permission: 'system.manage', what: 'change health settings' });
+  const key = a.dataset.col === 'ping' ? 'pingOn' : 'remoteOn';
+  hs[key] = a.dataset.set === 'all' ? new Set(hs.hosts.map((h) => h.id)) : new Set();
+  renderHsHosts();
+};
+$('hsAll').onclick = () => { if (!can('system.manage')) return showDenied({ permission: 'system.manage', what: 'change health settings' }); hs.pingOn = new Set(hs.hosts.map((h) => h.id)); hs.remoteOn = new Set(hs.pingOn); renderHsHosts(); };
+$('hsNone').onclick = () => { if (!can('system.manage')) return showDenied({ permission: 'system.manage', what: 'change health settings' }); hs.pingOn = new Set(); hs.remoteOn = new Set(); renderHsHosts(); };
 $('hsDefaults').onclick = () => {
   hsSetInterval('hsPing', 'hsPingUnit', hs.defaults.pingSeconds);
   hsSetInterval('hsPort', 'hsPortUnit', hs.defaults.portSeconds);
-  hs.monitored = new Set(hs.hosts.map((h) => h.id));
+  hs.pingOn = new Set(hs.hosts.map((h) => h.id)); hs.remoteOn = new Set(hs.pingOn);
   hsHints(); renderHsHosts();
   $('hsMsg').textContent = 'Defaults restored. Press Save to apply them.'; $('hsMsg').className = 'um-msg dim';
 };
@@ -1335,7 +1525,7 @@ $('hsSave').onclick = async () => {
   try {
     await api('PUT', '/api/settings/health', {
       pingSeconds: hsSeconds('hsPing', 'hsPingUnit'), portSeconds: hsSeconds('hsPort', 'hsPortUnit'),
-      excluded: hs.hosts.filter((h) => !hs.monitored.has(h.id)).map((h) => h.id),
+      pingOff: hs.hosts.filter((h) => !hs.pingOn.has(h.id)).map((h) => h.id), remoteOff: hs.hosts.filter((h) => !hs.remoteOn.has(h.id)).map((h) => h.id),
     });
     toast('Health settings saved');
     $('hsMsg').textContent = ''; pollNavStats();
@@ -1438,9 +1628,9 @@ const dur = (ms) => {
 };
 const monCountsHtml = (snap) => {
   if (!snap) return '';
-  const { total, hostsUp, remoteUp } = snap.summary;
-  return `<span title="Hosts that answer ping"><b class="${monClass(hostsUp, total)}">${hostsUp}/${total}</b> hosts up</span>
-    <span title="Hosts whose WinRM or SSH port is open"><b class="${monClass(remoteUp, total)}">${remoteUp}/${total}</b> remote up</span>`;
+  const { pingTotal, remoteTotal, hostsUp, remoteUp } = snap.summary;
+  return `<span title="Hosts that answer ping"><b class="${monClass(hostsUp, pingTotal)}">${hostsUp}/${pingTotal}</b> hosts up</span>
+    <span title="Hosts whose WinRM or SSH port is open"><b class="${monClass(remoteUp, remoteTotal)}">${remoteUp}/${remoteTotal}</b> remote up</span>`;
 };
 // Green when everything is up, orange when at least 80% is, red below that.
 const monClass = (n, total) => (!total ? 'dim' : n === total ? 'ok' : n / total >= 0.8 ? 'warnc' : 'bad');
@@ -1448,8 +1638,9 @@ const monClass = (n, total) => (!total ? 'dim' : n === total ? 'ok' : n / total 
 function renderNavStats() {
   const el = $('navStats'); if (!el || !monSnap) return;
   if (monSnap.enabled === false) { el.innerHTML = '<span title="Health monitoring is turned off in Settings > System > Health Settings">health monitoring off</span>'; return; }
-  const { total, hostsUp, remoteUp } = monSnap.summary;
-  el.innerHTML = total ? `<span title="Hosts up (answering ping)">hosts <b class="${monClass(hostsUp, total)}">${hostsUp}/${total}</b></span><span title="Remote up (WinRM or SSH port open)">remote <b class="${monClass(remoteUp, total)}">${remoteUp}/${total}</b></span>` : '';
+  const { total, pingTotal, remoteTotal, hostsUp, remoteUp } = monSnap.summary;
+  const part = (label, tip, up, n) => `<span title="${tip}">${label} ${n ? `<b class="${monClass(up, n)}">${up}/${n}</b>` : '<b class="dim">off</b>'}</span>`;
+  el.innerHTML = total ? part('hosts', 'Hosts up (answering ping)', hostsUp, pingTotal) + part('remote', 'Remote up (WinRM or SSH port open)', remoteUp, remoteTotal) : '';
 }
 let navTimer;
 async function pollNavStats() {
@@ -1464,23 +1655,25 @@ function renderMonitor() {
     $('monGrid').innerHTML = '<p class="dim" style="margin:0">Health monitoring is turned off, so no hosts are being checked. It can be turned back on under Settings → System → Health Settings.</p>';
     return;
   }
+  const pe = fmtSecs(monSnap.summary.pingEveryMs / 1000), re = fmtSecs(monSnap.summary.portsEveryMs / 1000);
+  $('monSub').textContent = `Each monitored host is pinged every ${pe}, and its WinRM or SSH port is checked every ${re}. Green is up, red is not responding, dashed is not monitored (change it under Settings → System → Health Settings).`;
   $('monSum').innerHTML = monCountsHtml(monSnap) + (monSnap.summary.excluded ? `<span class="dim" title="Change which hosts are monitored in Settings > System > Health Settings">${monSnap.summary.excluded} not monitored</span>` : '');
   const n = (ip) => ip.split('.').reduce((a, b) => a * 256 + Number(b), 0) || 0;
   const hosts = [...monSnap.hosts].sort((a, b) => n(a.address) - n(b.address) || a.address.localeCompare(b.address));
   $('monGrid').innerHTML = hosts.map((h) => {
     const hp = h.host, rm = h.remote;
-    const hostTxt = hp.state === 'up' ? `up${hp.rttMs ? ` · ${hp.rttMs} ms` : ''}` : hp.state === 'down' ? 'not responding' : 'checking…';
-    const remTxt = rm.state === 'up' ? 'open' : rm.state === 'down' ? 'not responding' : 'checking…';
-    const hostTip = hp.state === 'unknown' ? 'Ping has not run yet' : `Ping: ${hp.state === 'up' ? 'replied' : 'no reply'} (checked ${ago(hp.checkedAt)}; ${hp.state === 'up' ? 'up' : 'down'} for ${dur(hp.since)}). Checked every minute.`;
-    const remTip = rm.state === 'unknown' ? `${rm.label} port check has not run yet` : `${rm.label}: ${rm.ports.map((p) => `port ${p.port} ${p.state}`).join(', ')} (checked ${ago(rm.checkedAt)}; ${rm.state === 'up' ? 'up' : 'down'} for ${dur(rm.since)}). Checked every 5 minutes.`;
-    return `<div class="mon-box ${hp.state}">
+    const hostTxt = hp.state === 'off' ? 'not monitored' : hp.state === 'up' ? `up${hp.rttMs ? ` · ${hp.rttMs} ms` : ''}` : hp.state === 'down' ? 'not responding' : 'checking…';
+    const remTxt = rm.state === 'off' ? 'not monitored' : rm.state === 'up' ? 'open' : rm.state === 'down' ? 'not responding' : 'checking…';
+    const hostTip = hp.state === 'off' ? 'Ping is turned off for this host in Settings > System > Health Settings' : hp.state === 'unknown' ? 'Ping has not run yet' : `Ping: ${hp.state === 'up' ? 'replied' : 'no reply'} (checked ${ago(hp.checkedAt)}; ${hp.state === 'up' ? 'up' : 'down'} for ${dur(hp.since)}). Checked every ${pe}.`;
+    const remTip = rm.state === 'off' ? `The ${rm.label} port check is turned off for this host in Settings > System > Health Settings` : rm.state === 'unknown' ? `${rm.label} port check has not run yet` : `${rm.label}: ${rm.ports.map((p) => `port ${p.port} ${p.state}`).join(', ')} (checked ${ago(rm.checkedAt)}; ${rm.state === 'up' ? 'up' : 'down'} for ${dur(rm.since)}). Checked every ${re}.`;
+    return `<div class="mon-box ${hp.state === 'off' ? rm.state : hp.state}">
       <div class="mon-name"><span>${esc(h.name)}</span><span class="mon-proto ${h.protocol === 'ssh' ? 'proto-ssh' : 'proto-winrm'}">${rm.label}</span></div>
       <div class="mon-addr">${esc(h.address)}${h.os ? ` · ${esc(String(h.os).replace(/^Microsoft /, '').replace(/\s*\(\d[\d.]*\)$/, ''))}` : ''}</div>
       <div class="mon-pills">
         <span class="mon-pill ${hp.state}" title="${esc(hostTip)}"><i></i><b>Host</b>${esc(hostTxt)}</span>
-        <span class="mon-pill ${rm.state}" title="${esc(remTip)}"><i></i><b>Remote</b>${esc(rm.label)} ${esc(remTxt)}</span>
+        <span class="mon-pill ${rm.state}" title="${esc(remTip)}"><i></i><b>Remote</b>${rm.state === 'off' ? '' : `${esc(rm.label)} `}${esc(remTxt)}</span>
       </div>
-      <div class="mon-foot">pinged ${ago(hp.checkedAt)} · ${rm.label} checked ${ago(rm.checkedAt)}</div></div>`;
+      <div class="mon-foot">${hp.state === 'off' ? 'ping off' : `pinged ${ago(hp.checkedAt)}`} · ${rm.state === 'off' ? `${rm.label} check off` : `${rm.label} checked ${ago(rm.checkedAt)}`}</div></div>`;
   }).join('') || '<p class="dim" style="margin:0">No saved hosts yet. Add and authenticate hosts under Host Management to monitor them.</p>';
 }
 async function loadMonitor() {
@@ -1785,6 +1978,36 @@ function renderHomeAccess(me, groups) {
     <div class="hp-head cant">Can't do</div>
     <ul>${list(cant, 'cant', '✗', 'Nothing is restricted')}</ul>`;
 }
+// ---- Change your own password ----
+// A dialog on the Home page (and from your own row in User Management). It asks for the current password; everywhere else you
+// are signed in is signed out, but this session carries on.
+function openPassword() {
+  for (const id of ['pwCur', 'pwNew', 'pwNew2']) $(id).value = '';
+  $('pwMsg').textContent = '';
+  $('pwModal').hidden = false;
+  $('pwCur').focus();
+}
+const closePassword = () => { $('pwModal').hidden = true; };
+$('changePw').onclick = openPassword;
+$('pwX').onclick = closePassword; $('pwCancel').onclick = closePassword;
+$('pwModal').onclick = (e) => { if (e.target.id === 'pwModal') closePassword(); };
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('pwModal').hidden) closePassword(); });
+$('pwModal').onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); $('pwSave').click(); } };
+$('pwSave').onclick = async () => {
+  const say = (t) => { $('pwMsg').textContent = t; $('pwMsg').className = 'um-msg bad'; };
+  if (!$('pwCur').value) return say('Enter your current password');
+  if ($('pwNew').value.length < 8) return say('The new password must be at least 8 characters');
+  if ($('pwNew').value !== $('pwNew2').value) return say('The new passwords do not match');
+  if ($('pwNew').value === $('pwCur').value) return say('Choose a password that is different from the current one');
+  $('pwSave').disabled = true;
+  try {
+    await api('PUT', `/api/users/${access.id}/password`, { password: $('pwNew').value, currentPassword: $('pwCur').value });
+    closePassword();
+    toast('Password changed. Your other sessions have been signed out.');
+  } catch (e) { say(e.message); }
+  $('pwSave').disabled = false;
+};
+
 $('signOut').onclick = async () => {
   try { await api('POST', '/api/auth/logout'); } catch { /* signing out anyway */ }
   location.replace('/login.html');
@@ -1900,7 +2123,7 @@ function renderLog() {
       : `<table class="lg"><thead><tr><th class="rown">#</th><th>Time (UTC)</th><th>Host</th><th>Action</th><th>Artefact</th><th>Size</th><th>Hash match</th><th>Outcome</th><th>Detail</th></tr></thead><tbody>${evs.map(logRow).join('')}</tbody></table>`;
     return `<div class="lg-hunt ${open ? 'open' : ''}">
       <div class="lg-head" data-toggle="${r.id}" role="button" tabindex="0" aria-expanded="${open}"><span class="chev">${open ? '▾' : '▸'}</span>
-        <span class="lg-name">${esc(r.name || r.collectionName)}</span><span class="badge ${badge}">${esc(r.status.replaceAll('_', ' '))}</span>
+        <span class="lg-name">${esc(r.name || r.collectionName)}</span>${schedTag(r)}<span class="badge ${badge}">${esc(r.status.replaceAll('_', ' '))}</span>
         <span class="dim">${esc(new Date(r.startedAt).toLocaleString())}</span><span class="dim">${ok}/${r.results.length} ok · ${r.eventCount} event${r.eventCount === 1 ? '' : 's'}</span>
         <span class="lg-btns"><a href="/api/runs/${r.id}/log.csv" download data-stop="1" data-perm="hunts.export" data-perm-what="export logs" title="Download this hunt's log as CSV">Export CSV</a><a data-del="${r.id}" data-stop="1" data-perm="hunts.run" data-perm-what="delete hunt records">Delete</a></span></div>
       ${open ? `<div class="lg-body">${table}</div>` : ''}</div>`;

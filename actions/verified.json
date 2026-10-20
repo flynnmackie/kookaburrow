@@ -1,6 +1,6 @@
 {
   "powershell/block-address-firewall.ps1": "47bf06a5b9048b86a1abb6badb7df5d4a3de3cac7bee257f7e327e0f340d6b52",
-  "powershell/create-local-user.ps1": "e3dbd026d9334a365f4d4b8c03eeb63cfa57fe5f1307015b725101056e0fef2c",
+  "powershell/create-local-user.ps1": "6f3ffaea9fd86b5992274caebd7fe6ec5a57df84651f7e04f0b83787e1500032",
   "powershell/disable-local-user.ps1": "a24b47fe286eadfade4019a9d984bf168cb28bdfa31f2350404b606bd6faa4f5",
   "powershell/kill-process-by-name.ps1": "7a66ecf906f0afe7f87651a7a0e58439f99e5c5c5e56ce245cd03364420bf597",
   "powershell/kill-process-by-pid.ps1": "1350e0faae35f740e287271482bb1d4420bdf22a6ef8c87680360cb741af70cb",
@@ -9,7 +9,7 @@
   "powershell/remove-local-user.ps1": "b33b51b778f9abcd23d89788644a38f8cfb2344a4d27c7d04e0cd173b6383568",
   "powershell/stop-and-disable-service.ps1": "4d968fa21c7d4a7ffec02efc2509edebd626101e4ab6860935a4a9c976755682",
   "bash/block-address-firewall.sh": "9348653e32e2717981507bf1f3fb241475f540ff685ab4d3ce9f34d6a9375429",
-  "bash/create-user.sh": "b40ff8ff58e749cb38ae81cd7dccfdc4f914da75956dedcdfc7c1f72e8b7128a",
+  "bash/create-user.sh": "4f9ae5abec4e826883142b74adf937b79650d07480f949b87ce5f05e9152f550",
   "bash/kill-process-by-name.sh": "6ae67f8869dbfe4c0e144b46b3c49fa90f7b57e0cbb090e66eebf9f9b8c7f1ea",
   "bash/kill-process-by-pid.sh": "aa7ee3a8e9f592388a9edc6224e92bad8ad73af1c9ed29ce816572c74e67611d",
   "bash/lock-user.sh": "d2bcec71690eab1ad14ce1f7786f5560195782c80075cdbb6030cccc7d3075ca",

@@ -220,6 +220,43 @@
   .run-layout { grid-template-columns:minmax(190px, 250px) minmax(0, 1fr); }
   .run-layout > .card { overflow:auto; }
   .run-layout h2 { margin-top:0; }
+  /* Burrow > Hunt */
+  .bh-bar { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px; } .bh-bar h2 { margin:0; border:0; padding:0; }
+  .bh-bar .act, .bd-btns .act { width:auto; margin:0; }
+  table.bh { font-size:12px; } table.bh th { position:sticky; top:0; background:var(--panel-t); z-index:1; } table.bh td, table.bh th { padding:3px 8px; } table.bh .num { text-align:right; font-variant-numeric:tabular-nums; }
+  table.bh .bh-wrap { white-space:normal; overflow-wrap:anywhere; }
+  tr.bh-row { cursor:pointer; transition:background var(--ease); } tr.bh-row:hover { background:var(--hover); } tr.bh-row.on { background:var(--blue-soft); box-shadow:inset 2px 0 0 var(--blue); }
+  .bh-name { font-weight:600; color:var(--text); } .st-run { color:var(--blue); } .st-warn, tr.st-warn td { color:var(--orange); } tr.bad td { color:var(--bad); } tr.bad td.dim { color:var(--dim); }
+  .bd-head { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; flex-wrap:wrap; } .bd-btns { display:flex; gap:6px; flex-wrap:wrap; }
+  .bd-facts { display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:6px 14px; margin:6px 0 2px; font-size:12.5px; }
+  .bd-facts span { display:block; font:600 10.5px var(--f-ui); text-transform:uppercase; letter-spacing:.04em; color:var(--dim); }
+  a.dl { cursor:pointer; font-size:12px; }
+  .page.on > .card.bh-top { flex:2 1 0; } .page.on > .card.bh-detail { flex:3 1 0; }
+  /* recurring */
+  .rtag { display:inline-block; margin-left:6px; padding:0 5px; border:1px solid var(--ok); border-radius:var(--r-s); color:var(--ok); font:700 10.5px var(--f-ui); vertical-align:1px; cursor:help; }
+  .bh-del { text-align:right; white-space:nowrap; } a.dl.bad { color:var(--bad); }
+  .rec-box { border:1px solid var(--line); border-radius:var(--r-m); padding:8px 12px; margin:4px 0 8px; } .rec-row { display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin:5px 0; font-size:13px; }
+  .rec-row input[type=number] { width:90px; } .rec-opt { display:flex; align-items:center; gap:6px; } .rec-sum { margin-top:6px; font-size:12.5px; color:var(--blue); } .rec-sum.bad { color:var(--bad); }
+  .rc-head { flex-wrap:wrap; row-gap:3px; } .rc-head b { color:var(--text); font-variant-numeric:tabular-nums; } .rc-body { padding:6px 12px 10px; }
+  .rc-body .bd-facts { margin-top:2px; } .rc-items { display:flex; flex-direction:column; gap:4px; } .rc-item { font-size:12.5px; } .rc-item .dim { margin-left:6px; }
+  /* New response: parameters */
+  .rm-pa { border:1px solid var(--line); border-radius:var(--r-m); padding:6px 10px; margin-top:6px; } .rm-pn { font:600 12.5px var(--f-ui); margin-bottom:4px; }
+  .rm-prow { display:grid; grid-template-columns:minmax(120px, 200px) 1fr; gap:10px; align-items:center; margin:3px 0; font-size:12.5px; } .rm-prow input { width:100%; }
+  /* New hunt dialog */
+  .hm-title { display:flex; align-items:center; gap:12px; padding-bottom:8px; } .hm-title h2 { padding:0; } .hm-title .act { width:auto; margin:0; padding:2px 10px; font-size:12px; }
+  .modal .dlg.rr { width:min(900px, 100%); height:min(560px, 100%); } #rrList tr, #rxList tr { cursor:pointer; } #rxList tr.on, #rrList tr.on { background:var(--blue-soft); box-shadow:inset 2px 0 0 var(--blue); }
+  .modal .dlg.hunt { width:min(1060px, 100%); height:min(820px, 100%); } .hunt-body { padding:4px 16px 12px; }
+  .hsec { margin-top:8px; }
+  .hsec h3 { display:flex; align-items:center; gap:8px; margin:0 0 4px; font:600 14px var(--f-ui); color:var(--text); }
+  .hnum { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:50%; background:var(--blue-soft); border:1px solid var(--blue-d); color:var(--blue); font-size:11.5px; }
+  .hcount { font-weight:400; font-size:12px; }
+  .hunt-body { display:flex; flex-direction:column; } .hsec { flex:1; min-height:0; display:flex; flex-direction:column; } .hsec[hidden] { display:none; } .hsec .tcols { flex:1; min-height:0; grid-template-rows:minmax(0,1fr); } .hunt-body .tcols > div { display:flex; flex-direction:column; min-height:0; } .hunt-body .tcols .pickbox { flex:1; height:auto; min-height:0; }
+  #hmTabs .hnum, #rmTabs .hnum { margin-right:6px; width:18px; height:18px; font-size:11px; }
+  .hcoll { display:grid; grid-template-columns:minmax(260px, 2fr) 3fr; gap:10px; flex:1; min-height:0; margin-top:6px; } .hcoll .coll-list { display:flex; flex-direction:column; min-height:0; }
+  .hcoll .coll-list .toggle { margin:6px 0 0; } .hcoll .coll-list .pickbox { flex:1; height:auto; min-height:0; }
+  .hcoll .coll-detail { min-width:0; }
+  .hcoll .collection-item { display:flex; align-items:flex-start; gap:8px; } .hcoll .collection-item > input { margin-top:3px; flex-shrink:0; } .hcoll .ci-main { flex:1; min-width:0; }
+  @media (max-width:760px) { .hcoll { grid-template-columns:1fr; flex:none; } .hcoll .coll-list .pickbox { height:260px; flex:none; } .hcoll .coll-detail { min-height:240px; } }
   .run-layout .act { width:100%; margin-top:6px; }
   .warn { color:var(--orange); }
   .modal { position:fixed; inset:0; z-index:50; background:rgba(2,3,6,.7); display:flex; align-items:center; justify-content:center; padding:20px; }
@@ -363,12 +400,15 @@
   .modal .dlg.deny { width:min(420px, 100%); height:auto; }
   .deny-body { padding:12px 16px 4px; font-size:13px; } .deny-body p { margin:0 0 8px; }
   .deny .dlg-head h2 { display:flex; align-items:center; gap:7px; color:var(--bad); } .deny .dlg-head svg.lock { margin:0; }
+  .modal .dlg.pwdlg { width:min(400px, 100%); height:auto; } .pw-body { padding:6px 16px 4px; } .pw-body input { width:100%; }
+  .home-top { gap:8px; }
   /* User management */
   #umNew { padding:2px 12px; margin-left:auto; } #umNew + #umTabs { margin-left:0; }
   .um-actions { display:flex; align-items:center; gap:8px; margin:10px 0 4px; } .um-msg { font-size:12.5px; } .um-msg.ok { color:var(--ok); } .um-msg.bad { color:var(--bad); }
   .um-detail .fl { display:block; font:600 10.5px var(--f-ui); text-transform:uppercase; letter-spacing:.05em; color:var(--dim); margin:9px 0 4px; }
   .um-detail input[type=text], .um-detail input[type=password] { display:block; } .um-detail input[type=text], .um-detail input[type=password] { width:100%; max-width:420px; }
   .um-perm.um-on { cursor:pointer; }
+  .um-detail .um-pw { display:flex; flex-wrap:wrap; gap:8px; margin:4px 0; } .um-detail .um-pw input[type=password] { width:230px; max-width:100%; display:inline-block; }
   .um-top { display:flex; align-items:center; gap:14px; margin-bottom:2px; } .um-top h2 { margin-bottom:2px; }
   #umTabs { margin:0 0 0 auto; width:180px; }
   .um-layout { display:grid; grid-template-columns:minmax(200px, 260px) 1fr; gap:12px; align-items:start; margin-top:8px; }
@@ -426,6 +466,10 @@
   .hs-host:last-child { border-bottom:0; } .hs-host:hover { background:var(--hover); }
   .hs-host .hs-name { font-weight:600; min-width:120px; } .hs-host .hs-addr { color:var(--dim); min-width:110px; } .hs-host .hs-os { color:var(--faint); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .hs-host.off .hs-name { color:var(--faint); text-decoration:line-through; }
+  .hs-colhead { display:flex; align-items:center; gap:10px; padding:4px 10px; border-bottom:1px solid var(--line-hi); font:600 10.5px var(--f-ui); text-transform:uppercase; letter-spacing:.04em; color:var(--dim); position:sticky; top:0; background:var(--panel); z-index:1; }
+  .hs-col { width:78px; flex-shrink:0; } .hs-col a { margin-left:4px; text-transform:none; letter-spacing:0; cursor:pointer; font-weight:400; }
+  .hs-chk { width:78px; flex-shrink:0; display:flex; align-items:center; } .hs-host { cursor:default; }
+  .mon-pill.off { color:var(--faint); border-color:var(--line); border-style:dashed; background:none; } .mon-box.off { opacity:.85; }
   .hs-host input:disabled, .hs-row input:disabled, .hs-row select:disabled { cursor:not-allowed; opacity:.7; }
   .hs-actions { display:flex; align-items:center; gap:8px; margin:12px 0 2px; }
   /* Health monitor */
@@ -647,20 +691,22 @@
     </section>
     <!-- Burrow -->
     <section class="page" id="burrow/hunt">
-      <div class="run-layout">
-        <div class="card">
-          <h2>Hunt</h2>
-          <p class="dim">Run collections against hosts or groups and keep the results.</p>
-          <button class="act" id="bhNew" data-perm="hunts.run" data-perm-what="run hunts">New Hunt</button>
-        </div>
-        <div class="card">
-          <h2>Previous hunts</h2>
-          <div id="bhList"></div>
-        </div>
+      <div class="card bh-top">
+        <div class="bh-bar"><h2>Previous hunts</h2><button class="act" id="bhNew" data-perm="hunts.run" data-perm-what="run hunts">New Hunt</button></div>
+        <div id="bhList"></div>
       </div>
+      <div class="card bh-detail" id="bhDetail"><p class="dim" style="margin:0">Click a hunt above to see what it ran, the files it pulled back, any errors, and to download its results.</p></div>
     </section>
     <section class="page" id="burrow/respond">
-      <div class="card"><h2>Respond</h2><p class="dim">Nothing here yet.</p></div>
+      <div class="card bh-top">
+        <div class="bh-bar"><h2>Previous responses</h2><button class="act" id="brNew" data-perm="actions.run" data-perm-what="run actions">New Response</button></div>
+        <div id="brList"></div>
+      </div>
+      <div class="card bh-detail" id="brDetail"><p class="dim" style="margin:0">Click a response above to see what it ran, its output files, any errors, and to download the results.</p></div>
+    </section>
+    <section class="page" id="burrow/recurring">
+      <div class="card"><h2>Recurring hunts</h2><div id="rcHunts"></div></div>
+      <div class="card"><h2>Recurring responses</h2><div id="rcResps"></div></div>
     </section>
     <section class="page" id="settings/view-actions">
       <div class="collection-layout">
@@ -748,6 +794,7 @@
           <div class="hs-row"><input id="hsPort" type="number" min="1" step="1"><select id="hsPortUnit"></select><span class="dim" id="hsPortHint"></span></div>
         </div>
         <div class="hs-hosts-head"><span class="fl" style="margin:0">Hosts to monitor</span><span class="dim" id="hsCount"></span><span class="hs-links"><a id="hsAll">All</a><a id="hsNone">None</a></span></div>
+        <p class="dim" style="margin:0 0 6px; max-width:760px; font-size:12px">Choose per host whether its ping, its WinRM / SSH port, or both are checked. A check that is off shows as "not monitored" on the Health page.</p>
         <div class="hs-hosts" id="hsHosts"></div>
         <div class="hs-actions"><button class="act" id="hsSave" type="button" data-perm="system.manage" data-perm-what="change health settings">Save</button><button class="act sec" id="hsDefaults" type="button" data-perm="system.manage" data-perm-what="change health settings">Reset to defaults</button><span class="um-msg" id="hsMsg"></span></div>
         </div>
@@ -874,7 +921,7 @@
     <section class="page" id="health/monitor">
       <div class="card">
         <div class="mon-top"><h2>Monitor</h2><span class="mon-sum" id="monSum"></span><button class="act sec" id="monCheck" type="button" title="Run every check now instead of waiting for the schedule">Check now</button></div>
-        <p class="dim lg-sub">Every saved host is pinged each minute, and its WinRM or SSH port is checked every 5 minutes. Green is up, red is not responding.</p>
+        <p class="dim lg-sub" id="monSub">Every monitored host is pinged and has its WinRM or SSH port checked. Green is up, red is not responding.</p>
         <div class="mon-grid" id="monGrid"></div>
       </div>
     </section>
@@ -889,7 +936,7 @@
     <!-- Home -->
     <section class="page" id="home/home">
       <div class="card home">
-        <div class="home-top"><span id="signOutMsg"></span><button class="act sec" id="signOut" type="button" title="End this session and return to the sign-in page">Sign out</button></div>
+        <div class="home-top"><span id="signOutMsg"></span><button class="act sec" id="changePw" type="button" title="Change the password you sign in with">Change password</button><button class="act sec" id="signOut" type="button" title="End this session and return to the sign-in page">Sign out</button></div>
         <div class="home-main">
           <div class="home-hero">
             <dl class="home-info" id="homeInfo"></dl>
@@ -942,25 +989,86 @@
   </main>
 </div>
 <div class="modal" id="huntModal" hidden role="dialog" aria-modal="true" aria-labelledby="hmTitle">
-  <div class="dlg">
-    <div class="dlg-head"><h2 id="hmTitle">New hunt</h2><button class="dlg-x" id="hmClose" aria-label="Close">×</button></div>
-    <div class="dlg-tabs" id="hmTabs"><button type="button" class="on" data-tab="details">Details</button><button type="button" data-tab="collections" id="hmTabColl">Collections</button></div>
-    <div class="dlg-body" id="hmPaneDetails">
-      <span class="fl">Hunt name</span>
-      <input id="hmName" type="text" placeholder="e.g. Weekly persistence sweep" autocomplete="off">
-      <div class="tcols">
-        <div><span class="fl">Groups</span><div class="pickbox" id="hmGroups"></div></div>
-        <div><span class="fl">Hosts</span><div class="pickbox" id="hmHosts"></div></div>
-      </div>
-    </div>
-    <div class="dlg-body coll" id="hmPaneColl" hidden>
-      <div class="coll-list">
-        <input id="hmSearch" type="search" placeholder="Search collections" autocomplete="off">
-        <div class="pickbox" id="hmCollections"></div>
-      </div>
-      <div class="coll-detail" id="hmDetail"></div>
+  <div class="dlg hunt">
+    <div class="dlg-head"><div class="hm-title"><h2 id="hmTitle">New hunt</h2><button class="act sec" id="hmRerun" type="button" title="Start from a hunt you have run before">Rerun past hunt</button></div><button class="dlg-x" id="hmClose" aria-label="Close">×</button></div>
+    <div class="dlg-tabs" id="hmTabs"><button type="button" class="on" data-pane="who" id="hmTabWho"><span class="hnum">1</span>Who</button><button type="button" data-pane="coll" id="hmTabColl"><span class="hnum">2</span>Collections</button><button type="button" data-pane="name" id="hmTabName"><span class="hnum">3</span>Name</button></div>
+    <div class="dlg-body hunt-body">
+      <section class="hsec" data-pane="who">
+        <h3>Who to run it against</h3>
+        <div class="tcols">
+          <div><span class="fl">Groups</span><div class="pickbox" id="hmGroups"></div></div>
+          <div><span class="fl">Hosts</span><div class="pickbox" id="hmHosts"></div></div>
+        </div>
+      </section>
+      <section class="hsec" data-pane="coll" hidden>
+        <h3>Collections to run</h3>
+        <div class="hcoll">
+          <div class="coll-list">
+            <input id="hmSearch" type="search" placeholder="Search collection names and descriptions" autocomplete="off">
+            <div class="toggle" id="hmToggle"><button type="button" data-type="powershell" class="on">PowerShell</button><button type="button" data-type="bash">Linux</button></div>
+            <div class="pickbox" id="hmCollections"></div>
+          </div>
+          <div class="coll-detail" id="hmDetail"></div>
+        </div>
+      </section>
+      <section class="hsec" data-pane="name" hidden>
+        <h3>Name it</h3>
+        <span class="fl">Hunt name</span>
+        <input id="hmName" type="text" placeholder="e.g. Weekly persistence sweep" autocomplete="off">
+        <div class="sw-row"><button class="switch" id="hmRecurring" type="button" role="switch" aria-checked="false" aria-label="Recurring hunt"></button><b id="hmRecurringLabel">Recurring hunt: Off</b></div>
+        <div class="rec-box" id="hmRecBox" hidden></div>
+      </section>
     </div>
     <div class="dlg-foot"><button class="act" id="hmRun" data-perm="hunts.run" data-perm-what="run hunts">Run Hunt</button><button class="act sec" id="hmCancel">Cancel</button><span id="hmMsg"></span><span class="sum" id="hmSummary"></span></div>
+  </div>
+</div>
+<div class="modal" id="rerunModal" hidden role="dialog" aria-modal="true" aria-labelledby="rrTitle">
+  <div class="dlg rr">
+    <div class="dlg-head"><h2 id="rrTitle">Rerun a past hunt</h2><button class="dlg-x" id="rrClose" aria-label="Close">×</button></div>
+    <div class="dlg-body"><p class="dim" style="margin:2px 0 8px">Pick a hunt. Its hosts and collections are filled in for you; you then check the details and press Run Hunt.</p><div id="rrList"></div></div>
+    <div class="dlg-foot"><button class="act" id="rrUse" type="button" disabled>Use this hunt</button><button class="act sec" id="rrCancel" type="button">Cancel</button><span id="rrMsg"></span></div>
+  </div>
+</div>
+<div class="modal" id="respModal" hidden role="dialog" aria-modal="true" aria-labelledby="rmTitle">
+  <div class="dlg hunt">
+    <div class="dlg-head"><div class="hm-title"><h2 id="rmTitle">New response</h2><button class="act sec" id="rmRerun" type="button" title="Start from a response you have run before">Rerun past response</button></div><button class="dlg-x" id="rmClose" aria-label="Close">×</button></div>
+    <div class="dlg-tabs" id="rmTabs"><button type="button" class="on" data-pane="who" id="rmTabWho"><span class="hnum">1</span>Who</button><button type="button" data-pane="act" id="rmTabAct"><span class="hnum">2</span>Actions</button><button type="button" data-pane="name" id="rmTabName"><span class="hnum">3</span>Name</button></div>
+    <div class="dlg-body hunt-body">
+      <section class="hsec" data-pane="who">
+        <h3>Who to run it against</h3>
+        <div class="tcols">
+          <div><span class="fl">Groups</span><div class="pickbox" id="rmGroups"></div></div>
+          <div><span class="fl">Hosts</span><div class="pickbox" id="rmHosts"></div></div>
+        </div>
+      </section>
+      <section class="hsec" data-pane="act" hidden>
+        <h3>Actions to run <span class="dim hcount">These change the hosts they run on</span></h3>
+        <div class="hcoll">
+          <div class="coll-list">
+            <input id="rmSearch" type="search" placeholder="Search action names and descriptions" autocomplete="off">
+            <div class="toggle" id="rmToggle"><button type="button" data-type="powershell" class="on">PowerShell</button><button type="button" data-type="bash">Linux</button></div>
+            <div class="pickbox" id="rmActions"></div>
+          </div>
+          <div class="coll-detail" id="rmDetail"></div>
+        </div>
+      </section>
+      <section class="hsec" data-pane="name" hidden>
+        <h3>Name it</h3>
+        <span class="fl">Response name</span>
+        <input id="rmName" type="text" placeholder="e.g. Contain WS-12" autocomplete="off">
+        <div class="rm-params" id="rmParams"></div>
+        <div class="sw-row"><button class="switch" id="rmRecurring" type="button" role="switch" aria-checked="false" aria-label="Recurring response"></button><b id="rmRecurringLabel">Recurring response: Off</b></div>
+        <div class="rec-box" id="rmRecBox" hidden></div>
+      </section>
+    </div>
+    <div class="dlg-foot"><button class="act" id="rmRun" data-perm="actions.run" data-perm-what="run actions">Run Response</button><button class="act sec" id="rmCancel">Cancel</button><span id="rmMsg"></span><span class="sum" id="rmSummary"></span></div>
+  </div>
+</div>
+<div class="modal" id="rerunRespModal" hidden role="dialog" aria-modal="true" aria-labelledby="rxTitle">
+  <div class="dlg rr">
+    <div class="dlg-head"><h2 id="rxTitle">Rerun a past response</h2><button class="dlg-x" id="rxClose" aria-label="Close">×</button></div>
+    <div class="dlg-body"><p class="dim" style="margin:2px 0 8px">Pick a response. Its hosts and actions are filled in for you; you then enter any parameter values again, check the details and press Run Response.</p><div id="rxList"></div></div>
+    <div class="dlg-foot"><button class="act" id="rxUse" type="button" disabled>Use this response</button><button class="act sec" id="rxCancel" type="button">Cancel</button><span id="rxMsg"></span></div>
   </div>
 </div>
 <div class="menu" id="sendMenu" hidden><button type="button" id="sendPickFiles">Choose files…</button><button type="button" id="sendPickFolder">Choose a folder…</button></div>
@@ -974,6 +1082,18 @@
     <div class="dlg-foot"><button class="act" id="pmPull" type="button" disabled>Pull</button><button class="act sec" id="pmCancel" type="button">Cancel</button><span id="pmMsg"></span><span class="sum" id="pmSel"></span></div>
   </div>
 </div>
+<div class="modal" id="pwModal" hidden role="dialog" aria-modal="true" aria-labelledby="pwTitle">
+  <div class="dlg pwdlg">
+    <div class="dlg-head"><h2 id="pwTitle">Change password</h2><button class="dlg-x" id="pwX" aria-label="Close">×</button></div>
+    <div class="dlg-body pw-body">
+      <span class="fl">Current password</span><input id="pwCur" type="password" autocomplete="current-password">
+      <span class="fl">New password <span class="dim">(at least 8 characters)</span></span><input id="pwNew" type="password" autocomplete="new-password">
+      <span class="fl">Confirm new password</span><input id="pwNew2" type="password" autocomplete="new-password">
+      <div class="um-msg" id="pwMsg" style="margin-top:8px"></div>
+    </div>
+    <div class="dlg-foot"><button class="act" id="pwSave" type="button">Change password</button><button class="act sec" id="pwCancel" type="button">Cancel</button></div>
+  </div>
+</div>
 <div class="modal" id="denyModal" hidden role="alertdialog" aria-modal="true" aria-labelledby="denyTitle">
   <div class="dlg deny">
     <div class="dlg-head"><h2 id="denyTitle"><svg class="lock" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg> Permission denied</h2><button class="dlg-x" id="denyX" aria-label="Close">×</button></div>
@@ -985,5 +1105,7 @@
 <script src="vendor/xterm.js"></script>
 <script src="vendor/addon-fit.js"></script>
 <script src="app.js"></script>
+<script src="respond.js"></script>
+<script src="recurring.js"></script>
 </body>
 </html>

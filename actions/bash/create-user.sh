@@ -1,7 +1,7 @@
 NAME='Create local user'
 DESCRIPTION='Creates a local account with a home directory and the given password, optionally adding it to a supplementary group such as sudo.'
 DEPENDENCIES=()
-PARAMETERS=(USER_NAME PASSWORD GROUP)
+PARAMETERS=(USER_NAME PASSWORD 'GROUP?')
 TAGS=(accounts remediation)
 
 [ -n "$USER_NAME" ] && [ -n "$PASSWORD" ] || { echo "USER_NAME and PASSWORD are required" >&2; exit 2; }

@@ -58,7 +58,7 @@ app.post('/api/auth/logout', (req, res) => { res.set('Set-Cookie', auth.logout(r
 // Who is signed in, with their roles and what those roles allow (the Home page shows this).
 app.get('/api/auth/me', (req, res) => {
   const u = db.users.find((x) => x.username === req.user);
-  res.json({ username: req.user, ...(u ? access(u) : { roles: [], permissions: [], all: false }) });
+  res.json({ id: u?.id, username: req.user, ...(u ? access(u) : { roles: [], permissions: [], all: false }) });
 });
 
 // ---- Permissions: every API route needs the permission listed in src/route-perms.js (admin has all of them) ----
@@ -320,15 +320,33 @@ app.get('/api/runs/:id/log.csv', (req, res) => {
   res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="${String(r.name || r.collectionName || 'hunt').replace(/[^A-Za-z0-9_-]+/g, '-')}-log.csv"` });
   res.send(audit.toCsv(audit.eventsFor(r)));
 });
+// The hunt's whole evidence folder (all hosts, All-Hosts and the log) as one zip.
+app.get('/api/runs/:id/download', (req, res) => {
+  const r = db.runs.find((x) => x.id === req.params.id);
+  const dir = r?.evidenceDir && require('path').join(config.evidenceDir, r.evidenceDir);
+  if (!dir || !require('fs').existsSync(dir)) return res.status(404).json({ error: 'This hunt has no evidence folder' });
+  res.set({ 'Content-Type': 'application/zip', 'Content-Disposition': `attachment; filename="${r.evidenceDir.replace(/[^w. -]/g, '_')}.zip"` });
+  res.send(require('./src/zip').zipFolder(dir, r.evidenceDir));
+});
 app.get('/api/runs/:id', (req, res) => {
   const r = db.runs.find((x) => x.id === req.params.id);
   r ? res.json(r) : res.status(404).json({ error: 'Not found' });
 });
-app.delete('/api/runs/:id', (req, res) => {
-  db.runs = db.runs.filter((r) => r.id !== req.params.id);
+// Deletes a run's folder under evidence/ (only ever a folder directly inside it).
+function removeEvidence(r) {
+  if (!r.evidenceDir || /[\\/]/.test(r.evidenceDir)) return;
+  const path = require('path'), base = path.resolve(config.evidenceDir), dir = path.resolve(base, r.evidenceDir);
+  if (dir.startsWith(base + path.sep)) require('fs').rmSync(dir, { recursive: true, force: true });
+}
+// ?evidence=1 also deletes the evidence folder (Burrow's delete buttons); the Log page's Delete keeps the folder.
+app.delete('/api/runs/:id', wrap((req, res) => {
+  const r = db.runs.find((x) => x.id === req.params.id);
+  if (r && r.status === 'running') throw new Error('It is still running. Wait for it to finish.');
+  if (r && req.query.evidence === '1') removeEvidence(r);
+  db.runs = db.runs.filter((x) => x.id !== req.params.id);
   save();
   res.json({ ok: true });
-});
+}));
 
 // ---- Users, roles and permissions (read-only for now; Settings > System > User Management) ----
 app.get('/api/permissions', (req, res) => res.json(permissions.GROUPS));
@@ -386,11 +404,37 @@ app.put('/api/users/:id', wrap((req, res) => {
   save();
   res.json(userView(u));
 }));
+// Changing a password. Your own needs the current password (so a left-open session can't be used to take the account).
+// Someone else's needs Manage users, and you can't change the password of a user who has more access than you do, so
+// only an admin can change an admin's. Everyone signed in as that user is signed out (apart from the session that made
+// the change, when it is your own password).
+app.put('/api/users/:id/password', async (req, res) => {
+  try {
+    const u = db.users.find((x) => x.id === req.params.id);
+    if (!u) throw new Error('User not found');
+    const password = String(req.body?.password ?? '');
+    if (password.length < 8) throw new Error('The password must be at least 8 characters');
+    if (u.username === req.user) {
+      await auth.confirmPassword(u, req.body?.currentPassword);
+      auth.setPassword(u, password, { keepSession: auth.sessionHash(req) });
+    } else {
+      const a = access(caller(req)), target = access(u);
+      if (!a.all && !a.permissions.includes('users.manage')) {
+        return res.status(403).json({ error: 'Permission denied', permission: 'users.manage', needed: [labelOf['users.manage']] });
+      }
+      if (!a.all && (target.all || target.permissions.some((p) => !a.permissions.includes(p)))) throw new Error("You can't change the password of a user who has more access than you");
+      auth.setPassword(u, password);
+    }
+    res.json({ ok: true });
+  } catch (e) { res.status(e.status || 400).json({ error: firstLine(e.message) }); }
+});
+
 app.delete('/api/users/:id', wrap((req, res) => {
   const u = db.users.find((x) => x.id === req.params.id);
   if (!u) throw new Error('User not found');
   if (u.username === req.user) throw new Error("You can't delete the account you are signed in with");
-  if (access(u).all) throw new Error("An admin can't be deleted here");
+  // Admins can delete other admins, but only admins can (never yourself, so at least one admin always remains).
+  if (access(u).all && !access(caller(req)).all) throw new Error('Only an admin can delete an admin');
   db.users = db.users.filter((x) => x !== u);
   auth.endSessions(u.username);
   save();
@@ -460,8 +504,74 @@ app.post('/api/hunts', wrap((req, res) => {
     hostIds.push(...list.hostIds);
   }
   const hosts = [...new Set(hostIds)].map((hid) => db.hosts.find((h) => h.id === hid)).filter(Boolean);
-  res.json(huntRunner.startHunt({ name: b.name, collectionIds: Array.isArray(b.collectionIds) ? b.collectionIds : [], hosts }));
+  const collectionIds = Array.isArray(b.collectionIds) ? b.collectionIds : [];
+  const sched = b.schedule ? scheduler.prepare({ kind: 'hunt', name: b.name, hostIds: Array.isArray(b.hostIds) ? b.hostIds : [], listIds: Array.isArray(b.listIds) ? b.listIds : [], itemIds: collectionIds, schedule: b.schedule, createdBy: req.user }) : null;
+  const run = huntRunner.startHunt({ name: b.name, collectionIds, hosts, startedBy: req.user, scheduleId: sched?.id });
+  if (sched) scheduler.activate(sched, run);
+  res.json(run);
 }));
+
+// ---- Responses: run actions (scripts that change a host) on hosts/groups; output is kept under evidence/ ----
+// body: { name, actionIds: [], hostIds?: [], listIds?: [], params?: { [actionId]: { [parameter]: value } } }
+const responseRunner = require('./src/response-runner');
+const scheduler = require('./src/scheduler');
+app.post('/api/responses', wrap((req, res) => {
+  const b = req.body;
+  let hostIds = Array.isArray(b.hostIds) ? [...b.hostIds] : [];
+  for (const lid of Array.isArray(b.listIds) ? b.listIds : []) {
+    const list = db.lists.find((l) => l.id === lid);
+    if (!list) throw new Error('Unknown group');
+    hostIds.push(...list.hostIds);
+  }
+  const hosts = [...new Set(hostIds)].map((hid) => db.hosts.find((h) => h.id === hid)).filter(Boolean);
+  const actionIds = Array.isArray(b.actionIds) ? b.actionIds : [];
+  const sched = b.schedule ? scheduler.prepare({ kind: 'response', name: b.name, hostIds: Array.isArray(b.hostIds) ? b.hostIds : [], listIds: Array.isArray(b.listIds) ? b.listIds : [], itemIds: actionIds, params: b.params, schedule: b.schedule, createdBy: req.user }) : null;
+  const run = responseRunner.startResponse({ name: b.name, actionIds, hosts, params: b.params, startedBy: req.user, scheduleId: sched?.id });
+  if (sched) scheduler.activate(sched, run);
+  res.json(run);
+}));
+app.delete('/api/responses/:id', wrap((req, res) => {
+  const r = db.runs.find((x) => x.id === req.params.id && x.kind === 'response');
+  if (!r) throw new Error('Not found');
+  if (r.status === 'running') throw new Error('It is still running. Wait for it to finish.');
+  removeEvidence(r);
+  db.runs = db.runs.filter((x) => x.id !== r.id);
+  save();
+  res.json({ ok: true });
+}));
+// Recurring hunts and responses: the list shows each kind only to people who may see that kind; deleting stops the schedule.
+const mayFor = (req, kind, perm) => { const a = access(caller(req)); return a.all || a.permissions.includes(kind === 'hunt' ? `hunts.${perm}` : `actions.${perm}`); };
+app.get('/api/schedules', (req, res) => res.json({ now: new Date().toISOString(), schedules: db.schedules.filter((s) => mayFor(req, s.kind, 'view')).map(scheduler.view) }));
+app.delete('/api/schedules/:id', wrap((req, res) => {
+  const s = db.schedules.find((x) => x.id === req.params.id);
+  if (!s) throw new Error('Not found');
+  if (!mayFor(req, s.kind, 'run')) return res.status(403).json({ error: 'Permission denied', needed: [s.kind === 'hunt' ? 'Run hunts' : 'Run actions'] });
+  db.schedules = db.schedules.filter((x) => x.id !== s.id);
+  save();
+  res.json({ ok: true });
+}));
+app.get('/api/responses', (req, res) => res.json(db.runs.filter((r) => r.kind === 'response').map(({ events, ...r }) => ({
+  ...r, results: r.results.map(({ stdout, stderr, ...meta }) => meta),
+}))));
+app.get('/api/responses/:id/events', (req, res) => {
+  const r = db.runs.find((x) => x.id === req.params.id && x.kind === 'response');
+  r ? res.json(audit.eventsFor(r)) : res.status(404).json({ error: 'Not found' });
+});
+// Every file in the response's evidence folder (the log, response.json, one folder per host).
+app.get('/api/responses/:id/files', (req, res) => {
+  const r = db.runs.find((x) => x.id === req.params.id && x.kind === 'response');
+  if (!r) return res.status(404).json({ error: 'Not found' });
+  const fs = require('fs'), path = require('path'), out = [];
+  const walk = (dir, rel) => {
+    for (const e of fs.existsSync(dir) ? fs.readdirSync(dir, { withFileTypes: true }) : []) {
+      if (e.isSymbolicLink()) continue;
+      if (e.isDirectory()) walk(path.join(dir, e.name), rel ? `${rel}/${e.name}` : e.name);
+      else out.push({ folder: rel, name: e.name, size: fs.statSync(path.join(dir, e.name)).size, path: `/evidence/${r.evidenceDir}${rel ? `/${rel}` : ''}/${e.name}` });
+    }
+  };
+  if (r.evidenceDir) walk(path.join(config.evidenceDir, r.evidenceDir), '');
+  res.json(out);
+});
 
 // ---- Shell: interactive sessions on authenticated hosts (output streams out by SSE, input comes in by POST) ----
 const shellWrap = (fn) => (req, res) => {
@@ -533,6 +643,7 @@ app.post('/api/monitor/check', (req, res) => { monitor.checkNow(); res.json(moni
 const server = app.listen(config.port, config.host, () => {
   console.log(`Kookaburrow running at http://${config.host}:${config.port}`);
   monitor.start();
+  scheduler.start();
 });
 server.on('error', (e) => {
   console.error(e.code === 'EADDRINUSE' ? `Port ${config.port} is already in use (set KB_PORT to change it).` : e.message);
