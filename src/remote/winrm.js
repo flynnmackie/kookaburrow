@@ -6,7 +6,7 @@ const { maxOutputBytes, hostTimeoutMs } = require('../config');
 
 const wrapper = path.join(__dirname, 'winrm-run.ps1');
 
-function run(profile, { mode, scriptPath, binaries = [] }) {
+function run(profile, { mode, scriptPath, binaries = [], csv = false }) {
   return new Promise((resolve) => {
     const env = {
       ...process.env,
@@ -17,6 +17,7 @@ function run(profile, { mode, scriptPath, binaries = [] }) {
       KB_AUTH: profile.auth || 'Negotiate',
       KB_SSL: profile.useSsl ? '1' : '0',
       KB_MODE: mode,
+      KB_CSV: csv ? '1' : '0', // hunts: return the result as CSV
       KB_SCRIPT: scriptPath || '',
       KB_BINS: binaries.length ? JSON.stringify(binaries) : '', // local files to stage on the target
     };
@@ -44,6 +45,6 @@ async function verify(profile) {
   return { hostname: info.hostname, os: `${info.os} (${info.version})`, platform: 'windows' };
 }
 
-const runScript = (profile, scriptPath, binaries) => run(profile, { mode: 'script', scriptPath, binaries });
+const runScript = (profile, scriptPath, binaries, opts = {}) => run(profile, { mode: 'script', scriptPath, binaries, csv: !!opts.csv });
 
 module.exports = { verify, runScript };

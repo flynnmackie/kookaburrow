@@ -13,6 +13,11 @@ const ssh = require('./remote/ssh');
 //   $Description = 'What it finds'     DESCRIPTION='What it finds'
 //   $Dependencies = @('tool.exe')      DEPENDENCIES=('tool')      (@() / () for none)
 //   $Tags = @('persistence', 'wmi')    TAGS=(persistence wmi)
+// Three optional descriptors say what the script does; when left out they are worked out from the script's
+// dependencies (see describe() below):
+//   $Footprint = 'none'                FOOTPRINT="none"      none | transient | persistent  (what it leaves on the host)
+//   $Returns = 'records'               RETURNS="records"     records | files | both         (what comes back)
+//   $Type = 'command'                  TYPE="command"        command | artefact | tool      (how it gets the data)
 // The platform reads them as text and never executes the file to do so. Comments and blank
 // lines may sit between them; the first other line starts the collection itself.
 const COLLECTION_TYPES = [
@@ -27,6 +32,18 @@ function loadVerified(root) {
   try { return JSON.parse(fs.readFileSync(path.join(root, 'verified.json'), 'utf8')); } catch { return {}; }
 }
 const FIELDS = ['name', 'description', 'dependencies', 'tags'];
+const FOOTPRINTS = ['none', 'transient', 'persistent'];
+const RETURNS = ['records', 'files', 'both'];
+const KINDS = ['command', 'artefact', 'tool'];
+// Fills in whatever a script does not declare: one with dependencies stages a tool (transient footprint), one that
+// returns only files is an artefact pull, and actions change the host (persistent footprint).
+function describe(fields, dependencies, isAction) {
+  const pick = (v, allowed) => { const x = String(v ?? '').trim().toLowerCase().replace('artifact', 'artefact'); return allowed.includes(x) ? x : null; };
+  const returns = pick(fields.returns, RETURNS) || 'records';
+  const footprint = pick(fields.footprint, FOOTPRINTS) || (isAction ? 'persistent' : dependencies.length ? 'transient' : 'none');
+  const kind = pick(fields.type, KINDS) || (dependencies.length ? 'tool' : returns === 'files' ? 'artefact' : 'command');
+  return { footprint, returns, kind };
+}
 
 // Reads a quoted string starting at s[i] (the opening quote). Returns [value, indexAfter] or null.
 // PowerShell: '' inside '...' is a literal quote, ` escapes in "...". Bash: \ escapes in "...".
@@ -70,10 +87,10 @@ function readArray(s, i, type) {
   return null;
 }
 
-function parseCollection(text, type) {
+function parseCollection(text, type, isAction = false) {
   const s = text.replace(/^\uFEFF/, '');
   const ps = type === 'powershell';
-  const re = ps ? /^[ \t]*\$(Name|Description|Dependencies|Tags|Parameters)[ \t]*=[ \t]*/i : /^[ \t]*(NAME|DESCRIPTION|DEPENDENCIES|TAGS|PARAMETERS)=/;
+  const re = ps ? /^[ \t]*\$(Name|Description|Dependencies|Tags|Parameters|Footprint|Returns|Type)[ \t]*=[ \t]*/i : /^[ \t]*(NAME|DESCRIPTION|DEPENDENCIES|TAGS|PARAMETERS|FOOTPRINT|RETURNS|TYPE)=/;
   const fields = {};
   let pos = 0, end = 0;
   while (pos < s.length) {
@@ -99,10 +116,12 @@ function parseCollection(text, type) {
   const deps = Array.isArray(fields.dependencies) ? fields.dependencies : String(fields.dependencies ?? '').split(/[,;]/);
   const tags = Array.isArray(fields.tags) ? fields.tags : String(fields.tags ?? '').split(/[,;]/);
   const label = (f) => (ps ? `$${f[0].toUpperCase()}${f.slice(1)}` : f.toUpperCase());
+  const dependencies = deps.map((d) => d.trim()).filter((d) => d && !/^(none|n\/a|-)$/i.test(d));
   return {
     name: flat(fields.name),
     description: flat(fields.description),
-    dependencies: deps.map((d) => d.trim()).filter((d) => d && !/^(none|n\/a|-)$/i.test(d)),
+    dependencies,
+    ...describe(fields, dependencies, isAction),
     // Actions only: names of the inputs the script expects, e.g. $Parameters = @('ProcessName').
     parameters: (Array.isArray(fields.parameters) ? fields.parameters : String(fields.parameters ?? '').split(/[,;]/)).map((x) => x.trim()).filter(Boolean),
     tags: [...new Set(tags.map((t) => t.trim().toLowerCase()).filter(Boolean))],
@@ -116,6 +135,7 @@ function parseCollection(text, type) {
 // carry every one of those tags. `requiresDeps` keeps only collections that declare at least one
 // dependency (an external binary).
 function listScripts(root, query, tags = [], requiresDeps = false) {
+  const isAction = root === actionsDir;
   const q = String(query || '').trim().toLowerCase();
   const wanted = tags.map((t) => String(t).trim().toLowerCase()).filter(Boolean);
   const out = [];
@@ -125,11 +145,11 @@ function listScripts(root, query, tags = [], requiresDeps = false) {
     if (!fs.existsSync(dir)) continue;
     for (const f of fs.readdirSync(dir).filter((n) => n.toLowerCase().endsWith(ext)).sort()) {
       const text = fs.readFileSync(path.join(dir, f), 'utf8');
-      const p = parseCollection(text, type);
+      const p = parseCollection(text, type, isAction);
       const collection = {
         id: `${type}/${f}`, type, file: f,
         name: p.name || f.slice(0, -ext.length), description: p.description,
-        dependencies: p.dependencies, parameters: p.parameters, tags: p.tags, warnings: p.warnings,
+        dependencies: p.dependencies, footprint: p.footprint, returns: p.returns, kind: p.kind, parameters: p.parameters, tags: p.tags, warnings: p.warnings,
         verified: verified[`${type}/${f}`] === hashText(text),
       };
       if (!wanted.every((t) => collection.tags.includes(t))) continue;
@@ -164,7 +184,7 @@ function resolveCollection(collectionId, root = collectionsDir) {
   if (!h) return null;
   const file = path.join(root, h.type, h.file);
   const text = fs.readFileSync(file, 'utf8');
-  return { ...h, file, text, body: parseCollection(text, h.type).body };
+  return { ...h, file, text, body: parseCollection(text, h.type, root === actionsDir).body };
 }
 
 // Maps a collection's $Dependencies to hunter-provided files in binaries/. Dependency names come from
@@ -180,7 +200,7 @@ function resolveBinaries(collection) {
   return { found, missing };
 }
 
-async function executeOnHost(host, collection) {
+async function executeOnHost(host, collection, { csv = false } = {}) {
   const started = Date.now();
   let r;
   try {
@@ -188,7 +208,7 @@ async function executeOnHost(host, collection) {
     if (bins.missing.length) throw new Error(`Missing binaries: ${bins.missing.join(', ')}. Place them in the binaries folder and run again.`);
     if (bins.found.length && host.protocol !== 'winrm') throw new Error('Binary staging over SSH is not implemented yet');
 
-    if (collection.type === 'powershell' && host.protocol === 'winrm') r = await winrm.runScript(host, collection.file, bins.found);
+    if (collection.type === 'powershell' && host.protocol === 'winrm') r = await winrm.runScript(host, collection.file, bins.found, { csv });
     else if (host.protocol === 'ssh') r = await ssh.runScript(host, collection.text, collection.type);
     else throw new Error(`${collection.type} collections cannot run over ${host.protocol}`);
   } catch (e) {
@@ -233,4 +253,4 @@ const listCollections = (...a) => listScripts(collectionsDir, ...a);
 const listActions = (...a) => listScripts(actionsDir, ...a);
 const resolveAction = (id) => resolveCollection(id, actionsDir);
 
-module.exports = { parseCollection, loadVerified, hashText, listCollections, listActions, listTags, resolveCollection, resolveAction, startRun, collectionsDir, actionsDir };
+module.exports = { FOOTPRINTS, RETURNS, KINDS, parseCollection, loadVerified, hashText, listCollections, listActions, listTags, resolveCollection, resolveAction, startRun, executeOnHost, collectionsDir, actionsDir };

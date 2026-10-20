@@ -2,11 +2,25 @@ NAME='Short title of the collection'
 DESCRIPTION='One or two sentences on what this collection looks for and why it matters.'
 DEPENDENCIES=()
 TAGS=(persistence cron)
+FOOTPRINT='none'
+RETURNS='records'
+TYPE='command'
 
 # ----------------------------------------------------------------------------
 # COLLECTION TEMPLATE (bash) - copy to collections/bash/<your-collection>.sh
 #
-# Metadata (the three variables above)
+# Metadata (the variables above)
+#   * FOOTPRINT, RETURNS and TYPE are optional; say what the collection does so analysts know before running it.
+#       FOOTPRINT  none       runs only what is already on the host
+#                  transient  stages a tool or temp files and removes them afterwards
+#                  persistent leaves something behind or changes the host (belongs in Respond, not here)
+#       RETURNS    records    rows of text/data from the script output (CSV and JSON in the hunt evidence)
+#                  files      raw artefacts pulled and hashed into evidence
+#                  both
+#       TYPE       command    runs a command on the host and captures its output
+#                  artefact   collects existing files such as logs
+#                  tool       deploys a binary from DEPENDENCIES and returns its output
+#     When left out they are worked out: dependencies means tool + transient, otherwise command + none + records.
 #   * NAME, DESCRIPTION, DEPENDENCIES and TAGS must be the first statements in the file (after an
 #     optional shebang). Comments and blank lines may sit between them; the first other
 #     line starts the collection.
@@ -24,7 +38,7 @@ TAGS=(persistence cron)
 # Collection (everything after the metadata)
 #   * Piped to bash over SSH, so it must not read from stdin.
 #   * Write results to stdout; send expected errors to /dev/null or 2>&1.
-#   * Collections should be read-only: do not change, install or delete anything on the target.
+#   * Collections must leave nothing behind: do not change the host. Anything staged must be removed again.
 #   * Keep LF line endings (enforced for *.sh by .gitattributes).
 # ----------------------------------------------------------------------------
 

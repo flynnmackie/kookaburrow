@@ -1,62 +1,24 @@
 const fs = require('fs');
 const path = require('path');
-const { collectionsDir, actionsDir, binariesDir } = require('./config');
-const { db } = require('./store');
+const { collectionsDir, actionsDir, binariesDir, evidenceDir } = require('./config');
 
 // Read-only file browser behind Browse. Paths are virtual: "/<root>/<...>". Four roots:
-//   collections, actions, binaries  real folders (never anything outside them, no symlinks followed)
-//   evidence                        built from stored runs: evidence/<run>/<host>/{output.txt,errors.txt,result.json}
+//   collections, actions, binaries, evidence   real folders (never anything outside them, no symlinks followed);
+//   evidence holds one folder per hunt: YYYYMMDD-HHMMSS-HuntName/<host>/<collection>.csv plus hunt-log.csv
 const ROOTS = {
   collections: { dir: collectionsDir, label: 'Collections', desc: 'Read-only scripts that gather data from a host' },
   actions: { dir: actionsDir, label: 'Actions', desc: 'Scripts that change a host' },
   binaries: { dir: binariesDir, label: 'Binaries', desc: 'External tools uploaded for collections to use' },
-  evidence: { dir: null, label: 'Evidence', desc: 'Output collected from hunts, by run and host' },
+  evidence: { dir: evidenceDir, label: 'Evidence', desc: 'Data collected by hunts: a folder per hunt, then per host plus All-Hosts' },
 };
 const MAX_PREVIEW = 512 * 1024;
 
 const bad = (m) => { const e = new Error(m); e.status = 404; return e; };
-const slug = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'run';
-const stamp = (iso) => { const d = new Date(iso); return Number.isNaN(+d) ? 'undated' : d.toISOString().slice(0, 16).replace('T', '_').replace(':', ''); };
-const hostDir = (r) => String(r.hostLabel || r.address || 'host').replace(/[\\/:*?"<>|]/g, '_');
 
 function segments(vpath) {
   const segs = String(vpath || '/').split('/').filter(Boolean);
   for (const s of segs) if (s === '.' || s === '..' || /[\\:\0]/.test(s)) throw bad('Invalid path');
   return segs;
-}
-
-// ---- evidence (virtual) --------------------------------------------------------------------
-const runDirName = (r) => `${stamp(r.startedAt)}_${slug(r.collectionName || r.huntName)}_${r.id.slice(0, 8)}`;
-function resultFiles(res) {
-  const files = { 'output.txt': res.stdout || '' };
-  if (res.stderr) files['errors.txt'] = res.stderr;
-  const { stdout, stderr, ...meta } = res;
-  files['result.json'] = JSON.stringify(meta, null, 2);
-  return files;
-}
-function evidenceNode(segs) { // segs excludes the "evidence" root
-  const runs = db.runs;
-  if (segs.length === 0) {
-    return { dir: true, entries: runs.map((r) => ({ name: runDirName(r), dir: true, modified: r.finishedAt || r.startedAt, count: r.results.length })) };
-  }
-  const run = runs.find((r) => runDirName(r) === segs[0]);
-  if (!run) throw bad('Not found');
-  if (segs.length === 1) {
-    const seen = new Map();
-    for (const res of run.results) seen.set(hostDir(res), res);
-    return { dir: true, entries: [...seen].map(([name, res]) => ({ name, dir: true, modified: res.finishedAt || run.startedAt, count: Object.keys(resultFiles(res)).length })) };
-  }
-  const res = run.results.find((x) => hostDir(x) === segs[1]);
-  if (!res) throw bad('Not found');
-  const files = resultFiles(res);
-  if (segs.length === 2) {
-    return { dir: true, entries: Object.entries(files).map(([name, text]) => ({ name, dir: false, size: Buffer.byteLength(text), modified: res.finishedAt || run.startedAt })) };
-  }
-  if (segs.length === 3 && segs[2] in files) {
-    const text = files[segs[2]];
-    return { dir: false, size: Buffer.byteLength(text), modified: res.finishedAt || run.startedAt, buffer: Buffer.from(text) };
-  }
-  throw bad('Not found');
 }
 
 // ---- real folders --------------------------------------------------------------------------
@@ -89,7 +51,7 @@ function node(vpath) {
   if (!segs.length) return { top: true, segs };
   const root = ROOTS[segs[0]];
   if (!root || !Object.hasOwn(ROOTS, segs[0])) throw bad('Not found');
-  const n = segs[0] === 'evidence' ? evidenceNode(segs.slice(1)) : realNode(root, segs.slice(1));
+  const n = realNode(root, segs.slice(1));
   return { ...n, segs };
 }
 

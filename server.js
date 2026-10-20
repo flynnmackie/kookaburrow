@@ -8,8 +8,12 @@ const ssh = require('./src/remote/ssh');
 const collections = require('./src/collections');
 const binaries = require('./src/binaries');
 const collectionFiles = require('./src/collection-files');
+const audit = require('./src/audit');
 const browse = require('./src/browse');
 const authTest = require('./src/auth-test');
+const huntRunner = require('./src/hunt-runner');
+const shell = require('./src/shell');
+const monitor = require('./src/monitor');
 
 const app = express();
 app.use(express.json({ limit: '400kb' }));
@@ -147,6 +151,10 @@ app.post('/api/auth/test', wrap(async (req, res) => {
   res.json(await authTest.testHost(ip));
 }));
 
+// Manually Add: the credentials come from the form. Answers 200 with { state, protocol, reason, ... } like /api/auth/test;
+// the host is saved only when the login works.
+app.post('/api/hosts/manual', wrap(async (req, res) => res.json(await authTest.testManual(req.body || {}))));
+
 // ---- Host lists -------------------------------------------------------------------------
 app.get('/api/lists', (req, res) => res.json(db.lists));
 app.post('/api/lists', wrap((req, res) => {
@@ -239,9 +247,32 @@ app.post('/api/runs', wrap((req, res) => {
   res.json(collections.startRun(collection, targets));
 }));
 // Listing omits per-host output; fetch a run for the full results.
-app.get('/api/runs', (req, res) => res.json(db.runs.map((r) => ({
-  ...r, results: r.results.map(({ stdout, stderr, ...meta }) => meta),
+app.get('/api/runs', (req, res) => res.json(db.runs.map(({ events, ...r }) => ({
+  ...r, eventCount: audit.eventsFor({ events, ...r }).length, results: r.results.map(({ stdout, stderr, ...meta }) => meta),
 }))));
+// The data a hunt collected, as JSON: the contents of its All-Hosts CSVs as records (the hunt's own hunt.json, so what is
+// shown here is what is in the evidence folder). Runs that have no hunt.json (older runs) fall back to the stored run.
+app.get('/api/runs/:id/data', (req, res) => {
+  const r = db.runs.find((x) => x.id === req.params.id);
+  if (!r) return res.status(404).json({ error: 'Not found' });
+  if (!r.evidenceDir) return res.json(r);
+  const file = require('path').join(config.evidenceDir, r.evidenceDir, 'All-Hosts', 'hunt.json');
+  if (!require('fs').existsSync(file)) {
+    return res.json(r.status === 'running' ? { status: 'running', message: 'This hunt is still running. Its data appears here when it finishes.' } : r);
+  }
+  res.type('application/json').send(require('fs').readFileSync(file, 'utf8'));
+});
+// The activity log of one hunt (see src/audit.js), as JSON for Output > Log or as a CSV download.
+app.get('/api/runs/:id/events', (req, res) => {
+  const r = db.runs.find((x) => x.id === req.params.id);
+  r ? res.json(audit.eventsFor(r)) : res.status(404).json({ error: 'Not found' });
+});
+app.get('/api/runs/:id/log.csv', (req, res) => {
+  const r = db.runs.find((x) => x.id === req.params.id);
+  if (!r) return res.status(404).json({ error: 'Not found' });
+  res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="${String(r.name || r.collectionName || 'hunt').replace(/[^A-Za-z0-9_-]+/g, '-')}-log.csv"` });
+  res.send(audit.toCsv(audit.eventsFor(r)));
+});
 app.get('/api/runs/:id', (req, res) => {
   const r = db.runs.find((x) => x.id === req.params.id);
   r ? res.json(r) : res.status(404).json({ error: 'Not found' });
@@ -268,6 +299,48 @@ app.get('/api/about', (req, res) => {
   });
 });
 
+// ---- Hunts: run collections on hosts/groups and collect the data as CSV under evidence/ ----------
+// body: { name, collectionIds: [], hostIds?: [], listIds?: [] }
+app.post('/api/hunts', wrap((req, res) => {
+  const b = req.body;
+  let hostIds = Array.isArray(b.hostIds) ? [...b.hostIds] : [];
+  for (const lid of Array.isArray(b.listIds) ? b.listIds : []) {
+    const list = db.lists.find((l) => l.id === lid);
+    if (!list) throw new Error('Unknown group');
+    hostIds.push(...list.hostIds);
+  }
+  const hosts = [...new Set(hostIds)].map((hid) => db.hosts.find((h) => h.id === hid)).filter(Boolean);
+  res.json(huntRunner.startHunt({ name: b.name, collectionIds: Array.isArray(b.collectionIds) ? b.collectionIds : [], hosts }));
+}));
+
+// ---- Shell: interactive sessions on authenticated hosts (output streams out by SSE, input comes in by POST) ----
+const shellWrap = (fn) => (req, res) => {
+  try { fn(req, res); } catch (e) { res.status(e.status || 400).json({ error: firstLine(e.message) }); }
+};
+app.get('/api/shell', (req, res) => res.json(shell.open()));
+app.post('/api/shell', shellWrap((req, res) => res.json(shell.create(String(req.body.hostId || ''), { cols: Number(req.body.cols) || 100, rows: Number(req.body.rows) || 30 }))));
+app.get('/api/shell/:id/stream', shellWrap((req, res) => shell.stream(req.params.id, res)));
+app.post('/api/shell/:id/input', shellWrap((req, res) => { shell.write(req.params.id, req.body.data); res.json({ ok: true }); }));
+app.post('/api/shell/:id/resize', shellWrap((req, res) => { shell.resize(req.params.id, Number(req.body.cols), Number(req.body.rows)); res.json({ ok: true }); }));
+// Files: list a folder on the host, pull a file into evidence/Pulled-Files, or send an uploaded file to the shell's current folder
+app.post('/api/shell/:id/ls', wrap(async (req, res) => res.json(await shell.list(req.params.id, req.body.path))));
+app.post('/api/shell/:id/pull', wrap(async (req, res) => res.json(await shell.pull(req.params.id, req.body.path))));
+app.put('/api/shell/:id/send', wrap(async (req, res) => {
+  const MAX = 512 * 1024 * 1024;
+  try { shell.sendTarget(req.params.id); } catch (e) { req.resume(); throw e; } // fail before taking the upload if the folder is unknown
+  const tmp = require('path').join(require('os').tmpdir(), `kb-up-${require('crypto').randomBytes(6).toString('hex')}`);
+  try {
+    await new Promise((resolve, reject) => {
+      let size = 0; const out = require('fs').createWriteStream(tmp);
+      req.on('data', (c) => { size += c.length; if (size > MAX) { req.destroy(); out.destroy(); reject(new Error('File too large (max 512 MB)')); } });
+      req.on('error', reject); out.on('error', reject); out.on('finish', resolve);
+      req.pipe(out);
+    });
+    res.json(await shell.send(req.params.id, String(req.query.path || ''), tmp));
+  } finally { require('fs').promises.unlink(tmp).catch(() => {}); }
+}));
+app.delete('/api/shell/:id', shellWrap((req, res) => { shell.close(req.params.id); res.json({ ok: true }); }));
+
 // ---- Browse: read-only view of collections, actions, binaries and collected evidence --------
 const browseWrap = (fn) => (req, res) => {
   try { fn(req, res); } catch (e) { res.status(e.status || 400).json({ error: firstLine(e.message) }); }
@@ -287,8 +360,13 @@ app.use((err, req, res, next) => {
   res.status(err.status || 500).json({ error: err.status ? 'Bad request' : 'Internal error' });
 });
 
+// ---- Health monitor: ping every minute and the WinRM/SSH port every 5 minutes, for every saved host ----
+app.get('/api/monitor', (req, res) => res.json(monitor.snapshot()));
+app.post('/api/monitor/check', (req, res) => { monitor.checkNow(); res.json(monitor.snapshot()); });
+
 const server = app.listen(config.port, config.host, () => {
   console.log(`Kookaburrow running at http://${config.host}:${config.port}`);
+  monitor.start();
 });
 server.on('error', (e) => {
   console.error(e.code === 'EADDRINUSE' ? `Port ${config.port} is already in use (set KB_PORT to change it).` : e.message);

@@ -34,7 +34,7 @@ function makeFiles({ root, noun, listAll, resolve }) {
     if (!description) throw new Error('Description is required');
     const tags = list(b.tags).map((t) => t.toLowerCase());
     for (const t of tags) if (!ITEM_RE.test(t)) throw new Error(`Invalid tag "${t}": use letters, numbers, dot, dash`);
-    let dependencies = [], parameters = [];
+    let dependencies = [], parameters = [], footprint, returns, kind;
     if (isAction) {
       parameters = list(b.parameters);
       for (const p of parameters) {
@@ -43,20 +43,28 @@ function makeFiles({ root, noun, listAll, resolve }) {
     } else {
       dependencies = list(b.dependencies);
       for (const d of dependencies) if (!ITEM_RE.test(d)) throw new Error(`Invalid dependency "${d}": use a plain file name such as autorunsc.exe`);
+      const oneOf = (v, allowed, label) => { if (!allowed.includes(v)) throw new Error(`${label} must be one of: ${allowed.join(', ')}`); return v; };
+      footprint = oneOf(b.footprint ?? 'none', collections.FOOTPRINTS.filter((f) => f !== 'persistent'), 'Footprint (a collection that changes the host belongs in Respond)');
+      returns = oneOf(b.returns ?? 'records', collections.RETURNS, 'Returns');
+      kind = oneOf(b.kind ?? 'command', collections.KINDS, 'Type');
     }
     const script = String(b.script ?? '').replace(/\r\n/g, '\n').replace(/\s+$/, '').replace(/^(?:[ \t]*\n)+/, '');
     if (!script.trim()) throw new Error('The script is empty');
     if (script.length > MAX_SCRIPT) throw new Error('Script is too large');
-    return { type, file, name, description, tags, dependencies, parameters, script };
+    return { type, file, name, description, tags, dependencies, parameters, footprint, returns, kind, script };
   }
 
-  function build({ type, name, description, tags, dependencies, parameters, script }) {
+  function build({ type, name, description, tags, dependencies, parameters, footprint, returns, kind, script }) {
     const ps = type === 'powershell';
     const arr = (items) => (ps ? `@(${items.map((i) => quote(i, type)).join(', ')})` : `(${items.join(' ')})`);
     const head = ps
       ? [`$Name = ${quote(name, type)}`, `$Description = ${quote(description, type)}`, `$Dependencies = ${arr(dependencies)}`]
       : [`NAME=${quote(name, type)}`, `DESCRIPTION=${quote(description, type)}`, `DEPENDENCIES=${arr(dependencies)}`];
     if (isAction) head.push(ps ? `$Parameters = ${arr(parameters)}` : `PARAMETERS=${arr(parameters)}`);
+    else {
+      const one = (label, v) => (ps ? `$${label} = ${quote(v, type)}` : `${label.toUpperCase()}=${quote(v, type)}`);
+      head.push(one('Footprint', footprint), one('Returns', returns), one('Type', kind));
+    }
     head.push(ps ? `$Tags = ${arr(tags)}` : `TAGS=${arr(tags)}`);
     return `${head.join('\n')}\n\n${script}\n`;
   }
@@ -72,10 +80,11 @@ function makeFiles({ root, noun, listAll, resolve }) {
   function write(full, f) {
     const text = build(f);
     // The platform must be able to read the header back exactly, or the script would list wrongly.
-    const p = collections.parseCollection(text, f.type);
+    const p = collections.parseCollection(text, f.type, isAction);
     const same = p.name === f.name && p.description === f.description
       && p.dependencies.join('\n') === f.dependencies.join('\n') && p.tags.join('\n') === f.tags.join('\n')
-      && (!isAction || p.parameters.join('\n') === f.parameters.join('\n')) && p.body === f.script;
+      && (isAction ? p.parameters.join('\n') === f.parameters.join('\n') : p.footprint === f.footprint && p.returns === f.returns && p.kind === f.kind)
+      && p.body === f.script;
     if (!same) throw new Error(`Could not write this ${noun} safely; check the name, description and script for unusual characters`);
     fs.mkdirSync(path.dirname(full), { recursive: true });
     const tmp = `${full}.tmp`;

@@ -35,6 +35,7 @@ for (const run of db.runs) {
   if (run.status !== 'running') continue;
   run.status = 'interrupted';
   run.finishedAt = new Date().toISOString();
+  if (Array.isArray(run.events)) run.events.push({ t: run.finishedAt, kind: 'error', host: '-', action: 'Hunt interrupted', artefact: '', size: '', sourceHash: '', receivedHash: '', match: 'N/A', outcome: 'error', detail: 'The server restarted while this hunt was running' });
   for (const r of run.results) {
     if (r.status === 'queued' || r.status === 'running') { r.status = 'error'; r.stderr = 'Interrupted by server restart'; }
   }

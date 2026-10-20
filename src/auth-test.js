@@ -73,20 +73,61 @@ async function testHost(ip) {
   }
   conn.password = decrypt(profile.secret);
 
+  const r = await authenticate(conn, { profileId: profile.id });
+  return r.state === 'authenticated' ? { ...r, profile: profile.name } : r;
+}
+
+// Logs in with the credentials in conn and, only if that works, saves the host (or refreshes it if it is already saved).
+// Used by Discover (testHost) and by Manually Add (testManual). Always resolves to { state, protocol, reason, ... }.
+async function authenticate(conn, { profileId, name } = {}) {
+  const { protocol, address } = conn;
   try {
     const facts = await withTimeout((protocol === 'winrm' ? winrm : ssh).verify(conn), TEST_TIMEOUT_MS, 'Timed out');
-    const existing = db.hosts.find((h) => h.address === ip && h.protocol === protocol);
-    const host = existing || { id: id(), address: ip, protocol };
+    const existing = db.hosts.find((h) => h.address === address && h.protocol === protocol);
+    const host = existing || { id: id(), address, protocol };
     Object.assign(host, {
-      port: conn.port, username: conn.username, auth: conn.auth, useSsl: conn.useSsl, profileId: profile.id,
-      ...facts, name: existing?.name || facts.hostname || ip, secret: encrypt(conn.password), verifiedAt: new Date().toISOString(),
+      port: conn.port, username: conn.username, auth: conn.auth, useSsl: conn.useSsl, profileId,
+      ...facts, name: name || existing?.name || facts.hostname || address, secret: encrypt(conn.password), verifiedAt: new Date().toISOString(),
     });
     if (!existing) db.hosts.push(host);
     save();
-    return { state: 'authenticated', protocol, reason: '', hostname: facts.hostname, os: facts.os, profile: profile.name, added: !existing };
+    return { state: 'authenticated', protocol, reason: '', hostname: facts.hostname, os: facts.os, name: host.name, added: !existing };
   } catch (e) {
     return { ...classify(protocol, e.message), protocol };
   }
 }
 
-module.exports = { testHost, classify };
+// Manually Add: the user types the address and credentials instead of using a profile. Returns the same states as testHost;
+// anything wrong with the form itself throws (shown as a 400).
+const ADDR_RE = /^[A-Za-z0-9]([A-Za-z0-9.-]{0,251}[A-Za-z0-9])?$/;
+async function testManual(b) {
+  const address = String(b.address || '').trim();
+  if (!ADDR_RE.test(address)) throw new Error('Enter an IP address or host name');
+  const protocol = b.protocol === 'ssh' ? 'ssh' : 'winrm';
+  const username = String(b.username || '').trim();
+  const password = String(b.password ?? '');
+  if (!username || !password) throw new Error('A username and password are required');
+  const port = b.port === undefined || b.port === null || b.port === '' ? undefined : Number(b.port);
+  if (port !== undefined && !(Number.isInteger(port) && port > 0 && port < 65536)) throw new Error('Port must be a number from 1 to 65535');
+
+  const conn = { address, protocol, auth: 'Negotiate', useSsl: false, username, password };
+  if (protocol === 'winrm') {
+    const domain = String(b.domain || '').trim();
+    if (domain && !/[\\@]/.test(username)) conn.username = `${domain}\\${username}`;
+    if (port) {
+      if (!(await tcpOpen(address, port))) return { state: 'absent', protocol, reason: `Nothing is listening on port ${port}. WinRM may not be enabled on the host, or a firewall is blocking it.` };
+      conn.port = port; conn.useSsl = !!b.useSsl || port === 5986;
+    } else {
+      const http = await tcpOpen(address, 5985), https = http ? false : await tcpOpen(address, 5986);
+      if (!http && !https) return { state: 'absent', protocol, reason: 'WinRM is not listening on port 5985 or 5986. It may not be enabled on the host, or a firewall is blocking it.' };
+      if (https) { conn.port = 5986; conn.useSsl = true; }
+    }
+  } else {
+    const p = port || 22;
+    if (!(await tcpOpen(address, p))) return { state: 'absent', protocol, reason: `SSH is not listening on port ${p}. It may not be installed on the host, or a firewall is blocking it.` };
+    if (port) conn.port = port;
+  }
+  return authenticate(conn, { name: String(b.name || '').trim().slice(0, 80) || undefined });
+}
+
+module.exports = { testHost, testManual, classify };

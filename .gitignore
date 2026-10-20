@@ -5,3 +5,6 @@ data/
 # Hunter-provided tools (staged on targets per run) - keep the folder, not the files
 binaries/*
 !binaries/.gitkeep
+
+# Evidence brought back by hunts
+evidence/

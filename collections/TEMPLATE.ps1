@@ -2,11 +2,25 @@ $Name = 'Short title of the collection'
 $Description = 'One or two sentences on what this collection looks for and why it matters.'
 $Dependencies = @()
 $Tags = @('persistence', 'registry')
+$Footprint = 'none'
+$Returns = 'records'
+$Type = 'command'
 
 # ----------------------------------------------------------------------------
 # COLLECTION TEMPLATE (PowerShell) - copy to collections/powershell/<your-collection>.ps1
 #
-# Metadata (the three variables above)
+# Metadata (the variables above)
+#   * $Footprint, $Returns and $Type are optional; say what the collection does so analysts know before running it.
+#       $Footprint  none       runs only what is already on the host
+#                   transient  stages a tool or temp files and removes them afterwards
+#                   persistent leaves something behind or changes the host (belongs in Respond, not here)
+#       $Returns    records    rows of text/data from the script output (CSV and JSON in the hunt evidence)
+#                   files      raw artefacts pulled and hashed into evidence
+#                   both
+#       $Type       command    runs a command on the host and captures its output
+#                   artefact   collects existing files such as event logs or Prefetch
+#                   tool       deploys a binary from $Dependencies and returns its output
+#     When left out they are worked out: dependencies means tool + transient, otherwise command + none + records.
 #   * $Name, $Description, $Dependencies and $Tags must be the first statements in the file.
 #     Comments and blank lines may sit between them; the first other line starts the collection.
 #   * Each value must be a plain literal. The platform reads them as text and never runs
@@ -28,7 +42,7 @@ $Tags = @('persistence', 'registry')
 # Collection (everything after the metadata)
 #   * Runs remotely with Invoke-Command (WinRM) or piped to powershell/pwsh (SSH).
 #   * Write results to the output stream (Format-Table / Format-List / Write-Output).
-#   * Collections should be read-only: do not change, install or delete anything on the target.
+#   * Collections must leave nothing behind: do not change the host. Anything staged must be removed again.
 # ----------------------------------------------------------------------------
 
 '== Section title =='
