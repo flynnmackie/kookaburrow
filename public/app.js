@@ -136,6 +136,7 @@ const loaders = {
   'settings/view-actions': () => loadActionList(),
   'burrow/hunt': loadBurrowHunts,
   'burrow/recurring': () => window.loadRecurring?.(),
+  'output/report': () => window.loadReports?.(), // report.js loads after this file
   'burrow/respond': () => window.loadRespond?.(), // respond.js loads after this file
   'browse/files': () => loadBrowse('/'),
   'home/home': loadHome,
@@ -1232,6 +1233,11 @@ function hmRenderTargetList() {
   hmEl('TargetsHead').textContent = `Will run against ${list.length} host${list.length === 1 ? '' : 's'}`;
   hmEl('Targets').innerHTML = list.map((h) => `<div class="pick"><span class="pn">${esc(h.name)}</span><span class="pt">${esc(h.address)}</span><span class="proto-${h.protocol === 'ssh' ? 'ssh' : 'winrm'}">${h.protocol === 'ssh' ? 'SSH' : 'WinRM'}</span></div>`).join('')
     || '<p class="dim" style="margin:6px 10px">No hosts selected yet. Choose them on the Who tab.</p>';
+  // and what will run on them
+  const items = hm.collections.filter((c) => hm.selC.has(c.id));
+  hmEl('ItemsHead').textContent = `${items.length} collection${items.length === 1 ? '' : 's'} to run`;
+  hmEl('Items').innerHTML = items.map((c) => `<div class="pick"><span class="pn" title="${esc(c.description)}">${esc(c.name)}</span>${metaIcons(c)}<span class="pt">${c.type === 'bash' ? 'Linux' : 'PowerShell'}</span></div>`).join('')
+    || '<p class="dim" style="margin:6px 10px">No collections selected yet. Choose them on the Collections tab.</p>';
 }
 const HM_ORDER = ['who', 'coll', 'name'];
 hmEl('Next').onclick = () => { const cur = document.querySelector('#hmTabs .on')?.dataset.pane; hmTab(HM_ORDER[Math.min(HM_ORDER.indexOf(cur) + 1, HM_ORDER.length - 1)]); };
@@ -1352,6 +1358,12 @@ function renderBrowse() {
   let acc = '';
   $('bbCrumbs').innerHTML = `<a data-path="/">Browse</a>` + segs.map((s) => { acc += '/' + s; return ` <span class="sep">/</span> <a data-path="${esc(acc)}">${esc(s)}</a>`; }).join('');
   const top = bb.path === '/';
+  // The button at the top right downloads what is being viewed: the open file as it is, otherwise the folder as a zip (nothing at the
+  // top level, which is only the list of locations).
+  const dlBtn = $('bbZip');
+  dlBtn.hidden = top;
+  if (!top && bb.open) { dlBtn.textContent = 'Download'; dlBtn.href = `/api/browse/download?path=${encodeURIComponent(bb.path + '/' + bb.open)}`; }
+  else if (!top) { dlBtn.textContent = 'Download folder (zip)'; dlBtn.href = `/api/browse/download?folder=1&path=${encodeURIComponent(bb.path)}`; }
   const rows = bb.entries.map((e) => `<tr class="bb-row" data-name="${esc(e.name)}" data-dir="${e.dir ? 1 : 0}">
       <td class="bb-name">${bbIcon(e.dir)}<span>${esc(e.label || e.name)}</span>${e.desc ? `<span class="bb-desc">${esc(e.desc)}</span>` : ''}</td>
       <td class="dim">${e.dir ? `${e.count} item${e.count === 1 ? '' : 's'}` : bbFmt(e.size)}</td>
@@ -1372,8 +1384,7 @@ $('bbList').onclick = async (e) => {
     const ext = f.name.slice(f.name.lastIndexOf('.') + 1).toLowerCase();
     const body = f.binary ? `<p class="dim">Binary file (${bbFmt(f.size)}); no preview. Use Download to save it.</p>`
       : `<pre class="code">${ext === 'ps1' ? highlight(f.text, 'powershell') : ext === 'sh' ? highlight(f.text, 'bash') : ext === 'json' ? highlightJson(f.text) : esc(f.text)}</pre>${f.truncated ? `<p class="dim" style="margin-top:6px">Showing the first 512 KB of ${bbFmt(f.size)}.</p>` : ''}`;
-    $('bbPreview').innerHTML = `<div class="bb-head"><div><div class="bb-title">${esc(f.name)}</div><div class="hd-file">${esc(f.path)} · ${bbFmt(f.size)} · ${esc(new Date(f.modified).toLocaleString())}</div></div>
-      <a class="act sec" href="/api/browse/download?path=${encodeURIComponent(f.path)}" download data-perm="hunts.export" data-perm-what="download output files">Download</a></div>${body}`;
+    $('bbPreview').innerHTML = `<div class="bb-head"><div><div class="bb-title">${esc(f.name)}</div><div class="hd-file">${esc(f.path)} · ${bbFmt(f.size)} · ${esc(new Date(f.modified).toLocaleString())}</div></div></div>${body}`;
   } catch (err) { $('bbPreview').innerHTML = `<p class="bad">${esc(err.message)}</p>`; }
 };
 

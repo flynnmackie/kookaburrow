@@ -3,12 +3,13 @@ const path = require('path');
 const zlib = require('zlib');
 
 // A small zip writer (deflate, no zip64) for downloading a hunt's or response's output folder. Symlinks are skipped.
+const MAX_ZIP_BYTES = 512 * 1024 * 1024; // the zip is built in memory, so very large folders are refused
 function walk(dir, prefix, out) {
   for (const name of fs.readdirSync(dir)) {
     const full = path.join(dir, name), st = fs.lstatSync(full);
     if (st.isSymbolicLink()) continue;
     if (st.isDirectory()) walk(full, `${prefix}${name}/`, out);
-    else if (st.isFile()) out.push({ name: prefix + name, full, mtime: st.mtime });
+    else if (st.isFile()) { out.push({ name: prefix + name, full, mtime: st.mtime }); out.bytes = (out.bytes || 0) + st.size; if (out.bytes > MAX_ZIP_BYTES) throw new Error('This folder is too large to download as one zip (over 512 MB). Download its files one at a time.'); }
   }
   return out;
 }

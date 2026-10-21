@@ -13,6 +13,7 @@ const { outputDir } = require('./config');
 //     H_<name>_<date>_<IP>/             one folder per host
 //       <collection or action>_<date>_<IP>.csv
 //       raw/                            raw artefacts pulled back from the host (only when there are any)
+//   output/reports/ holds the HTML reports (Results > Report), named <H|R>_<name>_<date>_Report.html after the run they cover.
 //   output/Pulled-Files/ is where files pulled from a shell go.
 const GROUPS = { hunt: ['H', 'hunts'], response: ['R', 'responses'] };
 

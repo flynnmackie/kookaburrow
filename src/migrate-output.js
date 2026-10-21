@@ -11,6 +11,7 @@ function migrate() {
   if (fs.existsSync(old) && !fs.existsSync(outputDir)) fs.renameSync(old, outputDir);
   fs.mkdirSync(path.join(outputDir, 'hunts'), { recursive: true });
   fs.mkdirSync(path.join(outputDir, 'responses'), { recursive: true });
+  fs.mkdirSync(path.join(outputDir, 'reports'), { recursive: true });
   let changed = false;
   for (const run of db.runs) {
     if (!('evidenceDir' in run)) continue;
@@ -20,6 +21,16 @@ function migrate() {
     const from = path.join(outputDir, dir), to = path.join(outputDir, group, dir);
     if (fs.existsSync(from) && !fs.existsSync(to)) fs.renameSync(from, to);
     if (fs.existsSync(to)) run.outputPath = `${group}/${dir}`;
+  }
+  // Reports used to be saved inside the run's own folder; they now live together in output/reports.
+  for (const run of db.runs) {
+    if (!run.outputPath || !/^(hunts|responses)\/[^\\/]+$/.test(run.outputPath)) continue;
+    const dir = path.join(outputDir, ...run.outputPath.split('/'));
+    if (!fs.existsSync(dir)) continue;
+    for (const n of fs.readdirSync(dir).filter((x) => /_Report\.html$/.test(x))) {
+      const to = path.join(outputDir, 'reports', n);
+      if (!fs.existsSync(to)) fs.renameSync(path.join(dir, n), to); else fs.rmSync(path.join(dir, n), { force: true });
+    }
   }
   if (changed) save();
 }

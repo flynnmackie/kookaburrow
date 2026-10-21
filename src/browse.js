@@ -9,7 +9,7 @@ const ROOTS = {
   collections: { dir: collectionsDir, label: 'Collections', desc: 'Read-only scripts that gather data from a host' },
   actions: { dir: actionsDir, label: 'Actions', desc: 'Scripts that change a host' },
   binaries: { dir: binariesDir, label: 'Binaries', desc: 'External tools uploaded for collections to use' },
-  output: { dir: outputDir, label: 'Output', desc: 'What hunts and responses brought back: Hunts and Responses folders (a folder per run, then per host), plus pulled files' },
+  output: { dir: outputDir, label: 'Output', desc: 'What hunts and responses brought back: Hunts and Responses folders (a folder per run, then per host), Reports, and pulled files' },
 };
 const MAX_PREVIEW = 512 * 1024;
 
@@ -40,7 +40,7 @@ function realNode(root, segs) {
         ? { name, dir: true, modified: s.mtime.toISOString(), count: fs.readdirSync(path.join(full, name)).filter((n) => !n.startsWith('.')).length }
         : { name, dir: false, size: s.size, modified: s.mtime.toISOString() });
     }
-    return { dir: true, entries };
+    return { dir: true, entries, full };
   }
   if (!st.isFile()) throw bad('Not found');
   return { dir: false, size: st.size, modified: st.mtime.toISOString(), file: full };
@@ -92,4 +92,12 @@ function source(vpath) {
   return { name: n.segs[n.segs.length - 1], buffer: n.buffer, file: n.file };
 }
 
-module.exports = { list, preview, source };
+// For downloading a folder as a zip: the real folder on disk and its name.
+function dirSource(vpath) {
+  const n = node(vpath);
+  if (n.top) throw bad('Open a folder first');
+  if (!n.dir || !n.full) throw bad('Not a folder');
+  return { name: n.segs[n.segs.length - 1], dir: n.full };
+}
+
+module.exports = { list, preview, source, dirSource };

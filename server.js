@@ -347,6 +347,34 @@ app.get('/api/runs/:id/log.csv', (req, res) => {
   res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="${String(r.name || r.collectionName || 'hunt').replace(/[^A-Za-z0-9_-]+/g, '-')}-log.csv"` });
   res.send(audit.toCsv(audit.eventsFor(r)));
 });
+// ---- Reports: an HTML report of one hunt or response, covering every host, saved as <name>_Report.html in output/reports ----
+const reports = require('./src/report');
+const hostsInfo = () => db.hosts.map((h) => ({ address: h.address, os: h.os, protocol: h.protocol }));
+app.get('/api/reports', (req, res) => res.json(db.runs.filter((r) => outputs.runDir(r) && reports.reportFile(r)).map((r) => {
+  const st = require('fs').statSync(reports.reportFile(r));
+  return { runId: r.id, name: r.name || r.collectionName, kind: r.kind === 'response' ? 'response' : 'hunt', startedBy: r.startedBy || null, startedAt: r.startedAt, generatedAt: st.mtime.toISOString(), size: st.size, hosts: new Set(r.results.map((x) => x.address)).size };
+})));
+app.post('/api/runs/:id/report', wrap((req, res) => {
+  const r = db.runs.find((x) => x.id === req.params.id);
+  if (!r) throw new Error('Not found');
+  if (r.status === 'running') throw new Error('It is still running. Generate the report when it has finished.');
+  const file = reports.writeReport(r, hostsInfo());
+  res.json({ name: require('path').basename(file), size: require('fs').statSync(file).size });
+}));
+// The report opens in the browser inside a sandbox (no scripts of the app, no cookies), or downloads with ?download=1.
+app.get('/api/runs/:id/report', (req, res) => {
+  const r = db.runs.find((x) => x.id === req.params.id), file = r && reports.reportFile(r);
+  if (!file) return res.status(404).json({ error: 'No report has been generated for this run yet' });
+  res.set({ 'Content-Type': 'text/html; charset=utf-8', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "sandbox allow-scripts allow-popups; default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:" });
+  if (req.query.download === '1') res.set('Content-Disposition', `attachment; filename="${require('path').basename(file).replace(/[^\w. -]/g, '_')}"`);
+  res.send(require('fs').readFileSync(file));
+});
+app.delete('/api/runs/:id/report', wrap((req, res) => {
+  const r = db.runs.find((x) => x.id === req.params.id), file = r && reports.reportFile(r);
+  if (!file) throw new Error('Not found');
+  require('fs').rmSync(file, { force: true });
+  res.json({ ok: true });
+}));
 // The run's whole output folder (every host, the All_Hosts files and the log) as one zip.
 app.get('/api/runs/:id/download', (req, res) => {
   const r = db.runs.find((x) => x.id === req.params.id);
@@ -363,6 +391,8 @@ app.get('/api/runs/:id', (req, res) => {
 // Deletes a run's output folder (only ever one folder directly inside output/hunts or output/responses).
 function removeOutput(r) {
   const dir = outputs.runDir(r);
+  const report = require('./src/report').reportFile(r); // a run's report goes with it
+  if (report) require('fs').rmSync(report, { force: true });
   if (dir) require('fs').rmSync(dir, { recursive: true, force: true });
 }
 // ?output=1 also deletes the output folder (Burrow's delete buttons); the Log page's Delete keeps the folder.
@@ -633,6 +663,14 @@ const browseWrap = (fn) => (req, res) => {
 app.get('/api/browse', browseWrap((req, res) => res.json(browse.list(String(req.query.path || '/')))));
 app.get('/api/browse/file', browseWrap((req, res) => res.json(browse.preview(String(req.query.path || '')))));
 app.get('/api/browse/download', browseWrap((req, res) => {
+  if (req.query.folder === '1') { // a folder, as a zip
+    const d = browse.dirSource(String(req.query.path || ''));
+    const zip = require('./src/zip').zipFolder(d.dir, d.name);
+    res.setHeader('Content-Disposition', `attachment; filename="${d.name.replace(/[^\w. -]/g, '_')}.zip"`);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.type('application/zip');
+    return res.send(zip);
+  }
   const src = browse.source(String(req.query.path || ''));
   res.setHeader('Content-Disposition', `attachment; filename="${src.name.replace(/[^\w. -]/g, '_')}"`);
   res.setHeader('X-Content-Type-Options', 'nosniff');

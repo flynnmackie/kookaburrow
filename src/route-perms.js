@@ -26,6 +26,10 @@ const RULES = [
   ['GET', /^\/api\/schedules$/, ['hunts.view', 'actions.view']],
   ['DELETE', /^\/api\/schedules\/[^/]+$/, ['hunts.run', 'actions.run']], // the kind of schedule is checked in the handler
   ['GET', /^\/api\/responses(\/|$)/, ['actions.view']],
+  ['GET', /^\/api\/reports$/, ['hunts.view']],
+  ['POST', /^\/api\/runs\/[^/]+\/report$/, ['hunts.export']],
+  ['GET', /^\/api\/runs\/[^/]+\/report$/, ['hunts.export']],
+  ['DELETE', /^\/api\/runs\/[^/]+\/report$/, ['hunts.run']],
   ['POST', /^\/api\/(runs|hunts)$/, ['hunts.run']],
   ['DELETE', /^\/api\/runs\/[^/]+$/, ['hunts.run']],
   ['GET', /^\/api\/runs\/[^/]+\/(log\.csv|download)$/, ['hunts.export']],

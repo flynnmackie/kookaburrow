@@ -121,6 +121,11 @@ function rmRenderTargetList() {
   rmEl('TargetsHead').textContent = `Will run against ${list.length} host${list.length === 1 ? '' : 's'}`;
   rmEl('Targets').innerHTML = list.map((h) => `<div class="pick"><span class="pn">${esc(h.name)}</span><span class="pt">${esc(h.address)}</span><span class="proto-${h.protocol === 'ssh' ? 'ssh' : 'winrm'}">${h.protocol === 'ssh' ? 'SSH' : 'WinRM'}</span></div>`).join('')
     || '<p class="dim" style="margin:6px 10px">No hosts selected yet. Choose them on the Who tab.</p>';
+  // and what will run on them
+  const items = rm.actions.filter((a) => rm.selA.has(a.id));
+  rmEl('ItemsHead').textContent = `${items.length} action${items.length === 1 ? '' : 's'} to run`;
+  rmEl('Items').innerHTML = items.map((a) => `<div class="pick"><span class="pn" title="${esc(a.description)}">${esc(a.name)}</span>${metaIcons(a)}<span class="pt">${a.type === 'bash' ? 'Linux' : 'PowerShell'}</span></div>`).join('')
+    || '<p class="dim" style="margin:6px 10px">No actions selected yet. Choose them on the Actions tab.</p>';
 }
 const RM_ORDER = ['who', 'act', 'name'];
 rmEl('Next').onclick = () => { const cur = document.querySelector('#rmTabs .on')?.dataset.pane; rmTab(RM_ORDER[Math.min(RM_ORDER.indexOf(cur) + 1, RM_ORDER.length - 1)]); };

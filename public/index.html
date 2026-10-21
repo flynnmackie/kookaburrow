@@ -202,7 +202,8 @@
   .collection-layout { grid-template-columns:minmax(230px, 1fr) minmax(0, 2fr); }
   .browse-layout { grid-template-columns:minmax(0, 3fr) minmax(0, 2fr); }
   .browse-layout > .card { overflow:auto; }
-  #bbCrumbs { font-size:12.5px; padding-bottom:8px; margin-bottom:4px; border-bottom:1px solid var(--line); color:var(--dim); }
+  .bb-top { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; padding-bottom:8px; margin-bottom:4px; border-bottom:1px solid var(--line); } .bb-top .act { width:auto; margin:0; flex-shrink:0; }
+  #bbCrumbs { font-size:12.5px; color:var(--dim); min-width:0; overflow-wrap:anywhere; align-self:center; } #bbZip[hidden] { display:none; }
   #bbCrumbs .sep { color:var(--faint); margin:0 2px; }
   .bb-row { cursor:pointer; }
   .bb-row.on td { background:var(--panel2); }
@@ -256,8 +257,9 @@
   .rm-prow { display:grid; grid-template-columns:minmax(120px, 200px) 1fr; gap:10px; align-items:center; margin:3px 0; font-size:12.5px; } .rm-prow input { width:100%; }
   /* New hunt dialog */
   .hm-title { display:flex; align-items:center; gap:12px; padding-bottom:8px; } .hm-title h2 { padding:0; } .hm-title .act { width:auto; margin:0; padding:2px 10px; font-size:12px; }
-  .modal .dlg.rr { width:min(900px, 100%); height:min(560px, 100%); } #rrList tr, #rxList tr { cursor:pointer; } #rxList tr.on, #rrList tr.on { background:var(--blue-soft); box-shadow:inset 2px 0 0 var(--blue); }
+  .modal .dlg.rr { width:min(900px, 100%); height:min(560px, 100%); } #rrList tr, #rxList tr, #rpRuns tr { cursor:pointer; } #rpRuns tr.rp-off { cursor:not-allowed; opacity:.5; } #rpRuns tr.on, #rxList tr.on, #rrList tr.on { background:var(--blue-soft); box-shadow:inset 2px 0 0 var(--blue); }
   .modal .dlg.hunt { width:min(1060px, 100%); height:min(820px, 100%); } .hunt-body { padding:4px 16px 12px; }
+  .ov-cols { display:grid; grid-template-columns:1fr 1fr; gap:10px; } @media (max-width:640px) { .ov-cols { grid-template-columns:1fr; } }
   .hm-tlist { height:auto; max-height:200px; margin-bottom:8px; } .hm-tlist .pick { cursor:default; } .hm-tlist .pick:hover { background:none; } #hmRun[hidden], #rmRun[hidden] { display:none; }
   .hunt-body .tcols .pickbox
   .hsec h3 { display:flex; align-items:center; gap:8px; margin:0 0 4px; font:600 14px var(--f-ui); color:var(--text); }
@@ -976,7 +978,7 @@
     <section class="page" id="browse/files">
       <div class="browse-layout">
         <div class="card">
-          <div id="bbCrumbs"></div>
+          <div class="bb-top"><div id="bbCrumbs"></div><a class="act sec" id="bbZip" download hidden data-perm="hunts.export" data-perm-what="download files and folders">Download folder (zip)</a></div>
           <div id="bbList"></div>
         </div>
         <div class="card" id="bbPreview"></div>
@@ -1002,7 +1004,11 @@
       </div>
     </section>
     <section class="page" id="output/report">
-      <div class="card"><h2>Report</h2><p class="dim">Nothing here yet.</p></div>
+      <div class="card">
+        <div class="bh-bar"><h2>Reports</h2><button class="act" id="rpNew" type="button" data-perm="hunts.export" data-perm-what="generate reports">Generate report</button></div>
+        <p class="dim lg-sub">An HTML report of a hunt or response, covering every host together: a section for each collection or action with all the rows, searchable on one page. It is saved in the output/reports folder.</p>
+        <div id="rpList"></div>
+      </div>
     </section>
 
     <div class="card" id="emptyTab" hidden><p class="dim" style="margin:0">Nothing here yet.</p></div>
@@ -1011,7 +1017,7 @@
 <div class="modal" id="huntModal" hidden role="dialog" aria-modal="true" aria-labelledby="hmTitle">
   <div class="dlg hunt">
     <div class="dlg-head"><div class="hm-title"><h2 id="hmTitle">New hunt</h2><button class="act sec" id="hmRerun" type="button" title="Start from a hunt you have run before">Rerun past hunt</button></div><button class="dlg-x" id="hmClose" aria-label="Close">×</button></div>
-    <div class="dlg-tabs" id="hmTabs"><button type="button" class="on" data-pane="who" id="hmTabWho"><span class="hnum">1</span>Who</button><button type="button" data-pane="coll" id="hmTabColl"><span class="hnum">2</span>Collections</button><button type="button" data-pane="name" id="hmTabName"><span class="hnum">3</span>Name</button></div>
+    <div class="dlg-tabs" id="hmTabs"><button type="button" class="on" data-pane="who" id="hmTabWho"><span class="hnum">1</span>Who</button><button type="button" data-pane="coll" id="hmTabColl"><span class="hnum">2</span>Collections</button><button type="button" data-pane="name" id="hmTabName"><span class="hnum">3</span>Overview</button></div>
     <div class="dlg-body hunt-body">
       <section class="hsec" data-pane="who">
         <h3>Who to run it against</h3>
@@ -1032,10 +1038,11 @@
         </div>
       </section>
       <section class="hsec" data-pane="name" hidden>
-        <h3>Name it</h3>
+        <h3>Overview</h3>
         <span class="fl">Hunt name</span>
         <input id="hmName" type="text" placeholder="e.g. Weekly persistence sweep" autocomplete="off">
-        <span class="fl" id="hmTargetsHead">Will run against</span><div class="pickbox hm-tlist" id="hmTargets"></div>
+        <div class="ov-cols"><div><span class="fl" id="hmTargetsHead">Will run against</span><div class="pickbox hm-tlist" id="hmTargets"></div></div>
+          <div><span class="fl" id="hmItemsHead">Collections to run</span><div class="pickbox hm-tlist" id="hmItems"></div></div></div>
         <div class="sw-row"><button class="switch" id="hmRecurring" type="button" role="switch" aria-checked="false" aria-label="Recurring hunt"></button><b id="hmRecurringLabel">Recurring hunt: Off</b></div>
         <div class="rec-box" id="hmRecBox" hidden></div>
       </section>
@@ -1053,7 +1060,7 @@
 <div class="modal" id="respModal" hidden role="dialog" aria-modal="true" aria-labelledby="rmTitle">
   <div class="dlg hunt">
     <div class="dlg-head"><div class="hm-title"><h2 id="rmTitle">New response</h2><button class="act sec" id="rmRerun" type="button" title="Start from a response you have run before">Rerun past response</button></div><button class="dlg-x" id="rmClose" aria-label="Close">×</button></div>
-    <div class="dlg-tabs" id="rmTabs"><button type="button" class="on" data-pane="who" id="rmTabWho"><span class="hnum">1</span>Who</button><button type="button" data-pane="act" id="rmTabAct"><span class="hnum">2</span>Actions</button><button type="button" data-pane="name" id="rmTabName"><span class="hnum">3</span>Name</button></div>
+    <div class="dlg-tabs" id="rmTabs"><button type="button" class="on" data-pane="who" id="rmTabWho"><span class="hnum">1</span>Who</button><button type="button" data-pane="act" id="rmTabAct"><span class="hnum">2</span>Actions</button><button type="button" data-pane="name" id="rmTabName"><span class="hnum">3</span>Overview</button></div>
     <div class="dlg-body hunt-body">
       <section class="hsec" data-pane="who">
         <h3>Who to run it against</h3>
@@ -1074,10 +1081,11 @@
         </div>
       </section>
       <section class="hsec" data-pane="name" hidden>
-        <h3>Name it</h3>
+        <h3>Overview</h3>
         <span class="fl">Response name</span>
         <input id="rmName" type="text" placeholder="e.g. Contain WS-12" autocomplete="off">
-        <span class="fl" id="rmTargetsHead">Will run against</span><div class="pickbox hm-tlist" id="rmTargets"></div>
+        <div class="ov-cols"><div><span class="fl" id="rmTargetsHead">Will run against</span><div class="pickbox hm-tlist" id="rmTargets"></div></div>
+          <div><span class="fl" id="rmItemsHead">Actions to run</span><div class="pickbox hm-tlist" id="rmItems"></div></div></div>
         <div class="rm-params" id="rmParams"></div>
         <div class="sw-row"><button class="switch" id="rmRecurring" type="button" role="switch" aria-checked="false" aria-label="Recurring response"></button><b id="rmRecurringLabel">Recurring response: Off</b></div>
         <div class="rec-box" id="rmRecBox" hidden></div>
@@ -1142,6 +1150,13 @@
     <div class="dlg-foot"><button class="act" id="phDone" type="button">Close</button></div>
   </div>
 </div>
+<div class="modal" id="reportModal" hidden role="dialog" aria-modal="true" aria-labelledby="rpTitle">
+  <div class="dlg rr">
+    <div class="dlg-head"><h2 id="rpTitle">Generate report</h2><button class="dlg-x" id="rpClose" aria-label="Close">×</button></div>
+    <div class="dlg-body"><p class="dim" style="margin:2px 0 8px">Pick a hunt or response. The report includes every host it ran against.</p><div id="rpRuns"></div></div>
+    <div class="dlg-foot"><button class="act" id="rpMake" type="button" disabled>Generate report</button><button class="act sec" id="rpCancel" type="button">Cancel</button><span id="rpMsg"></span></div>
+  </div>
+</div>
 <div class="modal" id="errModal" hidden role="alertdialog" aria-modal="true" aria-labelledby="errTitle">
   <div class="dlg errdlg">
     <div class="dlg-head"><h2 id="errTitle">Error</h2><button class="dlg-x" id="errX" aria-label="Close">×</button></div>
@@ -1155,5 +1170,6 @@
 <script src="app.js"></script>
 <script src="respond.js"></script>
 <script src="recurring.js"></script>
+<script src="report.js"></script>
 </body>
 </html>
