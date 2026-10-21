@@ -83,7 +83,8 @@ const wrap = (fn) => async (req, res) => {
 // PowerShell remoting errors are multi-line walls of text; the first paragraph is the useful part.
 const firstLine = (m) => String(m).split(/\r?\n\s*At\s/)[0].replace(/\s*\r?\n\s*/g, ' ').trim();
 const connector = (protocol) => (protocol === 'winrm' ? winrm : ssh);
-const publicHost = ({ secret, password, ...h }) => h;
+// remoteCheck is the last WinRM/SSH port check { up, at }; a host that was verified but never checked counts as up at its verification time.
+const publicHost = ({ secret, password, ...h }) => ({ ...h, remoteCheck: h.remoteCheck || { up: true, at: h.verifiedAt }, profileName: h.profileName || db.profiles.find((p) => p.id === h.profileId)?.name || null });
 
 // ---- Scan -------------------------------------------------------------------------------
 app.post('/api/scans', wrap((req, res) => res.json(scanner.startScan(req.body.cidr))));
@@ -176,7 +177,9 @@ app.post('/api/hosts', wrap(async (req, res) => {
     name: req.body.name || facts.hostname || p.address,
     secret: encrypt(password),
     verifiedAt: new Date().toISOString(),
+    profileName: 'Manual entry',
   };
+  host.remoteCheck = { up: true, at: host.verifiedAt };
   db.hosts.push(host);
   save();
   res.json(publicHost(host));
@@ -557,6 +560,14 @@ app.get('/api/responses/:id/events', (req, res) => {
   const r = db.runs.find((x) => x.id === req.params.id && x.kind === 'response');
   r ? res.json(audit.eventsFor(r)) : res.status(404).json({ error: 'Not found' });
 });
+// The response's own JSON file (response.json) for the Notebook tab.
+app.get('/api/responses/:id/data', (req, res) => {
+  const r = db.runs.find((x) => x.id === req.params.id && x.kind === 'response');
+  if (!r) return res.status(404).json({ error: 'Not found' });
+  const fs = require('fs'), path = require('path'), file = path.join(config.evidenceDir, r.evidenceDir || '', 'response.json');
+  if (!r.evidenceDir || /[\\/]/.test(r.evidenceDir) || !fs.existsSync(file)) return res.json(r.status === 'running' ? { status: 'running', message: 'This response is still running. Its data appears here when it finishes.' } : { message: 'No response.json was saved for this response.' });
+  res.type('application/json').send(fs.readFileSync(file, 'utf8'));
+});
 // Every file in the response's evidence folder (the log, response.json, one folder per host).
 app.get('/api/responses/:id/files', (req, res) => {
   const r = db.runs.find((x) => x.id === req.params.id && x.kind === 'response');
@@ -638,6 +649,7 @@ app.put('/api/settings/shell', wrap((req, res) => { shell.setSettings(req.body |
 
 // ---- Health monitor: ping every minute and the WinRM/SSH port every 5 minutes, for every saved host ----
 app.get('/api/monitor', (req, res) => res.json(monitor.snapshot()));
+app.get('/api/monitor/log', (req, res) => res.json({ enabled: monitor.settings().enabled, entries: monitor.getLog(Math.min(Number(req.query.limit) || 500, 2000)) }));
 app.post('/api/monitor/check', (req, res) => { monitor.checkNow(); res.json(monitor.snapshot()); });
 
 const server = app.listen(config.port, config.host, () => {

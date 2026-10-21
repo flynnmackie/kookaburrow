@@ -1,4 +1,6 @@
 const net = require('net');
+const http = require('http');
+const https = require('https');
 const dns = require('dns').promises;
 const { scan: cfg } = require('./config');
 const { id, db } = require('./store');
@@ -89,6 +91,56 @@ function guessOs(open) {
   return win ? 'Windows (likely)' : 'Unknown';
 }
 
+// ---- Remote protocol check ----
+// After a host is found, ask the protocol its OS uses whether it really answers, rather than trusting an open port:
+//   WinRM  an unauthenticated POST to /wsman on 5985 (HTTP) and 5986 (HTTPS, any certificate). A real WinRM service answers 401 and offers
+//          Negotiate/Kerberos/Basic (or is the Windows HTTP.sys server), which is not something a random web server does.
+//   SSH    connect to port 22 and read the banner: every SSH server speaks first with "SSH-2.0-...".
+// Each is tried twice, so one dropped packet does not make a host look down. This sends no credentials.
+const REMOTE_TIMEOUT_MS = 3000;
+function wsman(ip, port, secure) {
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (v) => { if (!done) { done = true; resolve(v); } };
+    const req = (secure ? https : http).request({
+      host: ip, port, path: '/wsman', method: 'POST', timeout: REMOTE_TIMEOUT_MS, rejectUnauthorized: false,
+      headers: { 'Content-Type': 'application/soap+xml;charset=UTF-8', 'Content-Length': 0 },
+    }, (res) => {
+      res.resume();
+      const auth = String(res.headers['www-authenticate'] || ''), server = String(res.headers.server || '');
+      const ok = (res.statusCode === 401 && /negotiate|kerberos|ntlm|basic|credssp/i.test(auth)) || (/httpapi/i.test(server) && [200, 401, 405, 500].includes(res.statusCode));
+      finish({ ok, port, detail: `HTTP${secure ? 'S' : ''} ${res.statusCode}${auth ? ` (${auth.split(',')[0].trim()})` : ''}` });
+    });
+    req.on('timeout', () => { req.destroy(); finish({ ok: false, port, detail: `port ${port} timed out` }); });
+    req.on('error', (e) => finish({ ok: false, port, detail: `port ${port} ${e.code || e.message}` }));
+    req.end();
+  });
+}
+function sshBanner(ip, port = 22) {
+  return new Promise((resolve) => {
+    let done = false, buf = '';
+    const s = net.connect({ host: ip, port });
+    const finish = (v) => { if (!done) { done = true; s.destroy(); resolve(v); } };
+    s.setTimeout(REMOTE_TIMEOUT_MS);
+    s.on('data', (d) => { buf += d.toString('latin1'); if (buf.includes('\n') || buf.length > 255) finish(/^SSH-/.test(buf) ? { ok: true, port, detail: buf.split(/\r?\n/)[0].slice(0, 80) } : { ok: false, port, detail: `port ${port} is open but is not SSH` }); });
+    s.once('timeout', () => finish(buf.startsWith('SSH-') ? { ok: true, port, detail: buf.trim().slice(0, 80) } : { ok: false, port, detail: `port ${port} gave no SSH banner` }));
+    s.once('error', (e) => finish({ ok: false, port, detail: `port ${port} ${e.code || e.message}` }));
+    s.once('close', () => finish({ ok: false, port, detail: `port ${port} closed the connection` }));
+  });
+}
+// Windows hosts are asked over WinRM, everything else over SSH.
+async function checkRemote(r) {
+  const protocol = /^Windows/.test(r.osGuess) ? 'winrm' : 'ssh';
+  let last;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const tries = protocol === 'winrm' ? [await wsman(r.ip, 5985, false), await wsman(r.ip, 5986, true)] : [await sshBanner(r.ip, 22)];
+    const hit = tries.find((t) => t.ok);
+    if (hit) return { protocol, available: true, port: hit.port, detail: hit.detail };
+    last = tries;
+  }
+  return { protocol, available: false, port: null, detail: last.map((t) => t.detail).join('; ') };
+}
+
 async function scanHost(ip) {
   const results = await Promise.all(cfg.ports.map(async (p) => ((await probe(ip, p)) ? p : null)));
   const open = results.filter(Boolean);
@@ -100,13 +152,14 @@ async function scanHost(ip) {
 
 function startScan(spec) {
   const ips = parseTargets(spec);
-  const job = { id: id(), cidr: String(spec), status: 'running', total: ips.length, done: 0, found: [], startedAt: new Date().toISOString() };
+  const job = { id: id(), cidr: String(spec), status: 'running', phase: 'scan', total: ips.length, done: 0, found: [], startedAt: new Date().toISOString() };
   jobs.set(job.id, job);
 
   (async () => {
     // Each worker scans one host at a time; the ports within a host are probed in parallel.
     const workers = Math.max(1, Math.floor(cfg.concurrency / cfg.ports.length));
     let next = 0;
+    const checks = []; // the remote protocol check of every host found, started as soon as it is found
     await Promise.all(Array.from({ length: workers }, async () => {
       while (next < ips.length && job.status === 'running') {
         const ip = ips[next++];
@@ -117,10 +170,14 @@ function startScan(spec) {
           const saved = db.hosts.find((h) => h.address === r.ip);
           if (saved) r.known = { protocol: saved.protocol, hostname: saved.hostname || saved.name, os: saved.os };
           job.found.push(r);
+          checks.push(checkRemote(r).then((x) => { r.remote = x; }).catch(() => { r.remote = { protocol: /^Windows/.test(r.osGuess) ? 'winrm' : 'ssh', available: false, port: null, detail: 'the check failed' }; }));
         }
       }
     }));
+    if (job.status === 'running') job.phase = 'remote';
+    await Promise.all(checks);
     job.found.sort((a, b) => ipToInt(a.ip) - ipToInt(b.ip));
+    job.phase = 'done';
     if (job.status === 'running') job.status = 'complete';
     job.finishedAt = new Date().toISOString();
   })();
@@ -135,4 +192,4 @@ function cancelScan(jobId) {
   return j;
 }
 
-module.exports = { startScan, getScan, cancelScan, parseTargets };
+module.exports = { startScan, getScan, cancelScan, parseTargets, checkRemote };

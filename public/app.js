@@ -95,7 +95,7 @@ const PAGE_PERM = {
   'hosts/view-hosts': 'hosts.view', 'hosts/profiles': 'hosts.view', 'hosts/groups': 'hosts.view', 'hosts/discover': 'hosts.manage', 'hosts/manual': 'hosts.manage',
   'burrow/hunt': 'hunts.view', 'burrow/respond': 'actions.view', 'burrow/recurring': 'hunts.view,actions.view',
   'output/log': 'hunts.view', 'output/report': 'hunts.view', 'output/json': 'hunts.view', 'browse/files': 'hunts.view',
-  'shell/shell': 'shell.open', 'health/monitor': 'system.view',
+  'shell/shell': 'shell.open', 'health/monitor': 'system.view', 'health/monitor-log': 'system.view',
 };
 const pageAllowed = (slug) => can(PAGE_PERM[slug]);
 function refreshTopLocks() {
@@ -129,7 +129,7 @@ const NAV = [
   { id: 'home', label: 'Home', hidden: true, pages: [['home', 'Home']] },
   // Shell and Health are placed apart on the right of the top bar.
   { id: 'shell', label: 'Shell', pages: [['shell', 'Shell']], right: true, hostMenu: true }, // the side menu lists authenticated hosts
-  { id: 'health', label: 'Health', pages: [['monitor', 'Monitor']], right: true },
+  { id: 'health', label: 'Health', pages: [['monitor', 'Monitor'], ['monitor-log', 'Monitor log']], right: true },
 ];
 const loaders = {
   'settings/view-collections': () => loadCollectionList(),
@@ -141,6 +141,7 @@ const loaders = {
   'home/home': loadHome,
   'shell/shell': loadShell,
   'health/monitor': loadMonitor,
+  'health/monitor-log': loadMonitorLog,
   'settings/user-management': loadUserMgmt,
   'settings/health-settings': loadHealthSettings,
   'settings/shell-settings': loadShellSettings,
@@ -267,7 +268,7 @@ $('scanBtn').onclick = async () => {
 };
 async function pollScan(id) {
   const j = await api('GET', `/api/scans/${id}`);
-  $('scanStatus').textContent = `${j.status}: ${j.done}/${j.total} scanned, ${j.found.length} found`;
+  $('scanStatus').textContent = `${j.status}: ${j.done}/${j.total} scanned, ${j.found.length} found${j.status === 'running' && j.phase === 'remote' ? ', checking remote protocols…' : ''}`;
   $('scanBar').firstElementChild.style.width = `${(j.done / j.total) * 100}%`;
   addFound(j.found);
   if (j.status !== 'running') {
@@ -280,6 +281,10 @@ async function pollScan(id) {
 }
 // New hosts from a running scan are added to the table as they are found.
 function addFound(found) {
+  // the remote protocol check of a host finishes after the host is listed, so fill it in when it arrives
+  let late = false;
+  for (const h of found) { const mine = discovered.find((d) => d.ip === h.ip); if (mine && h.remote && !mine.remote) { mine.remote = h.remote; late = true; } }
+  if (late) { setDiscovered(discovered); renderAuthHosts(); }
   const fresh = found.filter((h) => !scanSeen.has(h.ip));
   if (!fresh.length) return;
   for (const h of fresh) {
@@ -312,6 +317,12 @@ function setDiscovered(found) {
   try { sessionStorage.setItem('discovered', JSON.stringify(found)); } catch { /* ignore */ }
 }
 
+// Clear all: empties the discovered hosts list (and stops a scan that is still running).
+$('scanClear').onclick = () => {
+  if (!$('scanStop').hidden) $('scanStop').click();
+  setDiscovered([]); scanSeen = new Set(); authState = {}; saveAuthState(); renderAuthHosts();
+  $('scanStatus').textContent = ''; $('scanBar').hidden = true;
+};
 $('cidr').onkeydown = (e) => { if (e.key === 'Enter') $('scanBtn').click(); };
 
 // ---- Authenticate ----
@@ -333,17 +344,23 @@ let authState = {};
 try { authState = JSON.parse(sessionStorage.getItem('authState') || '{}'); } catch { /* storage unavailable */ }
 const saveAuthState = () => { try { sessionStorage.setItem('authState', JSON.stringify(authState)); } catch { /* ignore */ } };
 
-// One WinRM or SSH cell. Without a test it falls back to what the scan saw on that port.
-function authCell(h, proto) {
-  const st = authState[h.ip] || {};
-  if (st.testing === proto) return '<span class="badge grey">Testing…</span>';
-  const r = st[proto];
-  if (r) {
-    const [cls, label] = { authenticated: ['green', 'Authenticated'], absent: ['grey', 'Absent'], rejected: ['red', 'Credentials rejected'] }[r.state] || ['red', 'Failed'];
-    return `<span class="badge ${cls}">${label}</span>${r.reason ? `<div class="reason ${r.state === 'absent' ? '' : 'bad'}">${esc(r.reason)}</div>` : ''}`;
+// The Remote protocol cell: what the scan found (WinRM or SSH, chosen by the host's OS, green if it answers and orange if it
+// appears down), with the result of the credential test underneath once one has been run.
+function authCell(h) {
+  const st = authState[h.ip] || {}, rem = h.remote;
+  const label = (rem?.protocol || (/^Windows/.test(h.osGuess) ? 'winrm' : 'ssh')) === 'winrm' ? 'WinRM' : 'SSH';
+  const found = !rem ? '<span class="dim">checking…</span>'
+    : rem.available ? `<span class="ok" title="${esc(rem.detail)}">${label} available</span>`
+      : `<span class="warnc" title="${esc(rem.detail)}">${label} - appears down</span>`;
+  const proto = st.testing || (['winrm', 'ssh'].find((p) => st[p]));
+  let auth = '';
+  if (st.testing) auth = '<div><span class="badge grey">Testing…</span></div>';
+  else if (proto && st[proto]) {
+    const r = st[proto];
+    const [cls, lbl] = { authenticated: ['green', 'Authenticated'], absent: ['grey', 'Absent'], rejected: ['red', 'Credentials rejected'] }[r.state] || ['red', 'Failed'];
+    auth = `<div><span class="badge ${cls}">${lbl}</span></div>${r.reason ? `<div class="reason ${r.state === 'absent' ? '' : 'bad'}">${esc(r.reason)}</div>` : ''}`;
   }
-  const ports = proto === 'winrm' ? [5985, 5986] : [22];
-  return h.openPorts.some((p) => ports.includes(p)) ? '<span class="dim">Port open · not tested</span>' : '<span class="dim">Absent</span>';
+  return found + auth;
 }
 function renderAuthHosts() {
   const options = (ip) => `<option value="">— none —</option>` + profiles.map((p) =>
@@ -357,8 +374,8 @@ function renderAuthHosts() {
     return `<tr class="${fade ? 'fading' : ''}" ${fade}><td><b>${esc(h.ip)}</b></td><td>${esc(ok?.hostname || h.hostname || '-')}</td>
       <td><span class="os ${cls}">${label}</span></td><td class="dim">${h.openPorts.join(', ')}</td>
       <td><select class="psel" data-ip="${esc(h.ip)}">${options(h.ip)}</select></td>
-      <td>${authCell(h, 'winrm')}</td><td>${authCell(h, 'ssh')}</td></tr>`;
-  }).join('') || '<tr><td colspan="7" class="dim">No hosts yet. Run a subnet scan above.</td></tr>';
+      <td>${authCell(h)}</td></tr>`;
+  }).join('') || '<tr><td colspan="6" class="dim">No hosts yet. Run a subnet scan above.</td></tr>';
 }
 
 // Tests the profile assigned to one host. The server picks WinRM or SSH from the profile type.
@@ -389,12 +406,12 @@ $('authTable').onchange = async (e) => {
   try { assignments = await api('PUT', '/api/assignments', { ip, profileId: e.target.value || null }); }
   catch (err) { alert(err.message); loadAuthHosts(); return; }
   delete authState[ip]; saveAuthState(); // a different profile invalidates the old result
-  renderAuthHosts();
-  if (e.target.value) testHost(ip); // a valid profile is tested straight away
+  renderAuthHosts(); // nothing is tested until Authenticate is pressed
 };
-// "Authenticate" re-tests every host that has a profile, a few at a time.
+// "Authenticate" tests every host that has a profile, a few at a time. Hosts with no profile are skipped.
 $('authBtn').onclick = async () => {
   const ips = discovered.map((h) => h.ip).filter((ip) => assignments[ip]);
+  const skipped = discovered.length - ips.length;
   const msg = $('authMsg');
   if (!ips.length) { msg.className = 'dim'; msg.textContent = 'Select a profile for at least one host first.'; return; }
   $('authBtn').disabled = true; msg.className = 'dim'; msg.textContent = `Testing ${ips.length} host${ips.length === 1 ? '' : 's'}…`;
@@ -403,7 +420,7 @@ $('authBtn').onclick = async () => {
   await Promise.all(Array.from({ length: Math.min(3, queue.length) }, async () => { while (queue.length) results.push(await testHost(queue.shift())); }));
   const okN = results.filter((s) => s === 'authenticated').length;
   msg.className = okN === results.length ? 'ok' : 'bad';
-  msg.textContent = `${okN} of ${results.length} authenticated${okN === results.length ? '' : '; see the reason under each failed host'}.`;
+  msg.textContent = `${okN} of ${results.length} authenticated${okN === results.length ? '' : '; see the reason under each failed host'}.${skipped ? ` ${skipped} host${skipped === 1 ? ' has' : 's have'} no profile and ${skipped === 1 ? 'was' : 'were'} skipped.` : ''}`;
   $('authBtn').disabled = false;
 };
 
@@ -414,10 +431,27 @@ function renderProfiles() {
       <a class="pname os ${p.kind.startsWith('Windows') ? 'windows' : 'unix'}" data-edit="${p.id}" title="Click to edit">${esc(p.name)}</a>
       <div class="dim pkind">${esc(p.kind)}</div>
     </div>
+    <button class="act sec vh" type="button" data-hosts="${p.id}">View hosts</button>
     <button class="del" data-del="${p.id}" data-perm="hosts.manage" data-perm-what="delete credential profiles">Delete</button></div>`).join('') || '<p class="dim" style="margin:0">No profiles yet.</p>';
 }
+// View hosts: the saved hosts that were authenticated with a profile.
+const closeProfHosts = () => { $('profHostsModal').hidden = true; };
+$('phDone').onclick = $('phX').onclick = closeProfHosts;
+$('profHostsModal').onclick = (e) => { if (e.target.id === 'profHostsModal') closeProfHosts(); };
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('profHostsModal').hidden) closeProfHosts(); });
+async function showProfileHosts(p) {
+  $('phTitle').textContent = `Hosts that used "${p.name}"`;
+  $('phBody').innerHTML = '<p class="dim">Loading…</p>'; $('profHostsModal').hidden = false;
+  try {
+    const mine = (await api('GET', '/api/hosts')).filter((h) => h.profileId === p.id);
+    $('phBody').innerHTML = mine.length
+      ? `<table class="bh"><thead><tr><th>Name</th><th>Address</th><th>OS</th><th>Protocol</th><th>Last verified</th></tr></thead><tbody>${mine.map((h) => `<tr><td><b>${esc(h.name)}</b></td><td>${esc(h.address)}</td><td class="dim">${esc(String(h.os || '').replace(/^Microsoft /, '').replace(/\s*\(\d[\d.]*\)$/, ''))}</td><td class="${h.protocol === 'ssh' ? 'proto-ssh' : 'proto-winrm'}">${h.protocol === 'ssh' ? 'SSH' : 'WinRM'}</td><td class="dim">${esc(fmtVerified((h.remoteCheck || {}).at || h.verifiedAt))}</td></tr>`).join('')}</tbody></table>`
+      : '<p class="dim" style="margin:0">No saved hosts have been authenticated with this profile yet.</p>';
+  } catch (e) { $('phBody').innerHTML = `<p class="bad">${esc(e.message)}</p>`; }
+}
 $('profileList').onclick = async (e) => {
-  const { edit, del } = e.target.dataset;
+  const { edit, del, hosts: viewHosts } = e.target.dataset;
+  if (viewHosts) { const p = profiles.find((x) => x.id === viewHosts); if (p) showProfileHosts(p); return; }
   if (edit) {
     // Load into the form; the password stays blank, and leaving it blank keeps the stored one.
     const p = profiles.find((x) => x.id === edit); if (!p) return;
@@ -471,11 +505,8 @@ function renderHosts() {
   // One fixed-size line per host, so rows never grow: the groups it is in show as tags (clipped if there are many,
   // the full list is in the tooltip), and one dropdown both adds it to a group and takes it out of one.
   const groupCell = (h) => {
-    const mine = lists.filter((l) => l.hostIds.includes(h.id)), rest = lists.filter((l) => !l.hostIds.includes(h.id));
-    const group = (label, items, prefix) => items.length ? `<optgroup label="${label}">${items.map((l) => `<option value="${prefix}${l.id}">${esc(l.name)}</option>`).join('')}</optgroup>` : '';
-    return `<div class="gcell"><select class="gsel" data-host="${h.id}" data-perm="hosts.manage" data-perm-what="change host groups" ${lists.length ? '' : 'disabled'}>
-        <option value="">${lists.length ? 'Groups' : 'None yet'}</option>
-        ${group('Add to', rest, 'add:')}${group('Remove from', mine, 'remove:')}</select>
+    const mine = lists.filter((l) => l.hostIds.includes(h.id));
+    return `<div class="gcell"><button class="act sec" type="button" data-manage="${h.id}" data-perm="hosts.manage" data-perm-what="change host groups">Manage groups</button>
       <div class="gchips" title="${mine.length ? esc(mine.map((l) => l.name).join(', ')) : 'Not in any group'}">${mine.map((l) => `<span class="tagchip on">${esc(l.name)}</span>`).join('')}</div></div>`;
   };
   // Search matches name, address, OS and protocol. WinRM hosts show in blue and SSH hosts in orange.
@@ -483,14 +514,32 @@ function renderHosts() {
   const shown = hosts.filter((h) => !q || [h.name, h.hostname, h.address, h.os, h.protocol === 'ssh' ? 'ssh' : 'winrm'].some((v) => String(v || '').toLowerCase().includes(q)));
   $('hostTable').tBodies[0].innerHTML = shown.map((h, i) => {
     const pc = h.protocol === 'ssh' ? 'proto-ssh' : 'proto-winrm';
-    return `<tr><td class="rown">${i + 1}</td>
+    const rc = h.remoteCheck || { up: true, at: h.verifiedAt };
+    return `<tr data-hostrow="${esc(h.id)}"><td class="hdotc"><span class="hdot ${rc.up ? '' : 'down'}" data-dot="${esc(h.id)}"></span></td><td class="rown">${i + 1}</td>
     <td>${esc(h.name)}</td><td>${esc(h.address)}</td><td class="${pc}" title="${esc(h.os)}">${esc(String(h.os || '').replace(/^Microsoft /, '').replace(/\s*\(\d[\d.]*\)$/, ''))}</td><td class="${pc}">${h.protocol === 'ssh' ? 'SSH' : 'WinRM'}</td>
-    <td class="dim">${new Date(h.verifiedAt).toLocaleString([], { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</td>
+    <td class="dim" title="The credential profile this host was authenticated with">${esc(h.profileName || '-')}</td>
+    <td class="${rc.up ? 'ok' : 'bad'}" data-lastver="${esc(h.id)}">${fmtVerified(rc.at)}</td>
     <td>${groupCell(h)}</td>
     <td><a data-del-host="${h.id}" data-perm="hosts.manage" data-perm-what="delete hosts">Delete</a></td></tr>`;
-  }).join('') || `<tr><td colspan="8" class="dim">${hosts.length ? 'No hosts match' : 'No hosts saved'}</td></tr>`;
+  }).join('') || `<tr><td colspan="10" class="dim">${hosts.length ? 'No hosts match' : 'No hosts saved'}</td></tr>`;
 
   $('groupBox').innerHTML = groupsHtml(hosts, lists);
+  paintHostDots();
+}
+const fmtVerified = (at) => (at ? new Date(at).toLocaleString([], { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-');
+// The lamp and the Last verified text follow the live remote port check while monitoring is on; otherwise they show the last result kept on the host
+// (a host starts green when it is verified, so it stays that way if monitoring is off).
+function paintHostDots() {
+  const live = new Map((monSnap && monSnap.enabled !== false ? monSnap.hosts : []).map((m) => [m.id, m]));
+  for (const h of hosts) {
+    const dot = document.querySelector(`[data-dot="${h.id}"]`), cell = document.querySelector(`[data-lastver="${h.id}"]`); if (!dot || !cell) continue;
+    const m = live.get(h.id), checked = m && (m.remote.state === 'up' || m.remote.state === 'down') && m.remote.checkedAt;
+    const rc = checked ? { up: m.remote.state === 'up', at: m.remote.checkedAt } : (h.remoteCheck || { up: true, at: h.verifiedAt });
+    const label = h.protocol === 'ssh' ? 'SSH' : 'WinRM';
+    dot.classList.toggle('down', !rc.up);
+    dot.title = `${label} port ${rc.up ? 'open' : 'not responding'} (last checked ${fmtVerified(rc.at)})`;
+    cell.className = rc.up ? 'ok' : 'bad'; cell.textContent = fmtVerified(rc.at);
+  }
 }
 // Every group with its members; the arrow folds a group, and the fold state is remembered. Hosts that are in no group
 // are collected in an Unassigned group at the end. Used by View Hosts and by the Groups page (which also lets you delete).
@@ -522,18 +571,32 @@ const foldGroup = (e) => {
 };
 $('groupBox').onclick = foldGroup;
 $('hosts/view-hosts').onclick = async (e) => {
+  const m = e.target.closest('[data-manage]');
+  if (m) { gmHost = m.dataset.manage; renderGroupsModal(); $('groupsModal').hidden = false; $('gmDone').focus(); return; }
   if (e.target.dataset.delHost) { await api('DELETE', `/api/hosts/${e.target.dataset.delHost}`); loadHosts(); return; }
 };
-$('hosts/view-hosts').onchange = async (e) => {
-  if (!e.target.classList.contains('gsel') || !e.target.value) return;
-  const [action, listId] = e.target.value.split(':');
-  await setMembership(listId, e.target.dataset.host, action === 'add');
-};
+// Manage groups: the groups the host is in, and a tick box for every group. Each tick adds or removes the host straight away.
+let gmHost = null;
+function renderGroupsModal() {
+  const h = hosts.find((x) => x.id === gmHost); if (!h) { $('groupsModal').hidden = true; return; }
+  const mine = hostLists.filter((l) => l.hostIds.includes(h.id));
+  $('gmWho').textContent = `${h.name} · ${h.address}`;
+  $('gmCurrent').innerHTML = mine.length ? mine.map((l) => `<span class="tagchip on">${esc(l.name)}</span>`).join('') : '<span class="dim">None. This host shows under Unassigned.</span>';
+  $('gmList').innerHTML = hostLists.map((l) => `<label class="pick"><input type="checkbox" data-gm="${esc(l.id)}" ${l.hostIds.includes(h.id) ? 'checked' : ''} ${can('hosts.manage') ? '' : 'disabled'}>
+      <span class="pn">${esc(l.name)}</span><span class="pt">${l.hostIds.length} host${l.hostIds.length === 1 ? '' : 's'}</span></label>`).join('')
+    || '<p class="dim" style="margin:6px 10px">No groups yet. Create one on the Groups page.</p>';
+}
+$('gmList').onchange = async (e) => { if (e.target.dataset.gm) await setMembership(e.target.dataset.gm, gmHost, e.target.checked); };
+const closeGroups = () => { $('groupsModal').hidden = true; gmHost = null; };
+$('gmDone').onclick = $('gmX').onclick = closeGroups;
+$('groupsModal').onclick = (e) => { if (e.target.id === 'groupsModal') closeGroups(); };
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('groupsModal').hidden) closeGroups(); });
 async function setMembership(listId, hostId, member) {
   const list = hostLists.find((l) => l.id === listId); if (!list) return;
   const hostIds = member ? [...new Set([...list.hostIds, hostId])] : list.hostIds.filter((i) => i !== hostId);
   try { await api('PUT', `/api/lists/${listId}`, { hostIds }); } catch (err) { alert(err.message); }
-  loadHosts();
+  await loadHosts();
+  if (!$('groupsModal').hidden) renderGroupsModal();
 }
 
 // ---- Manually Add ----
@@ -674,6 +737,8 @@ function makeLibrary({ id, url, noun, folder, showParams }) {
     if (r !== req) return; // a newer search is in flight
     all = list; tagList = tags;
     renderTagFilter();
+    // the box on the right is never empty: with nothing open yet, the first script in the list is opened
+    if (!open) open = all.find((h) => h.type === type)?.id ?? null;
     renderList();
     if (open) show(open); // refresh the open script, e.g. after uploading a binary
   }
@@ -744,7 +809,6 @@ function makeLibrary({ id, url, noun, folder, showParams }) {
   };
   // Clicking a script shows it in the right-hand box; clicking one of its tags filters by it.
   el('List').onclick = (e) => {
-    if (e.target.dataset.tag) { toggleTag(e.target.dataset.tag); return; }
     const item = e.target.closest('.collection-item'); if (!item) return;
     open = item.dataset.id;
     renderList();
@@ -986,7 +1050,7 @@ function recInit(p) {
 // ---- Burrow: Hunt ----
 // Top: the previous hunts (name, who ran it, status, started, finished, elapsed). Click one to fill the box below it with what it
 // ran, the files it pulled back, its errors and downloads. New Hunt opens a dialog in three steps: who, which collections, name.
-const bh = { runs: [], sel: null };
+const bh = { runs: [], sel: null, tab: 'details' };
 const fmtDur = (ms) => {
   if (ms == null || !(ms >= 0)) return '';
   const s = Math.round(ms / 1000), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
@@ -1027,33 +1091,76 @@ async function huntFiles(r) {
   const rank = (f) => (f.folder === '' ? 0 : f.folder === 'All-Hosts' ? 1 : 2);
   return [...files, ...subs.flat()].sort((a, b) => rank(a) - rank(b) || a.folder.localeCompare(b.folder, undefined, { numeric: true }) || a.name.localeCompare(b.name));
 }
+// Clicking a host's error opens its message in a small popup.
+document.addEventListener('click', (e) => {
+  const a = e.target.closest('[data-errmsg]'); if (!a) return;
+  $('errWhere').textContent = `${a.dataset.errhost} · ${a.dataset.erritem}`;
+  $('errBody').textContent = a.dataset.errmsg;
+  $('errModal').hidden = false; $('errOk').focus();
+});
+const closeErr = () => { $('errModal').hidden = true; };
+$('errOk').onclick = $('errX').onclick = closeErr;
+$('errModal').onclick = (e) => { if (e.target.id === 'errModal') closeErr(); };
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('errModal').hidden) closeErr(); });
+// The box under the hunt/response list. A header with the downloads, then three tabs: Details (what ran, the facts and the error log),
+// Files (what it collected, each with a download) and Notebook (the hunt's or response's JSON file to scroll through).
+// `kind` is 'hunt' or 'response'; the tab you pick stays selected as you click from one run to the next.
+const BD_TABS = [['details', 'Details'], ['files', 'Files'], ['notebook', 'Notebook']];
+async function bdNotebook(url) {
+  try {
+    let t = JSON.stringify(await api('GET', url), null, 2);
+    const MAX = 1500000, cut = t.length > MAX;
+    if (cut) t = t.slice(0, MAX);
+    return `<pre class="code bd-json">${highlightJson(t)}</pre>${cut ? '<p class="dim" style="margin:6px 0 0">Showing the first part only. Download the file for all of it.</p>' : ''}`;
+  } catch (e) { return `<p class="bad">${esc(e.message)}</p>`; }
+}
+function bdRender({ kind, r, events, files, tab, notebook }) {
+  const isHunt = kind === 'hunt', noun = isHunt ? 'hunt' : 'response';
+  const hosts = new Set(r.results.map((x) => x.hostId)).size, idKey = isHunt ? 'collectionId' : 'actionId', nameKey = isHunt ? 'collectionName' : 'actionName';
+  const rows = [...new Map(r.results.map((x) => [x[idKey], x[nameKey]])).entries()].map(([cid, name]) => {
+    const mine = r.results.filter((x) => x[idKey] === cid), ok = mine.filter((x) => x.status === 'ok').length, bad = mine.filter((x) => x.status === 'error').length;
+    const hostsCell = mine.map((x) => x.status === 'ok' ? `<span class="hres ok">${esc(x.address)} OK</span>`
+      : x.status === 'error' ? `<a class="hres bad" data-errmsg="${esc(x.error || 'No error message was recorded.')}" data-errhost="${esc(x.address)}" data-erritem="${esc(name)}" title="Click to see the error">${esc(x.address)} error</a>`
+      : `<span class="hres dim">${esc(x.address)} ${esc(x.status)}</span>`).join('');
+    if (!isHunt) {
+      const ps = (r.parameterNames || {})[cid] || [];
+      return `<tr><td>${esc(name)}</td><td class="dim">${ps.length ? esc(ps.join(', ')) : '-'}</td><td>${hostsCell}</td></tr>`;
+    }
+    return `<tr><td>${esc(name)}</td><td>${hostsCell}</td><td class="num">${mine.reduce((n, x) => n + (x.rows || 0), 0)}</td></tr>`;
+  }).join('');
+  const problems = events.filter((e) => e.kind === 'error' || e.kind === 'warn' || /^(error|warning|unconfirmed)/.test(e.outcome || ''));
+  const dl = (path, text, cls = 'act sec') => `<a class="${cls}" href="/api/browse/download?path=${encodeURIComponent(path)}" download data-perm="hunts.export" data-perm-what="download ${noun} results">${text}</a>`;
+  const jsonName = isHunt ? 'hunt.json' : 'response.json', json = files.find((f) => f.name === jsonName && f.folder === (isHunt ? 'All-Hosts' : ''));
+  const btns = `<div class="bd-btns bd-files-btns">${r.evidenceDir ? `<a class="act" href="/api/runs/${esc(r.id)}/download" download data-perm="hunts.export" data-perm-what="download ${noun} results" title="The whole ${noun} folder as one zip file">Download all (zip)</a>` : ''}<a class="act sec" href="/api/runs/${esc(r.id)}/log.csv" download data-perm="hunts.export" data-perm-what="export logs">Download log (CSV)</a>${json ? dl(json.path, `Download ${jsonName}`) : ''}${r.evidenceDir ? `<a class="act sec" data-evidence="/evidence/${esc(r.evidenceDir)}">Open in Browse</a>` : ''}</div>`;
+  const head = `<div class="bd-head"><div><div class="hd-name">${esc(huntName(r))}${schedTag(r)}</div><div class="hd-file">${esc(r.evidenceDir ? `evidence/${r.evidenceDir}` : 'No evidence folder')}</div></div>
+      <div class="toggle bd-tabs" role="tablist">${BD_TABS.map(([k, label]) => `<button type="button" role="tab" data-bdtab="${k}" aria-selected="${k === tab}" class="${k === tab ? 'on' : ''}">${label}${k === 'files' ? ` (${files.length})` : ''}</button>`).join('')}</div></div>`;
+  let pane;
+  if (tab === 'files') {
+    pane = btns + (files.length ? `<table class="bh"><thead><tr><th>Folder</th><th>File</th><th class="num">Size</th><th></th></tr></thead><tbody>${files.map((f) => `<tr><td class="dim">${esc(f.folder || '/')}</td><td>${esc(f.name)}</td><td class="num dim">${bbFmt(f.size)}</td><td class="num">${dl(f.path, 'Download', 'dl')}</td></tr>`).join('')}</tbody></table>`
+      : `<p class="dim" style="margin:0">${r.status === 'running' ? 'Nothing yet. Files appear as hosts finish.' : 'No files were saved.'}</p>`);
+  } else if (tab === 'notebook') {
+    pane = notebook;
+  } else {
+    pane = `<div class="bd-facts"><div><span>Status</span>${huntStatus(r)}</div><div><span>Run by</span>${r.startedBy ? esc(r.startedBy) : '-'}</div><div><span>Started</span>${esc(new Date(r.startedAt).toLocaleString())}</div>
+      <div><span>Finished</span>${r.finishedAt ? esc(new Date(r.finishedAt).toLocaleString()) : '-'}</div><div><span>Elapsed</span>${esc(huntElapsed(r))}</div><div><span>Hosts</span>${hosts}</div></div>
+    ${r.error ? `<div class="hd-unmet">${esc(r.error)}</div>` : ''}
+    <div class="hd-label">${isHunt ? 'Collections' : 'Actions'} run</div>
+    <table class="bh"><thead><tr><th>${isHunt ? 'Collection' : 'Action'}</th>${isHunt ? '' : '<th>Parameters</th>'}<th>Result on each host</th>${isHunt ? '<th class="num">Rows</th>' : ''}</tr></thead><tbody>${rows || '<tr><td colspan="3" class="dim">None</td></tr>'}</tbody></table>
+    <div class="hd-label">Error log <span class="dim">(${problems.length})</span></div>
+    ${problems.length ? `<table class="bh"><thead><tr><th>Time</th><th>Host</th><th>${isHunt ? 'Action' : 'Step'}</th><th>${isHunt ? 'Collection' : 'Action'}</th><th>Detail</th></tr></thead><tbody>${problems.map((e) => `<tr class="${e.kind === 'warn' ? 'st-warn' : 'bad'}"><td class="dim">${esc(new Date(e.t).toLocaleTimeString())}</td><td>${esc(e.host)}</td><td>${esc(e.action)}</td><td>${esc(e.artefact)}</td><td class="bh-wrap">${esc(e.detail)}</td></tr>`).join('')}</tbody></table>`
+      : '<p class="ok" style="margin:0">No errors.</p>'}`;
+  }
+  return head + pane;
+}
 async function showHunt(id) {
   bh.sel = id; renderHuntList();
   const r = bh.runs.find((x) => x.id === id), box = $('bhDetail'); if (!r) return;
-  let events, files;
-  try { [events, files] = await Promise.all([api('GET', `/api/runs/${id}/events`), huntFiles(r)]); } catch (e) { box.innerHTML = `<p class="bad">${esc(e.message)}</p>`; return; }
+  let events, files, notebook = '';
+  try { [events, files, notebook] = await Promise.all([api('GET', `/api/runs/${id}/events`), huntFiles(r), bh.tab === 'notebook' ? bdNotebook(`/api/runs/${id}/data`) : '']); } catch (e) { box.innerHTML = `<p class="bad">${esc(e.message)}</p>`; return; }
   if (bh.sel !== id) return; // another hunt was clicked while this loaded
-  const hosts = new Set(r.results.map((x) => x.hostId)).size;
-  const cols = [...new Map(r.results.map((x) => [x.collectionId, x.collectionName])).entries()].map(([cid, name]) => {
-    const mine = r.results.filter((x) => x.collectionId === cid), ok = mine.filter((x) => x.status === 'ok').length, bad = mine.filter((x) => x.status === 'error').length;
-    return `<tr><td>${esc(name)}</td><td>${ok} of ${mine.length}</td><td class="${bad ? 'bad' : 'dim'}">${bad}</td><td class="num">${mine.reduce((n, x) => n + (x.rows || 0), 0)}</td></tr>`;
-  }).join('');
-  const problems = events.filter((e) => e.kind === 'error' || e.kind === 'warn' || /^(error|warning|unconfirmed)/.test(e.outcome || ''));
-  const dl = (path, text, cls = 'act sec') => `<a class="${cls}" href="/api/browse/download?path=${encodeURIComponent(path)}" download data-perm="hunts.export" data-perm-what="download hunt results">${text}</a>`;
-  const json = files.find((f) => f.folder === 'All-Hosts' && f.name === 'hunt.json');
-  box.innerHTML = `<div class="bd-head"><div><div class="hd-name">${esc(huntName(r))}${schedTag(r)}</div><div class="hd-file">${esc(r.evidenceDir ? `evidence/${r.evidenceDir}` : 'No evidence folder')}</div></div>
-      <div class="bd-btns">${r.evidenceDir ? `<a class="act" href="/api/runs/${esc(r.id)}/download" download data-perm="hunts.export" data-perm-what="download hunt results" title="The whole hunt folder as one zip file">Download all (zip)</a>` : ''}<a class="act sec" href="/api/runs/${esc(r.id)}/log.csv" download data-perm="hunts.export" data-perm-what="export logs">Download log (CSV)</a>${json ? dl(json.path, 'Download hunt.json') : ''}${r.evidenceDir ? `<a class="act sec" data-evidence="/evidence/${esc(r.evidenceDir)}">Open in Browse</a>` : ''}</div></div>
-    <div class="bd-facts"><div><span>Status</span>${huntStatus(r)}</div><div><span>Run by</span>${r.startedBy ? esc(r.startedBy) : '-'}</div><div><span>Started</span>${esc(new Date(r.startedAt).toLocaleString())}</div>
-      <div><span>Finished</span>${r.finishedAt ? esc(new Date(r.finishedAt).toLocaleString()) : '-'}</div><div><span>Elapsed</span>${esc(huntElapsed(r))}</div><div><span>Hosts</span>${hosts}</div></div>
-    ${r.error ? `<div class="hd-unmet">${esc(r.error)}</div>` : ''}
-    <div class="hd-label">Collections run</div>
-    <table class="bh"><thead><tr><th>Collection</th><th>Hosts ok</th><th>Failed</th><th class="num">Rows</th></tr></thead><tbody>${cols || '<tr><td colspan="4" class="dim">None</td></tr>'}</tbody></table>
-    <div class="hd-label">Files pulled back <span class="dim">(${files.length})</span></div>
-    ${files.length ? `<table class="bh"><thead><tr><th>Folder</th><th>File</th><th class="num">Size</th><th></th></tr></thead><tbody>${files.map((f) => `<tr><td class="dim">${esc(f.folder || '/')}</td><td>${esc(f.name)}</td><td class="num dim">${bbFmt(f.size)}</td><td class="num">${dl(f.path, 'Download', 'dl')}</td></tr>`).join('')}</tbody></table>`
-      : `<p class="dim" style="margin:0">${r.status === 'running' ? 'Nothing yet. Files appear as hosts finish.' : 'No files were saved.'}</p>`}
-    <div class="hd-label">Error log <span class="dim">(${problems.length})</span></div>
-    ${problems.length ? `<table class="bh"><thead><tr><th>Time</th><th>Host</th><th>Action</th><th>Collection</th><th>Detail</th></tr></thead><tbody>${problems.map((e) => `<tr class="${e.kind === 'warn' ? 'st-warn' : 'bad'}"><td class="dim">${esc(new Date(e.t).toLocaleTimeString())}</td><td>${esc(e.host)}</td><td>${esc(e.action)}</td><td>${esc(e.artefact)}</td><td class="bh-wrap">${esc(e.detail)}</td></tr>`).join('')}</tbody></table>`
-      : '<p class="ok" style="margin:0">No errors.</p>'}`;
+  const keep = box.querySelector('.bd-json')?.scrollTop;
+  box.innerHTML = bdRender({ kind: 'hunt', r, events, files, tab: bh.tab, notebook });
+  if (keep) box.querySelector('.bd-json').scrollTop = keep; // the running-hunt refresh does not jump back to the top
 }
 $('bhList').onclick = async (e) => {
   const del = e.target.closest('[data-del]');
@@ -1065,6 +1172,8 @@ $('bhList').onclick = async (e) => {
   const tr = e.target.closest('.bh-row'); if (tr) showHunt(tr.dataset.id);
 };
 $('bhDetail').onclick = (e) => {
+  const t = e.target.closest('[data-bdtab]');
+  if (t) { bh.tab = t.dataset.bdtab; showHunt(bh.sel); return; }
   const p = e.target.dataset.evidence; if (!p) return;
   go('browse', 'files');
   loadBrowse(p);
@@ -1615,6 +1724,7 @@ async function fetchMonitor(force = false) {
   if (!can('system.view')) { monSnap = null; if ($('navStats')) $('navStats').innerHTML = ''; return null; }
   try { monSnap = await api(force ? 'POST' : 'GET', force ? '/api/monitor/check' : '/api/monitor'); } catch { /* keep the last results */ }
   renderNavStats();
+  if (isActive('hosts/view-hosts')) paintHostDots();
   return monSnap;
 }
 const ago = (ms) => {
@@ -1682,6 +1792,28 @@ async function loadMonitor() {
   clearTimeout(monTimer);
   if (isActive('health/monitor')) monTimer = setTimeout(loadMonitor, 5000);
 }
+// Health > Monitor log: every ping and port check the monitor made, newest first.
+let mlEntries = [], mlTimer, mlFilter = 'all';
+async function loadMonitorLog() {
+  try { const r = await api('GET', '/api/monitor/log?limit=1000'); mlEntries = r.entries; mlEnabled = r.enabled; } catch (e) { $('mlBox').innerHTML = `<p class="bad">${esc(e.message)}</p>`; return; }
+  renderMonitorLog();
+  clearTimeout(mlTimer);
+  if (isActive('health/monitor-log')) mlTimer = setTimeout(loadMonitorLog, 5000);
+}
+let mlEnabled = true;
+function renderMonitorLog() {
+  const q = $('mlSearch').value.trim().toLowerCase();
+  document.querySelectorAll('#mlFilter button').forEach((b) => b.classList.toggle('on', b.dataset.f === mlFilter));
+  const shown = mlEntries.filter((e) => (mlFilter === 'all' || (mlFilter === 'ok') === e.ok) && (!q || [e.host, e.address, e.check, e.command, e.message].some((v) => String(v || '').toLowerCase().includes(q)))).slice(0, 500);
+  $('mlCount').textContent = `${shown.length} of ${mlEntries.length} shown`;
+  $('mlBox').innerHTML = shown.length
+    ? `<table class="ml"><thead><tr><th>Time</th><th>Host</th><th>Check</th><th>Command</th><th>Result</th><th>Message</th></tr></thead><tbody>${shown.map((e) => `<tr><td class="dim" title="${esc(e.t)}">${esc(new Date(e.t).toLocaleString([], { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }))}</td>
+        <td><b>${esc(e.host)}</b> <span class="dim">${esc(e.address)}</span></td><td>${esc(e.check)}</td><td class="mlc">${esc(e.command)}</td>
+        <td class="${e.ok ? 'ok' : 'bad'}">${e.ok ? 'Success' : 'Error'}</td><td class="mlm ${e.ok ? '' : 'bad'}">${esc(e.message)}</td></tr>`).join('')}</tbody></table>`
+    : `<p class="dim" style="margin:0">${mlEnabled ? (mlEntries.length ? 'No checks match.' : 'No checks have run yet since the server started.') : 'Health monitoring is turned off, so no checks are running. Turn it on under Settings → System → Health Settings.'}</p>`;
+}
+$('mlSearch').oninput = renderMonitorLog;
+$('mlFilter').onclick = (e) => { if (e.target.dataset.f) { mlFilter = e.target.dataset.f; renderMonitorLog(); } };
 $('monCheck').onclick = async () => { $('monCheck').disabled = true; await fetchMonitor(true); renderMonitor(); setTimeout(() => { $('monCheck').disabled = false; loadMonitor(); }, 2500); };
 
 // ---- Shell ----

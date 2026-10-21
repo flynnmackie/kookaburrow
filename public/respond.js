@@ -3,7 +3,7 @@
 // dialog (Who / Actions / Name) with Rerun past response. An action changes the hosts it runs on, so the dialog asks you to confirm,
 // and the values you type for an action's parameters are used for that run only (never stored or logged).
 // Shares helpers with app.js: api, esc, $, toast, go, isActive, metaIcons, VERIFIED, highlight, bbFmt, huntStatus, huntElapsed, huntName.
-const br = { runs: [], sel: null };
+const br = { runs: [], sel: null, tab: 'details' };
 const BR_HINT = '<p class="dim" style="margin:0">Click a response above to see what it ran, its output files, any errors, and to download the results.</p>';
 let respPoll;
 
@@ -27,33 +27,14 @@ function renderRespList() {
 async function showResponse(id) {
   br.sel = id; renderRespList();
   const r = br.runs.find((x) => x.id === id), box = $('brDetail'); if (!r) return;
-  let events, files;
-  try { [events, files] = await Promise.all([api('GET', `/api/responses/${id}/events`), api('GET', `/api/responses/${id}/files`)]); } catch (e) { box.innerHTML = `<p class="bad">${esc(e.message)}</p>`; return; }
+  let events, files, notebook = '';
+  try { [events, files, notebook] = await Promise.all([api('GET', `/api/responses/${id}/events`), api('GET', `/api/responses/${id}/files`), br.tab === 'notebook' ? bdNotebook(`/api/responses/${id}/data`) : '']); } catch (e) { box.innerHTML = `<p class="bad">${esc(e.message)}</p>`; return; }
   if (br.sel !== id) return;
   const rank = (f) => (f.folder === '' ? 0 : 1);
   files.sort((a, b) => rank(a) - rank(b) || a.folder.localeCompare(b.folder, undefined, { numeric: true }) || a.name.localeCompare(b.name));
-  const hosts = new Set(r.results.map((x) => x.hostId)).size;
-  const acts = [...new Map(r.results.map((x) => [x.actionId, x.actionName])).entries()].map(([aid, name]) => {
-    const mine = r.results.filter((x) => x.actionId === aid), ok = mine.filter((x) => x.status === 'ok').length, bad = mine.filter((x) => x.status === 'error').length;
-    const ps = (r.parameterNames || {})[aid] || [];
-    return `<tr><td>${esc(name)}</td><td class="dim">${ps.length ? esc(ps.join(', ')) : '-'}</td><td>${ok} of ${mine.length}</td><td class="${bad ? 'bad' : 'dim'}">${bad}</td></tr>`;
-  }).join('');
-  const problems = events.filter((e) => e.kind === 'error' || e.kind === 'warn' || /^(error|warning|unconfirmed)/.test(e.outcome || ''));
-  const dl = (path, text, cls = 'act sec') => `<a class="${cls}" href="/api/browse/download?path=${encodeURIComponent(path)}" download data-perm="hunts.export" data-perm-what="download response results">${text}</a>`;
-  const json = files.find((f) => f.folder === '' && f.name === 'response.json');
-  box.innerHTML = `<div class="bd-head"><div><div class="hd-name">${esc(huntName(r))}${schedTag(r)}</div><div class="hd-file">${esc(r.evidenceDir ? `evidence/${r.evidenceDir}` : 'No evidence folder')}</div></div>
-      <div class="bd-btns">${r.evidenceDir ? `<a class="act" href="/api/runs/${esc(r.id)}/download" download data-perm="hunts.export" data-perm-what="download response results" title="The whole response folder as one zip file">Download all (zip)</a>` : ''}<a class="act sec" href="/api/runs/${esc(r.id)}/log.csv" download data-perm="hunts.export" data-perm-what="export logs">Download log (CSV)</a>${json ? dl(json.path, 'Download response.json') : ''}${r.evidenceDir ? `<a class="act sec" data-evidence="/evidence/${esc(r.evidenceDir)}">Open in Browse</a>` : ''}</div></div>
-    <div class="bd-facts"><div><span>Status</span>${huntStatus(r)}</div><div><span>Run by</span>${r.startedBy ? esc(r.startedBy) : '-'}</div><div><span>Started</span>${esc(new Date(r.startedAt).toLocaleString())}</div>
-      <div><span>Finished</span>${r.finishedAt ? esc(new Date(r.finishedAt).toLocaleString()) : '-'}</div><div><span>Elapsed</span>${esc(huntElapsed(r))}</div><div><span>Hosts</span>${hosts}</div></div>
-    ${r.error ? `<div class="hd-unmet">${esc(r.error)}</div>` : ''}
-    <div class="hd-label">Actions run</div>
-    <table class="bh"><thead><tr><th>Action</th><th>Parameters</th><th>Hosts ok</th><th>Failed</th></tr></thead><tbody>${acts || '<tr><td colspan="4" class="dim">None</td></tr>'}</tbody></table>
-    <div class="hd-label">Files pulled back <span class="dim">(${files.length})</span></div>
-    ${files.length ? `<table class="bh"><thead><tr><th>Folder</th><th>File</th><th class="num">Size</th><th></th></tr></thead><tbody>${files.map((f) => `<tr><td class="dim">${esc(f.folder || '/')}</td><td>${esc(f.name)}</td><td class="num dim">${bbFmt(f.size)}</td><td class="num">${dl(f.path, 'Download', 'dl')}</td></tr>`).join('')}</tbody></table>`
-      : `<p class="dim" style="margin:0">${r.status === 'running' ? 'Nothing yet. Files appear as hosts finish.' : 'No files were saved.'}</p>`}
-    <div class="hd-label">Error log <span class="dim">(${problems.length})</span></div>
-    ${problems.length ? `<table class="bh"><thead><tr><th>Time</th><th>Host</th><th>Step</th><th>Action</th><th>Detail</th></tr></thead><tbody>${problems.map((e) => `<tr class="${e.kind === 'warn' ? 'st-warn' : 'bad'}"><td class="dim">${esc(new Date(e.t).toLocaleTimeString())}</td><td>${esc(e.host)}</td><td>${esc(e.action)}</td><td>${esc(e.artefact)}</td><td class="bh-wrap">${esc(e.detail)}</td></tr>`).join('')}</tbody></table>`
-      : '<p class="ok" style="margin:0">No errors.</p>'}`;
+  const keep = box.querySelector('.bd-json')?.scrollTop;
+  box.innerHTML = bdRender({ kind: 'response', r, events, files, tab: br.tab, notebook });
+  if (keep) box.querySelector('.bd-json').scrollTop = keep;
 }
 $('brList').onclick = async (e) => {
   const del = e.target.closest('[data-del]');
@@ -65,6 +46,8 @@ $('brList').onclick = async (e) => {
   const tr = e.target.closest('.bh-row'); if (tr) showResponse(tr.dataset.id);
 };
 $('brDetail').onclick = (e) => {
+  const t = e.target.closest('[data-bdtab]');
+  if (t) { br.tab = t.dataset.bdtab; showResponse(br.sel); return; }
   const p = e.target.dataset.evidence; if (!p) return;
   go('browse', 'files');
   loadBrowse(p);

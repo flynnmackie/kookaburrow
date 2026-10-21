@@ -192,7 +192,7 @@
   #hostTable { font-size:11.5px; }
   #hostTable th { font-size:9.5px; padding:3px 6px; }
   #hostTable td { white-space:nowrap; vertical-align:middle; padding:2px 6px; }
-  #hostTable td:nth-child(4) { max-width:210px; overflow:hidden; text-overflow:ellipsis; }
+  #hostTable td:nth-child(5) { max-width:210px; overflow:hidden; text-overflow:ellipsis; }
   #hostTable .tagchip { font-size:10px; padding:0 6px; }
   #hostTable .gcell select { font-size:11px; }
   .gcell { display:flex; align-items:center; gap:5px; width:170px; }
@@ -231,6 +231,18 @@
   .bd-facts { display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:6px 14px; margin:6px 0 2px; font-size:12.5px; }
   .bd-facts span { display:block; font:600 10.5px var(--f-ui); text-transform:uppercase; letter-spacing:.04em; color:var(--dim); }
   a.dl { cursor:pointer; font-size:12px; }
+  .hdot { display:inline-block; width:11px; height:11px; border-radius:50%; vertical-align:middle; cursor:help; background:var(--ok); box-shadow:0 0 0 2px rgba(76,214,138,.22); } .hdot.down { background:var(--bad); box-shadow:0 0 0 2px rgba(239,91,97,.25); }
+  #hostTable th.hdotc, #hostTable td.hdotc { width:1%; padding-right:0; }
+  .hres { display:inline-block; margin:1px 8px 1px 0; font-size:12px; } .hres.ok { color:var(--ok); } a.hres.bad { color:var(--bad); text-decoration:underline dotted; cursor:pointer; } .hres.dim { color:var(--dim); }
+  .errmsg { white-space:pre-wrap; overflow-wrap:anywhere; margin:0; font:12px/1.5 var(--f-mono); color:var(--bad); }
+  .modal .dlg.errdlg { width:min(520px, 100%); height:auto; max-height:80%; }
+  table.ml { font-size:11.5px; } table.ml th { position:sticky; top:0; background:var(--panel-t); z-index:1; } table.ml td { padding:2px 8px; white-space:nowrap; vertical-align:top; } table.ml td.mlc { font:11px var(--f-mono); color:var(--dim); } table.ml td.mlm { white-space:normal; overflow-wrap:anywhere; }
+  .modal .dlg.gm { width:min(480px, 100%); height:auto; max-height:85%; } .modal .dlg.gm.ph { width:min(680px, 100%); }
+  .gm-who { font:600 14px var(--f-ui); margin:4px 0; } .gm-current { display:flex; flex-wrap:wrap; gap:4px; min-height:22px; } .gm-list { height:auto; max-height:260px; }
+  #hostTable .gcell { display:flex; align-items:center; gap:6px; } #hostTable .gcell .act { width:auto; margin:0; padding:0 8px; font-size:11px; flex-shrink:0; }
+  .plist .act.vh { width:auto; margin:0; padding:1px 9px; font-size:11.5px; flex-shrink:0; }
+  .bd-tabs { width:max-content; max-width:100%; margin:0; } .bd-files-btns { margin:8px 0 10px; } .bd-tabs button { padding:3px 18px; white-space:nowrap; flex:none; }
+  pre.bd-json { max-height:52vh; overflow:auto; margin:0; font-size:11.5px; }
   .page.on > .card.bh-top { flex:2 1 0; } .page.on > .card.bh-detail { flex:3 1 0; }
   /* recurring */
   .rtag { display:inline-block; margin-left:6px; padding:0 5px; border:1px solid var(--ok); border-radius:var(--r-s); color:var(--ok); font:700 10.5px var(--f-ui); vertical-align:1px; cursor:help; }
@@ -483,7 +495,7 @@
   .navstat .ok { color:var(--ok); } .navstat .warnc { color:var(--orange); } .navstat .bad { color:var(--bad); } .navstat .dim { color:var(--faint); }
   #topnav .navstat + button.right.first { margin-left:0; }
   #topnav .navstat:empty + button.right.first { margin-left:auto; }
-  b.warnc { color:var(--orange); } b.ok { color:var(--ok); } b.bad { color:var(--bad); } b.dim { color:var(--dim); }
+  b.warnc, span.warnc { color:var(--orange); } b.ok { color:var(--ok); } b.bad { color:var(--bad); } b.dim { color:var(--dim); }
   .mon-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(230px, 1fr)); gap:8px; margin-top:6px; }
   .mon-box { border:1px solid var(--line-hi); border-left-width:3px; border-radius:var(--r); padding:7px 10px 6px; background:var(--panel2); min-width:0; }
   .mon-box.up { border-left-color:var(--ok); } .mon-box.down { border-color:rgba(239,91,97,.5); border-left-color:var(--bad); background:rgba(239,91,97,.06); }
@@ -548,8 +560,7 @@
   .collection-item .mwarn { color:var(--orange); margin-left:8px; }
   .collection-item .hl { font:11px/1.4 var(--f-mono); color:var(--faint); margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .htags { display:flex; flex-wrap:nowrap; overflow:hidden; gap:3px; margin-top:2px; }
-  .htag { font-size:10.5px; line-height:1.4; color:var(--faint); border:1px solid var(--line); border-radius:var(--r-s); padding:0 6px; cursor:pointer; white-space:nowrap; flex-shrink:0; transition:all var(--ease); }
-  .htag:hover { color:var(--text); border-color:var(--blue-d); }
+  .htag { font-size:10.5px; line-height:1.4; color:var(--faint); border:1px solid var(--line); border-radius:var(--r-s); padding:0 6px; cursor:inherit; white-space:nowrap; flex-shrink:0; }
   .htag.on { color:var(--blue); border-color:var(--blue-d); }
   /* collections whose binary dependencies have not been uploaded */
   .collection-item.unmet { background:rgba(239,91,97,.06); box-shadow:inset 2px 0 0 var(--bad); }
@@ -816,7 +827,7 @@
         <div class="card">
           <h2>Saved hosts</h2>
           <input id="hostSearch" type="search" class="hostsearch" placeholder="Search hosts by name, address, OS or protocol" autocomplete="off" spellcheck="false">
-          <table id="hostTable"><thead><tr><th class="rown">#</th><th>Name</th><th>Address</th><th>OS</th><th>Protocol</th><th>Verified</th><th>Add to group</th><th></th></tr></thead><tbody></tbody></table>
+          <table id="hostTable"><thead><tr><th class="hdotc"></th><th class="rown">#</th><th>Name</th><th>Address</th><th>OS</th><th>Protocol</th><th>Profile</th><th>Last verified</th><th>Groups</th><th></th></tr></thead><tbody></tbody></table>
         </div>
         <div class="card">
           <h2>Groups</h2>
@@ -861,9 +872,9 @@
         <div class="bar" id="scanBar" hidden><div></div></div>
       </div>
       <div class="card">
-        <h2>Discovered hosts</h2>
+        <div class="bh-bar"><h2>Discovered hosts</h2><button class="act sec" id="scanClear" type="button" title="Remove every host from the subnet scan results">Clear all</button></div>
         <p class="dim">Results of the last scan. OS is assumed from open ports until a host is authenticated.</p>
-        <table id="authTable"><thead><tr><th>Host</th><th>Hostname</th><th>OS (assumed)</th><th>Open ports</th><th>Profile</th><th>WinRM</th><th>SSH</th></tr></thead><tbody></tbody></table>
+        <table id="authTable"><thead><tr><th>Host</th><th>Hostname</th><th>OS (assumed)</th><th>Open ports</th><th>Profile</th><th>Remote protocol</th></tr></thead><tbody></tbody></table>
         <div class="row" style="margin-top:12px">
           <button class="act" id="authBtn" data-perm="hosts.manage" data-perm-what="authenticate hosts">Authenticate</button> <span id="authMsg"></span>
         </div>
@@ -923,6 +934,14 @@
         <div class="mon-top"><h2>Monitor</h2><span class="mon-sum" id="monSum"></span><button class="act sec" id="monCheck" type="button" title="Run every check now instead of waiting for the schedule">Check now</button></div>
         <p class="dim lg-sub" id="monSub">Every monitored host is pinged and has its WinRM or SSH port checked. Green is up, red is not responding.</p>
         <div class="mon-grid" id="monGrid"></div>
+      </div>
+    </section>
+    <section class="page" id="health/monitor-log">
+      <div class="card">
+        <div class="mon-top"><h2>Monitor log</h2><span class="dim" id="mlCount"></span></div>
+        <p class="dim lg-sub">Every ping and remote port check, newest first: the command that ran, the host, when, and whether it worked or why not. The log is kept in memory (the latest 5000 checks) and starts empty when the server restarts.</p>
+        <div class="row" style="margin-bottom:8px"><input id="mlSearch" type="search" placeholder="Search host, address, command or message" autocomplete="off" style="flex:1; max-width:460px"><div class="toggle" id="mlFilter" style="margin:0"><button type="button" data-f="all" class="on">All</button><button type="button" data-f="ok">Success</button><button type="button" data-f="fail">Failed</button></div></div>
+        <div id="mlBox"></div>
       </div>
     </section>
     <!-- Shell -->
@@ -1099,6 +1118,32 @@
     <div class="dlg-head"><h2 id="denyTitle"><svg class="lock" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg> Permission denied</h2><button class="dlg-x" id="denyX" aria-label="Close">×</button></div>
     <div class="dlg-body deny-body" id="denyBody"></div>
     <div class="dlg-foot"><button class="act" id="denyOk" type="button">OK</button></div>
+  </div>
+</div>
+<div class="modal" id="groupsModal" hidden role="dialog" aria-modal="true" aria-labelledby="gmTitle">
+  <div class="dlg gm">
+    <div class="dlg-head"><h2 id="gmTitle">Manage groups</h2><button class="dlg-x" id="gmX" aria-label="Close">×</button></div>
+    <div class="dlg-body">
+      <div class="gm-who" id="gmWho"></div>
+      <span class="fl">Current groups</span><div class="gm-current" id="gmCurrent"></div>
+      <span class="fl">All groups <span class="dim" style="text-transform:none; letter-spacing:0">(tick to add the host, untick to remove it)</span></span>
+      <div class="pickbox gm-list" id="gmList"></div>
+    </div>
+    <div class="dlg-foot"><button class="act" id="gmDone" type="button">Done</button></div>
+  </div>
+</div>
+<div class="modal" id="profHostsModal" hidden role="dialog" aria-modal="true" aria-labelledby="phTitle">
+  <div class="dlg gm ph">
+    <div class="dlg-head"><h2 id="phTitle">Hosts</h2><button class="dlg-x" id="phX" aria-label="Close">×</button></div>
+    <div class="dlg-body" id="phBody"></div>
+    <div class="dlg-foot"><button class="act" id="phDone" type="button">Close</button></div>
+  </div>
+</div>
+<div class="modal" id="errModal" hidden role="alertdialog" aria-modal="true" aria-labelledby="errTitle">
+  <div class="dlg errdlg">
+    <div class="dlg-head"><h2 id="errTitle">Error</h2><button class="dlg-x" id="errX" aria-label="Close">×</button></div>
+    <div class="dlg-body"><div class="dim" id="errWhere" style="margin-bottom:6px"></div><pre class="errmsg" id="errBody"></pre></div>
+    <div class="dlg-foot"><button class="act" id="errOk" type="button">OK</button></div>
   </div>
 </div>
 <div id="toasts" aria-live="polite"></div>

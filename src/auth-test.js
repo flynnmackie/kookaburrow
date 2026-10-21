@@ -86,9 +86,12 @@ async function authenticate(conn, { profileId, name } = {}) {
     const existing = db.hosts.find((h) => h.address === address && h.protocol === protocol);
     const host = existing || { id: id(), address, protocol };
     Object.assign(host, {
+      // the profile's name is kept on the host as it was at the time, so it still reads right if the profile is renamed or deleted
+      profileName: db.profiles.find((p) => p.id === profileId)?.name || 'Manual entry',
       port: conn.port, username: conn.username, auth: conn.auth, useSsl: conn.useSsl, profileId,
       ...facts, name: name || existing?.name || facts.hostname || address, secret: encrypt(conn.password), verifiedAt: new Date().toISOString(),
     });
+    host.remoteCheck = { up: true, at: host.verifiedAt }; // authenticating proves the remote port is up right now
     if (!existing) db.hosts.push(host);
     save();
     return { state: 'authenticated', protocol, reason: '', hostname: facts.hostname, os: facts.os, name: host.name, added: !existing };

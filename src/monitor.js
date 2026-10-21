@@ -55,16 +55,27 @@ const SAFE_ADDR = /^[A-Za-z0-9.:_-]+$/; // an address becomes a ping argument, s
 const portsFor = (h) => (h.protocol === 'ssh' ? [h.port || 22] : h.port ? [h.port] : [5985, 5986]);
 const remoteLabel = (h) => (h.protocol === 'ssh' ? 'SSH' : 'WinRM');
 
+// Every check is also written to a log kept in memory (the newest 5000), for Health > Monitor log: when it ran, which host, the
+// command, and whether it worked or why not.
+const checkLog = [];
+function note(e) { checkLog.push({ t: new Date().toISOString(), ...e }); if (checkLog.length > 5000) checkLog.splice(0, checkLog.length - 5000); }
+const getLog = (limit = 500) => checkLog.slice(-limit).reverse();
+const namesAt = (address) => db.hosts.filter((h) => h.address === address).map((h) => h.name || h.hostname || h.address).join(', ') || address;
+
 function ping(address) {
   return new Promise((resolve) => {
-    if (!SAFE_ADDR.test(address)) return resolve({ up: false });
+    if (!SAFE_ADDR.test(address)) return resolve({ up: false, command: `ping ${address}`, message: 'The address is not a valid host name or IP, so it was not pinged' });
     const args = process.platform === 'win32' ? ['-n', '1', '-w', '1500', address] : ['-c', '1', '-W', '2', address];
+    const command = `ping ${args.join(' ')}`;
     execFile('ping', args, { timeout: 6000, windowsHide: true }, (err, stdout) => {
       // A Windows ping exits 0 even for "destination host unreachable", so a real reply is recognised by its TTL.
       const out = String(stdout || '');
-      if (!/ttl=/i.test(out)) return resolve({ up: false });
+      if (!/ttl=/i.test(out)) {
+        const why = out.split(/\r?\n/).map((l) => l.trim()).find((l) => /timed out|unreachable|could not find|general failure|transmit failed/i.test(l));
+        return resolve({ up: false, command, message: why || (err && err.killed ? 'The ping command did not finish in time' : 'No reply') });
+      }
       const m = /time[=<]\s*([\d.]+)\s*ms/i.exec(out);
-      resolve({ up: true, rttMs: m ? Math.max(1, Math.round(Number(m[1]))) : null });
+      resolve({ up: true, rttMs: m ? Math.max(1, Math.round(Number(m[1]))) : null, command, message: out.split(/\r?\n/).map((l) => l.trim()).find((l) => /ttl=/i.test(l)) || 'Reply received' });
     });
   });
 }
@@ -72,13 +83,24 @@ function ping(address) {
 function probe(address, port) {
   return new Promise((resolve) => {
     const s = net.connect({ host: address, port, timeout: PORT_TIMEOUT });
-    const done = (open) => { s.destroy(); resolve({ open }); };
-    s.once('connect', () => done(true));
-    s.once('timeout', () => done(false));
-    s.once('error', () => done(false));
+    const done = (open, message) => { s.destroy(); resolve({ open, message }); };
+    s.once('connect', () => done(true, 'Connected, the port is open'));
+    s.once('timeout', () => done(false, `No answer within ${PORT_TIMEOUT / 1000} seconds`));
+    s.once('error', (e) => done(false, e.code === 'ECONNREFUSED' ? 'Connection refused (nothing is listening on the port)' : `${e.code || 'Error'}: ${e.message}`));
   });
 }
 
+// Keeps the result of the remote port check on the host itself, so Host Management can show it (and when it was made) even when
+// monitoring is later turned off.
+function syncRemote(h) {
+  const ps = portsFor(h).map((port) => ports.get(`${h.address}:${port}`)).filter((p) => p && p.checkedAt > 0);
+  if (!ps.length) return;
+  const up = ps.some((p) => p.open);
+  if (!up && ps.length < portsFor(h).length) return; // wait for the other port before calling the host down
+  const at = new Date(Math.max(...ps.map((p) => p.checkedAt))).toISOString();
+  const live = db.hosts.find((x) => x.id === h.id);
+  if (live) { live.remoteCheck = { up, at }; save(); }
+}
 function record(map, key, up, field, extra = {}) {
   const prev = map.get(key), now = Date.now();
   map.set(key, { ...extra, [field]: up, startedAt: prev?.startedAt ?? now, checkedAt: now, since: prev && prev[field] === up ? prev.since : now });
@@ -91,17 +113,26 @@ function jobs(now) {
   for (const address of new Set(pingHosts(s).map((h) => h.address))) {
     const key = `ping|${address}`;
     if (!inflight.has(key) && due(pings, address, pingMs)) {
-      out.push({ key, run: async () => { const r = await ping(address); record(pings, address, r.up, 'up', { rttMs: r.rttMs ?? null }); } });
+      out.push({ key, run: async () => { const r = await ping(address); record(pings, address, r.up, 'up', { rttMs: r.rttMs ?? null }); note({ check: 'Ping', host: namesAt(address), address, command: r.command, ok: r.up, message: r.message }); } });
       pings.set(address, { ...(pings.get(address) || { up: false, since: now, checkedAt: 0 }), startedAt: now }); // marks it as started so it is not queued twice
     }
   }
+  // One remote check per host: all of its ports (WinRM's 5985 and 5986) are probed at the same time and the host is up if any answers.
   for (const h of remoteHosts(s)) {
-    for (const port of portsFor(h)) {
-      const k = `${h.address}:${port}`, key = `port|${k}`;
-      if (inflight.has(key) || !due(ports, k, portMs) || out.some((j) => j.key === key)) continue;
-      out.push({ key, run: async () => { const r = await probe(h.address, port); record(ports, k, r.open, 'open'); } });
-      ports.set(k, { ...(ports.get(k) || { open: false, since: now, checkedAt: 0 }), startedAt: now });
-    }
+    const list = portsFor(h), key = `remote|${h.address}|${list.join(',')}`, first = `${h.address}:${list[0]}`;
+    if (inflight.has(key) || !due(ports, first, portMs) || out.some((j) => j.key === key)) continue;
+    out.push({ key, run: async () => {
+      const results = await Promise.all(list.map(async (port) => ({ port, ...(await probe(h.address, port)) })));
+      for (const r of results) record(ports, `${h.address}:${r.port}`, r.open, 'open');
+      syncRemote(h);
+      const open = results.filter((r) => r.open), up = open.length > 0;
+      const message = list.length === 1 ? results[0].message
+        : up ? `${remoteLabel(h)} answered on port ${open.map((r) => r.port).join(' and ')}${open.length < list.length ? ` (${results.filter((r) => !r.open).map((r) => `port ${r.port}: ${r.message}`).join('; ')})` : ''}`
+          : results.map((r) => `port ${r.port}: ${r.message}`).join('; ');
+      note({ check: remoteLabel(h), host: h.name || h.hostname || h.address, address: h.address, ok: up, message,
+        command: `tcp connect ${list.map((p) => `${h.address}:${p}`).join(' and ')} (at the same time, timeout ${PORT_TIMEOUT} ms)` });
+    } });
+    for (const port of list) { const k = `${h.address}:${port}`; ports.set(k, { ...(ports.get(k) || { open: false, since: now, checkedAt: 0 }), startedAt: now }); }
   }
   return out;
 }
@@ -174,4 +205,4 @@ function start() {
   setInterval(tick, TICK_MS).unref();
 }
 
-module.exports = { start, snapshot, checkNow, settings, setSettings, DEFAULTS, LIMITS };
+module.exports = { start, snapshot, checkNow, settings, setSettings, getLog, DEFAULTS, LIMITS };
