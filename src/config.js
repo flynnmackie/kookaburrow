@@ -18,4 +18,7 @@ module.exports = {
   runConcurrency: 4,
   maxOutputBytes: 5 * 1024 * 1024,
   hostTimeoutMs: 10 * 60 * 1000,
+  // Large-transfer collections (SMB / SFTP file pulls): how long one step may take, and how long to wait for SMB to come up or go down on a host.
+  largeTimeoutMs: 6 * 60 * 60 * 1000,
+  smbWaitMs: 45 * 1000,
 };

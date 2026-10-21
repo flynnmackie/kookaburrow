@@ -4,7 +4,7 @@ const { Client } = require('ssh2');
 const { decrypt } = require('../crypto');
 const { maxOutputBytes, hostTimeoutMs } = require('../config');
 
-function exec(profile, command, stdin) {
+function exec(profile, command, stdin, timeoutMs = hostTimeoutMs) {
   return new Promise((resolve) => {
     const conn = new Client();
     let stdout = '', stderr = '', truncated = false;
@@ -20,7 +20,7 @@ function exec(profile, command, stdin) {
       try { conn.end(); } catch { /* ignore */ }
       resolve({ exitCode, stdout, stderr: extraErr ? `${stderr}${extraErr}` : stderr, truncated });
     };
-    const timer = setTimeout(() => finish(-1, 'Timed out'), hostTimeoutMs);
+    const timer = setTimeout(() => finish(-1, 'Timed out'), timeoutMs);
 
     conn.on('ready', () => {
       conn.exec(command, (err, stream) => {
@@ -60,10 +60,12 @@ async function verify(profile) {
 }
 
 // type 'bash' pipes the script to `bash -s`; 'powershell' pipes it to pwsh/powershell.
-function runScript(profile, scriptText, type = 'powershell') {
-  if (type === 'bash') return exec(profile, 'bash -s', scriptText);
+// opts.outDir (large-transfer collections): the folder the script writes its files to, set as $OUT_DIR (bash) or $OutDir (PowerShell).
+function runScript(profile, scriptText, type = 'powershell', opts = {}) {
+  const q = (v) => `'${String(v).replace(/'/g, `'\\''`)}'`; // single-quote for bash
+  if (type === 'bash') return exec(profile, 'bash -s', (opts.outDir ? `OUT_DIR=${q(opts.outDir)}\nexport OUT_DIR\n` : '') + scriptText, opts.timeoutMs);
   const shell = profile.platform === 'windows' ? 'powershell' : 'pwsh';
-  return exec(profile, `${shell} -NoProfile -NonInteractive -Command -`, scriptText);
+  return exec(profile, `${shell} -NoProfile -NonInteractive -Command -`, (opts.outDir ? `$OutDir = '${String(opts.outDir).replace(/'/g, "''")}'\n` : '') + scriptText, opts.timeoutMs);
 }
 
-module.exports = { verify, runScript };
+module.exports = { verify, runScript, exec };

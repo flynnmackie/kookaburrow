@@ -1006,7 +1006,8 @@ const addActions = makeEditor({
 
 // ---- Shared by Hunt and Respond ----
 // A green R after a name marks a run that came from a recurring schedule.
-const schedTag = (r) => (r.scheduleId ? '<span class="rtag" title="Ran on a recurring schedule">R</span>' : '');
+// Small tags after a name: Q for a quick hunt or response (one host, from the Shell tab), a green R for a recurring run.
+const schedTag = (r) => (r.quick ? '<span class="qtag" title="Quick run: one host, started from the Shell tab">Q</span>' : '') + (r.scheduleId ? '<span class="rtag" title="Ran on a recurring schedule">R</span>' : '');
 // Confirms, then deletes a hunt or response: its record and its output folder. A running one can't be deleted.
 async function confirmDeleteRun(r, url, noun) {
   if (r.status === 'running') { toast(`That ${noun} is still running. Wait for it to finish.`); return false; }
@@ -1083,9 +1084,17 @@ function renderHuntList() {
         <td class="dim">${esc(new Date(r.startedAt).toLocaleString())}</td><td class="dim">${r.finishedAt ? esc(new Date(r.finishedAt).toLocaleString()) : '-'}</td><td class="dim">${esc(huntElapsed(r))}</td><td class="bh-del"><a class="dl bad" data-del="${esc(r.id)}" data-perm="hunts.run" data-perm-what="delete hunts" title="Delete this hunt and its output folder">Delete</a></td></tr>`).join('')}</tbody></table>`
     : '<p class="dim" style="margin:0">No hunts yet. Use New Hunt to run collections against your hosts.</p>';
 }
+// A collection or action that needs a binary that has not been uploaded cannot be picked: clicking it says what is missing.
+function showMissingBinary(item) {
+  $('errTitle').textContent = 'Required binary missing';
+  $('errWhere').textContent = item.name;
+  $('errBody').textContent = `Required binary missing: ${item.missingDependencies.join(', ')}\n\nUpload it under Settings → Binaries, then pick this again.`;
+  $('errModal').hidden = false; $('errOk').focus();
+}
 // Clicking a host's error opens its message in a small popup.
 document.addEventListener('click', (e) => {
   const a = e.target.closest('[data-errmsg]'); if (!a) return;
+  $('errTitle').textContent = 'Error';
   $('errWhere').textContent = `${a.dataset.errhost} · ${a.dataset.erritem}`;
   $('errBody').textContent = a.dataset.errmsg;
   $('errModal').hidden = false; $('errOk').focus();
@@ -1175,7 +1184,7 @@ $('bhDetail').onclick = (e) => {
 
 // ---- New hunt dialog ----
 // 1. who (groups and hosts)  2. which collections (the View Collections list, with the full detail on the right)  3. name, and the recurring switch.
-const hm = { collections: [], hosts: [], lists: [], selC: new Set(), selH: new Set(), selL: new Set(), q: '', type: 'powershell', shown: null, recurring: false };
+const hm = { collections: [], hosts: [], lists: [], selC: new Set(), selH: new Set(), selL: new Set(), q: '', type: 'powershell', shown: null, recurring: false, quick: null };
 const hmEl = (s) => $('hm' + s);
 function hmCount() {
   const ids = new Set(hm.selH);
@@ -1192,8 +1201,7 @@ function hmRenderCollections() {
   const q = hm.q.toLowerCase(), inType = hm.collections.filter((c) => c.type === hm.type);
   const shown = inType.filter((c) => !q || [c.name, c.file, c.description, ...c.tags].some((s) => String(s).toLowerCase().includes(q)));
   document.querySelectorAll('#hmToggle button').forEach((b) => b.classList.toggle('on', b.dataset.type === hm.type));
-  hmEl('Collections').innerHTML = shown.map((c) => `<div class="collection-item ${c.id === hm.shown ? 'on' : ''}" data-view="${esc(c.id)}">
-      <input type="checkbox" data-c="${esc(c.id)}" ${hm.selC.has(c.id) ? 'checked' : ''} aria-label="Include ${esc(c.name)}">
+  hmEl('Collections').innerHTML = shown.map((c) => `<div class="collection-item ${c.id === hm.shown ? 'on' : ''} ${hm.selC.has(c.id) ? 'sel' : ''} ${c.missingDependencies.length ? 'blocked' : ''}" data-view="${esc(c.id)}" ${c.missingDependencies.length ? `aria-disabled="true" title="Required binary missing: ${esc(c.missingDependencies.join(', '))}"` : ''}>
       <div class="ci-main">${c.verified ? VERIFIED : ''}${metaIcons(c)}<div class="hn">${esc(c.name)}</div><div class="hd" title="${esc(c.description)}">${esc(c.description)}</div>
       ${c.tags.length ? `<div class="htags">${c.tags.map((t) => `<span class="htag">${esc(t)}</span>`).join('')}</div>` : ''}</div></div>`).join('')
     || '<p class="dim" style="margin:6px 10px">No collections match.</p>';
@@ -1205,7 +1213,7 @@ async function hmShow(id) {
     const h = await api('GET', `/api/collections/${id}`);
     if (id !== hm.shown) return;
     hmEl('Detail').innerHTML = `<div class="hd-name">${esc(h.name)}</div><div class="hd-file">${esc(h.id)}</div>${metaIcons(h, true)}
-      <div class="hd-label hd-label-desc">Description</div><div class="hd-desc">${h.description ? esc(h.description) : '<span class="dim">-</span>'}</div>
+      <div class="hd-label hd-label-desc">Description</div><div class="hd-desc">${h.description ? esc(h.description) : '<span class="dim">-</span>'}${h.transfer === 'large' ? '<div class="smb-note"><b>Large transfer.</b> The files this collection leaves on the host are pulled back to the server: over SMB for Windows hosts (switched on for the hunt only, then off again) and over SFTP for Linux hosts.</div>' : ''}</div>
       <div class="hd-label hd-label-dep">Dependencies</div><div class="hd-deps">${h.dependencies.length ? h.dependencies.map((d) => `<span class="dep ${h.missingDependencies.includes(d) ? 'miss' : 'have'}">${esc(d)}${h.missingDependencies.includes(d) ? ' (not uploaded)' : ''}</span>`).join('') : '<span class="dim">None</span>'}</div>
       <div class="hd-label hd-label-tags">Tags</div><div class="hd-tags">${h.tags.length ? h.tags.map((t) => `<span class="hd-tag">${esc(t)}</span>`).join('') : '<span class="dim">None</span>'}</div>
       <div class="hd-label hd-label-code">Collection</div><pre class="code">${highlight(h.body, h.type)}</pre>`;
@@ -1238,6 +1246,14 @@ function hmRenderTargetList() {
   hmEl('ItemsHead').textContent = `${items.length} collection${items.length === 1 ? '' : 's'} to run`;
   hmEl('Items').innerHTML = items.map((c) => `<div class="pick"><span class="pn" title="${esc(c.description)}">${esc(c.name)}</span>${metaIcons(c)}<span class="pt">${c.type === 'bash' ? 'Linux' : 'PowerShell'}</span></div>`).join('')
     || '<p class="dim" style="margin:6px 10px">No collections selected yet. Choose them on the Collections tab.</p>';
+  // a collection that pulls back large files: say what will be switched on, and for which hosts, before the hunt runs
+  const big = items.filter((c) => c.transfer === 'large'), win = list.filter((h) => h.protocol !== 'ssh'), lin = list.filter((h) => h.protocol === 'ssh');
+  const names = (hs) => hs.slice(0, 4).map((h) => esc(h.name)).join(', ') + (hs.length > 4 ? ` and ${hs.length - 4} more` : '');
+  const box = hmEl('SmbWarn');
+  box.hidden = !big.length;
+  box.innerHTML = big.length ? `<b>⚠ Large file transfer:</b> ${big.map((c) => esc(c.name)).join(', ')} brings back big files.
+    ${win.length || !list.length ? `<p><b>SMB will be enabled temporarily</b> on ${win.length ? `${win.length} Windows host${win.length === 1 ? '' : 's'} (${names(win)})` : 'Windows hosts'} for this hunt. Before the collection runs, port 445 is switched on for this server's address only; the files are pulled over SMB; then SMB is switched off again and checked. If SMB was already on, it is left as it was found.</p>` : ''}
+    ${lin.length ? `<p>${lin.length} Linux host${lin.length === 1 ? '' : 's'} (${names(lin)}): the files come back over SFTP on the SSH connection, so nothing is switched on.</p>` : ''}` : '';
 }
 const HM_ORDER = ['who', 'coll', 'name'];
 hmEl('Next').onclick = () => { const cur = document.querySelector('#hmTabs .on')?.dataset.pane; hmTab(HM_ORDER[Math.min(HM_ORDER.indexOf(cur) + 1, HM_ORDER.length - 1)]); };
@@ -1247,12 +1263,25 @@ function hmSetRecurring(on) {
   hmEl('RecurringLabel').textContent = `Recurring hunt: ${on ? 'On' : 'Off'}`;
   recToggle('hm', on);
 }
-async function openHuntModal() {
+// Quick mode (from the Shell tab): the dialog is for one host, so it has no Who tab, no Rerun and no recurring switch.
+function hmQuickUi(host) {
+  hm.quick = host || null;
+  const q = !!host;
+  $('hmTitle').textContent = q ? `Quick hunt · ${host.hostname || host.name}` : 'New hunt';
+  hmEl('TabWho').hidden = q; hmEl('Rerun').hidden = q;
+  hmEl('TabColl').querySelector('.hnum').textContent = q ? '1' : '2';
+  hmEl('TabName').querySelector('.hnum').textContent = q ? '2' : '3';
+  hmEl('Recurring').closest('.sw-row').hidden = q;
+  hmEl('Run').textContent = q ? 'Run Quick Hunt' : 'Run Hunt';
+}
+async function openHuntModal(quickHost) {
   hm.selC.clear(); hm.selH.clear(); hm.selL.clear(); hm.q = ''; hm.type = 'powershell';
+  hmQuickUi(quickHost);
+  if (quickHost) { hm.selH.add(quickHost.id); hm.type = quickHost.protocol === 'ssh' ? 'bash' : 'powershell'; } // open on the host's own kind of collections
   hm.shown = null; hmEl('Detail').innerHTML = '<p class="dim">Click a collection to see what it does.</p>';
-  hmEl('Name').value = ''; hmEl('Search').value = ''; hmEl('Msg').textContent = '';
+  hmEl('Name').value = quickHost ? (quickHost.hostname || quickHost.name) : ''; hmEl('Search').value = ''; hmEl('Msg').textContent = '';
   hmEl('Msg').className = ''; hmSetRecurring(false);
-  hmTab('who');
+  hmTab(quickHost ? 'coll' : 'who');
   $('huntModal').hidden = false;
   try {
     [hm.collections, hm.hosts, hm.lists] = await Promise.all([api('GET', '/api/collections'), api('GET', '/api/hosts'), api('GET', '/api/lists')]);
@@ -1260,7 +1289,7 @@ async function openHuntModal() {
   hmRenderCollections(); hmRenderTargets(); hmSummary();
 }
 const closeHuntModal = () => { $('huntModal').hidden = true; };
-$('bhNew').onclick = openHuntModal;
+$('bhNew').onclick = () => openHuntModal();
 $('hmCancel').onclick = closeHuntModal;
 $('hmClose').onclick = closeHuntModal;
 $('huntModal').onclick = (e) => { if (e.target.id === 'huntModal') closeHuntModal(); };
@@ -1270,12 +1299,15 @@ $('hmToggle').onclick = (e) => { if (e.target.dataset.type) { hm.type = e.target
 recInit('hm');
 hmEl('Recurring').onclick = () => hmSetRecurring(!hm.recurring);
 $('hmCollections').onclick = (e) => {
-  const row = e.target.closest('[data-view]');
-  if (row && !e.target.matches('input')) hmShow(row.dataset.view);
+  const row = e.target.closest('[data-view]'); if (!row) return;
+  const id = row.dataset.view, c = hm.collections.find((x) => x.id === id); if (!c) return;
+  if (c.missingDependencies.length) { showMissingBinary(c); return; }
+  if (hm.selC.has(id)) hm.selC.delete(id); else hm.selC.add(id); // a click adds it to the hunt, another takes it out
+  hmSummary(); hmShow(id);
 };
 hmEl('Search').oninput = () => { hm.q = hmEl('Search').value.trim(); hmRenderCollections(); };
 $('huntModal').onchange = (e) => {
-  const d = e.target.dataset, set = d.c ? [hm.selC, d.c] : d.h ? [hm.selH, d.h] : d.l ? [hm.selL, d.l] : null;
+  const d = e.target.dataset, set = d.h ? [hm.selH, d.h] : d.l ? [hm.selL, d.l] : null;
   if (!set) return;
   if (e.target.checked) set[0].add(set[1]); else set[0].delete(set[1]);
   hmSummary();
@@ -1325,7 +1357,7 @@ hmEl('Run').onclick = async () => {
   hmEl('Run').disabled = true;
   try {
     const run = await api('POST', '/api/hunts', {
-      name: hmEl('Name').value.trim(), collectionIds: [...hm.selC], hostIds: [...hm.selH], listIds: [...hm.selL], schedule: rec?.schedule,
+      name: hmEl('Name').value.trim(), collectionIds: [...hm.selC], hostIds: [...hm.selH], listIds: [...hm.selL], schedule: rec?.schedule, quick: !!hm.quick,
     });
     closeHuntModal();
     toast(`Hunt "${run.name}" started${rec ? ` and scheduled: ${rec.text.replace(/^Runs now, then /, '')}` : `. Results go to ${run.outputPath}`}`);
@@ -1880,7 +1912,7 @@ function renderShellMain() {
   if (sh) { sh.fit.fit(); sh.term.focus(); }
   updateShellButton();
 }
-// The row of buttons next to the status. Send file and Pull file work; the quick hunt and response ones are not built yet.
+// The row of buttons next to the status. Quick hunt and Quick response open the New Hunt / New Response dialog for this one host.
 $('shellHead').onclick = (e) => {
   const act = e.target.dataset.shellAct; if (!act) return;
   if (act === 'Send file') {
@@ -1890,8 +1922,9 @@ $('shellHead').onclick = (e) => {
     return;
   }
   if (act === 'Pull file') { openPull(); return; }
-  const h = hostOf(shellHost);
-  toast(`${act} for ${h ? h.hostname || h.name : 'this host'} isn't built yet`, 'bad');
+  const h = hostOf(shellHost); if (!h) return;
+  if (act === 'Quick hunt') openHuntModal(h);
+  else if (act === 'Quick response') window.openRespModal?.(h); // respond.js
 };
 let shellCfg = null; // the limits from Shell Settings (on/off, allowed hosts, maximum and timeout)
 const shellDenied = (hostId) => !!(shellCfg && (!shellCfg.enabled || (shellCfg.allowedHosts && !shellCfg.allowedHosts.includes(hostId))));

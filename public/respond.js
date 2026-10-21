@@ -55,7 +55,7 @@ $('brDetail').onclick = (e) => {
 
 // ---- New response dialog ----
 // Who (groups and hosts) / Actions (the View Actions list, detail on the right) / Name (parameters, name, recurring switch).
-const rm = { actions: [], hosts: [], lists: [], selA: new Set(), selH: new Set(), selL: new Set(), q: '', type: 'powershell', shown: null, recurring: false, params: {} };
+const rm = { actions: [], hosts: [], lists: [], selA: new Set(), selH: new Set(), selL: new Set(), q: '', type: 'powershell', shown: null, recurring: false, params: {}, quick: null };
 const rmEl = (s) => $('rm' + s);
 function rmCount() {
   const ids = new Set(rm.selH);
@@ -72,8 +72,7 @@ function rmRenderActions() {
   const q = rm.q.toLowerCase(), inType = rm.actions.filter((c) => c.type === rm.type);
   const shown = inType.filter((c) => !q || [c.name, c.file, c.description, ...c.tags].some((s) => String(s).toLowerCase().includes(q)));
   document.querySelectorAll('#rmToggle button').forEach((b) => b.classList.toggle('on', b.dataset.type === rm.type));
-  rmEl('Actions').innerHTML = shown.map((c) => `<div class="collection-item ${c.id === rm.shown ? 'on' : ''}" data-view="${esc(c.id)}">
-      <input type="checkbox" data-a="${esc(c.id)}" ${rm.selA.has(c.id) ? 'checked' : ''} aria-label="Include ${esc(c.name)}">
+  rmEl('Actions').innerHTML = shown.map((c) => `<div class="collection-item ${c.id === rm.shown ? 'on' : ''} ${rm.selA.has(c.id) ? 'sel' : ''} ${c.missingDependencies.length ? 'blocked' : ''}" data-view="${esc(c.id)}" ${c.missingDependencies.length ? `aria-disabled="true" title="Required binary missing: ${esc(c.missingDependencies.join(', '))}"` : ''}>
       <div class="ci-main">${c.verified ? VERIFIED : ''}${metaIcons(c)}<div class="hn">${esc(c.name)}</div><div class="hd" title="${esc(c.description)}">${esc(c.description)}</div>
       ${c.tags.length ? `<div class="htags">${c.tags.map((t) => `<span class="htag">${esc(t)}</span>`).join('')}</div>` : ''}</div></div>`).join('')
     || '<p class="dim" style="margin:6px 10px">No actions match.</p>';
@@ -135,12 +134,25 @@ function rmSetRecurring(on) {
   rmEl('RecurringLabel').textContent = `Recurring response: ${on ? 'On' : 'Off'}`;
   recToggle('rm', on);
 }
-async function openRespModal() {
+// Quick mode (from the Shell tab): the dialog is for one host, so it has no Who tab, no Rerun and no recurring switch.
+function rmQuickUi(host) {
+  rm.quick = host || null;
+  const q = !!host;
+  $('rmTitle').textContent = q ? `Quick response · ${host.hostname || host.name}` : 'New response';
+  rmEl('TabWho').hidden = q; rmEl('Rerun').hidden = q;
+  rmEl('TabAct').querySelector('.hnum').textContent = q ? '1' : '2';
+  rmEl('TabName').querySelector('.hnum').textContent = q ? '2' : '3';
+  rmEl('Recurring').closest('.sw-row').hidden = q;
+  rmEl('Run').textContent = q ? 'Run Quick Response' : 'Run Response';
+}
+async function openRespModal(quickHost) {
   rm.selA.clear(); rm.selH.clear(); rm.selL.clear(); rm.q = ''; rm.type = 'powershell'; rm.params = {};
+  rmQuickUi(quickHost);
+  if (quickHost) { rm.selH.add(quickHost.id); rm.type = quickHost.protocol === 'ssh' ? 'bash' : 'powershell'; } // open on the host's own kind of actions
   rm.shown = null; rmEl('Detail').innerHTML = '<p class="dim">Click an action to see what it does.</p>';
-  rmEl('Name').value = ''; rmEl('Search').value = ''; rmEl('Msg').textContent = '';
+  rmEl('Name').value = quickHost ? (quickHost.hostname || quickHost.name) : ''; rmEl('Search').value = ''; rmEl('Msg').textContent = '';
   rmEl('Msg').className = ''; rmSetRecurring(false);
-  rmTab('who');
+  rmTab(quickHost ? 'act' : 'who');
   $('respModal').hidden = false;
   try {
     [rm.actions, rm.hosts, rm.lists] = await Promise.all([api('GET', '/api/actions'), api('GET', '/api/hosts'), api('GET', '/api/lists')]);
@@ -148,7 +160,7 @@ async function openRespModal() {
   rmRenderActions(); rmRenderTargets(); rmSummary();
 }
 const closeRespModal = () => { $('respModal').hidden = true; };
-$('brNew').onclick = openRespModal;
+$('brNew').onclick = () => openRespModal();
 $('rmCancel').onclick = closeRespModal;
 $('rmClose').onclick = closeRespModal;
 $('respModal').onclick = (e) => { if (e.target.id === 'respModal') closeRespModal(); };
@@ -158,14 +170,17 @@ $('rmToggle').onclick = (e) => { if (e.target.dataset.type) { rm.type = e.target
 recInit('rm');
 rmEl('Recurring').onclick = () => rmSetRecurring(!rm.recurring);
 $('rmActions').onclick = (e) => {
-  const row = e.target.closest('[data-view]');
-  if (row && !e.target.matches('input')) rmShow(row.dataset.view);
+  const row = e.target.closest('[data-view]'); if (!row) return;
+  const id = row.dataset.view, a = rm.actions.find((x) => x.id === id); if (!a) return;
+  if (a.missingDependencies.length) { showMissingBinary(a); return; }
+  if (rm.selA.has(id)) rm.selA.delete(id); else rm.selA.add(id); // a click adds it to the response, another takes it out
+  rmSummary(); rmShow(id);
 };
 rmEl('Search').oninput = () => { rm.q = rmEl('Search').value.trim(); rmRenderActions(); };
 $('respModal').onchange = (e) => {
   const d = e.target.dataset;
   if (d.pa) { (rm.params[d.pa] ||= {})[d.pp] = e.target.value; return; }
-  const set = d.a ? [rm.selA, d.a] : d.h ? [rm.selH, d.h] : d.l ? [rm.selL, d.l] : null;
+  const set = d.h ? [rm.selH, d.h] : d.l ? [rm.selL, d.l] : null;
   if (!set) return;
   if (e.target.checked) set[0].add(set[1]); else set[0].delete(set[1]);
   rmSummary();
@@ -230,7 +245,7 @@ rmEl('Run').onclick = async () => {
   rmEl('Run').disabled = true;
   try {
     const run = await api('POST', '/api/responses', {
-      name: rmEl('Name').value.trim(), actionIds: [...rm.selA], hostIds: [...rm.selH], listIds: [...rm.selL], params, schedule: rec?.schedule,
+      name: rmEl('Name').value.trim(), actionIds: [...rm.selA], hostIds: [...rm.selH], listIds: [...rm.selL], params, schedule: rec?.schedule, quick: !!rm.quick,
     });
     closeRespModal();
     toast(`Response "${run.name}" started${rec ? ` and scheduled: ${rec.text.replace(/^Runs now, then /, '')}` : `. Output goes to ${run.outputPath}`}`);

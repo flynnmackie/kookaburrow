@@ -562,8 +562,9 @@ app.post('/api/hunts', wrap((req, res) => {
   }
   const hosts = [...new Set(hostIds)].map((hid) => db.hosts.find((h) => h.id === hid)).filter(Boolean);
   const collectionIds = Array.isArray(b.collectionIds) ? b.collectionIds : [];
+  if (b.quick && (b.schedule || (b.listIds || []).length || hosts.length !== 1)) throw new Error('A quick hunt runs once, on exactly one host');
   const sched = b.schedule ? scheduler.prepare({ kind: 'hunt', name: b.name, hostIds: Array.isArray(b.hostIds) ? b.hostIds : [], listIds: Array.isArray(b.listIds) ? b.listIds : [], itemIds: collectionIds, schedule: b.schedule, createdBy: req.user }) : null;
-  const run = huntRunner.startHunt({ name: b.name, collectionIds, hosts, startedBy: req.user, scheduleId: sched?.id });
+  const run = huntRunner.startHunt({ name: b.name, collectionIds, hosts, startedBy: req.user, scheduleId: sched?.id, quick: !!b.quick });
   if (sched) scheduler.activate(sched, run);
   res.json(run);
 }));
@@ -582,8 +583,9 @@ app.post('/api/responses', wrap((req, res) => {
   }
   const hosts = [...new Set(hostIds)].map((hid) => db.hosts.find((h) => h.id === hid)).filter(Boolean);
   const actionIds = Array.isArray(b.actionIds) ? b.actionIds : [];
+  if (b.quick && (b.schedule || (b.listIds || []).length || hosts.length !== 1)) throw new Error('A quick response runs once, on exactly one host');
   const sched = b.schedule ? scheduler.prepare({ kind: 'response', name: b.name, hostIds: Array.isArray(b.hostIds) ? b.hostIds : [], listIds: Array.isArray(b.listIds) ? b.listIds : [], itemIds: actionIds, params: b.params, schedule: b.schedule, createdBy: req.user }) : null;
-  const run = responseRunner.startResponse({ name: b.name, actionIds, hosts, params: b.params, startedBy: req.user, scheduleId: sched?.id });
+  const run = responseRunner.startResponse({ name: b.name, actionIds, hosts, params: b.params, startedBy: req.user, scheduleId: sched?.id, quick: !!b.quick });
   if (sched) scheduler.activate(sched, run);
   res.json(run);
 }));

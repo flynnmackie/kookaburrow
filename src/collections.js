@@ -18,6 +18,8 @@ const ssh = require('./remote/ssh');
 //   $Footprint = 'none'                FOOTPRINT="none"      none | transient | persistent  (what it leaves on the host)
 //   $Returns = 'records'               RETURNS="records"     records | files | both         (what comes back)
 //   $Type = 'command'                  TYPE="command"        command | artefact | tool      (how it gets the data)
+//   $Transfer = 'none'                 TRANSFER="none"       none | large                   (large: the script writes files to $OutDir / $OUT_DIR, which can be GBs,
+//                                                             and they are pulled back over SMB (Windows hosts) or SFTP (Linux hosts); see src/large-transfer.js)
 // The platform reads them as text and never executes the file to do so. Comments and blank
 // lines may sit between them; the first other line starts the collection itself.
 const COLLECTION_TYPES = [
@@ -35,6 +37,7 @@ const FIELDS = ['name', 'description', 'dependencies', 'tags'];
 const FOOTPRINTS = ['none', 'transient', 'persistent'];
 const RETURNS = ['records', 'files', 'both'];
 const KINDS = ['command', 'artefact', 'tool'];
+const TRANSFERS = ['none', 'large'];
 // Fills in whatever a script does not declare: one with dependencies stages a tool (transient footprint), one that
 // returns only files is an artefact pull, and actions change the host (persistent footprint).
 function describe(fields, dependencies, isAction) {
@@ -42,7 +45,8 @@ function describe(fields, dependencies, isAction) {
   const returns = pick(fields.returns, RETURNS) || 'records';
   const footprint = pick(fields.footprint, FOOTPRINTS) || (isAction ? 'persistent' : dependencies.length ? 'transient' : 'none');
   const kind = pick(fields.type, KINDS) || (dependencies.length ? 'tool' : returns === 'files' ? 'artefact' : 'command');
-  return { footprint, returns, kind };
+  const transfer = pick(fields.transfer, TRANSFERS) || 'none';
+  return { footprint, returns, kind, transfer };
 }
 
 // Reads a quoted string starting at s[i] (the opening quote). Returns [value, indexAfter] or null.
@@ -91,7 +95,7 @@ const rawParams = (fields) => (Array.isArray(fields.parameters) ? fields.paramet
 function parseCollection(text, type, isAction = false) {
   const s = text.replace(/^\uFEFF/, '');
   const ps = type === 'powershell';
-  const re = ps ? /^[ \t]*\$(Name|Description|Dependencies|Tags|Parameters|Footprint|Returns|Type)[ \t]*=[ \t]*/i : /^[ \t]*(NAME|DESCRIPTION|DEPENDENCIES|TAGS|PARAMETERS|FOOTPRINT|RETURNS|TYPE)=/;
+  const re = ps ? /^[ \t]*\$(Name|Description|Dependencies|Tags|Parameters|Footprint|Returns|Type|Transfer)[ \t]*=[ \t]*/i : /^[ \t]*(NAME|DESCRIPTION|DEPENDENCIES|TAGS|PARAMETERS|FOOTPRINT|RETURNS|TYPE|TRANSFER)=/;
   const fields = {};
   let pos = 0, end = 0;
   while (pos < s.length) {
@@ -151,7 +155,7 @@ function listScripts(root, query, tags = [], requiresDeps = false) {
       const collection = {
         id: `${type}/${f}`, type, file: f,
         name: p.name || f.slice(0, -ext.length), description: p.description,
-        dependencies: p.dependencies, footprint: p.footprint, returns: p.returns, kind: p.kind, parameters: p.parameters, optionalParameters: p.optionalParameters, tags: p.tags, warnings: p.warnings,
+        dependencies: p.dependencies, footprint: p.footprint, returns: p.returns, kind: p.kind, transfer: p.transfer, parameters: p.parameters, optionalParameters: p.optionalParameters, tags: p.tags, warnings: p.warnings,
         verified: verified[`${type}/${f}`] === hashText(text),
       };
       if (!wanted.every((t) => collection.tags.includes(t))) continue;
@@ -202,7 +206,8 @@ function resolveBinaries(collection) {
   return { found, missing };
 }
 
-async function executeOnHost(host, collection, { csv = false } = {}) {
+// outDir (large-transfer collections): the folder on the host the script writes its files to, given to it as $OutDir / $OUT_DIR.
+async function executeOnHost(host, collection, { csv = false, outDir = '', timeoutMs } = {}) {
   const started = Date.now();
   let r;
   try {
@@ -210,8 +215,8 @@ async function executeOnHost(host, collection, { csv = false } = {}) {
     if (bins.missing.length) throw new Error(`Missing binaries: ${bins.missing.join(', ')}. Place them in the binaries folder and run again.`);
     if (bins.found.length && host.protocol !== 'winrm') throw new Error('Binary staging over SSH is not implemented yet');
 
-    if (collection.type === 'powershell' && host.protocol === 'winrm') r = await winrm.runScript(host, collection.file, bins.found, { csv });
-    else if (host.protocol === 'ssh') r = await ssh.runScript(host, collection.text, collection.type);
+    if (collection.type === 'powershell' && host.protocol === 'winrm') r = await winrm.runScript(host, collection.file, bins.found, { csv, outDir, timeoutMs });
+    else if (host.protocol === 'ssh') r = await ssh.runScript(host, collection.text, collection.type, { outDir, timeoutMs });
     else throw new Error(`${collection.type} collections cannot run over ${host.protocol}`);
   } catch (e) {
     r = { exitCode: -1, stdout: '', stderr: e.message, truncated: false };

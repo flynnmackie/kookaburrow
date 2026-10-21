@@ -5,6 +5,7 @@ TAGS=(persistence cron)
 FOOTPRINT='none'
 RETURNS='records'
 TYPE='command'
+TRANSFER='none'
 
 # ----------------------------------------------------------------------------
 # COLLECTION TEMPLATE (bash) - copy to collections/bash/<your-collection>.sh

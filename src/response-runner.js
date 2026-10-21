@@ -24,7 +24,7 @@ function withParams(action, values) {
   return `${lines.join(nl)}${nl}${action.text}`;
 }
 
-function startResponse({ name, actionIds, hosts, params, startedBy, scheduleId }) {
+function startResponse({ name, actionIds, hosts, params, startedBy, scheduleId, quick = false }) {
   const chosen = actionIds.map((aid) => {
     const a = collections.resolveAction(aid);
     if (!a) throw new Error(`Unknown action: ${aid}`);
@@ -48,13 +48,13 @@ function startResponse({ name, actionIds, hosts, params, startedBy, scheduleId }
   }
 
   const started = new Date();
-  const folder = createRunFolder('response', respName, started);
+  const folder = createRunFolder('response', respName, started, quick);
   const label = (h) => h.hostname || h.name || h.address;
   const proto = (h) => (h.protocol === 'ssh' ? 'SSH' : 'WinRM');
   const hostBase = (h) => `${folder.base}_${safeName(h.address, 'host')}`;
   const outputs = new Map(); // `${actionId}|${hostId}` -> csv text
   const run = {
-    id: id(), kind: 'response', name: respName, startedBy: startedBy || null, ...(scheduleId ? { scheduleId } : {}),
+    id: id(), kind: 'response', name: respName, startedBy: startedBy || null, ...(scheduleId ? { scheduleId } : {}), ...(quick ? { quick: true } : {}),
     actionIds: chosen.map((a) => a.id), actionNames: chosen.map((a) => a.name),
     collectionIds: [], collectionName: chosen.map((a) => a.name).join(', '),
     parameterNames: Object.fromEntries(chosen.map((a) => [a.id, a.parameters.map((p) => (a.optionalParameters.includes(p) ? `${p}?` : p))])),
@@ -64,7 +64,7 @@ function startResponse({ name, actionIds, hosts, params, startedBy, scheduleId }
   db.runs.unshift(run);
   save();
   const audit = createAudit(run, path.join(folder.abs, `${folder.base}_Log.csv`));
-  audit.log({ kind: 'hunt', action: 'Response started', detail: `${respName}: ${chosen.length} action${chosen.length === 1 ? '' : 's'} (${run.collectionName}) on ${hosts.length} host${hosts.length === 1 ? '' : 's'}${startedBy ? `, started by ${startedBy}` : ''}` });
+  audit.log({ kind: 'hunt', action: quick ? 'Quick response started' : 'Response started', detail: `${respName}: ${chosen.length} action${chosen.length === 1 ? '' : 's'} (${run.collectionName}) on ${hosts.length} host${hosts.length === 1 ? '' : 's'}${startedBy ? `, started by ${startedBy}` : ''}` });
 
   (async () => {
     let next = 0;

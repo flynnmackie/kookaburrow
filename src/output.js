@@ -24,8 +24,9 @@ const stamp = (d) => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate(
 const safeName = (s, fallback = 'x') => String(s ?? '').trim().replace(/[^A-Za-z0-9.-]+/g, '_').replace(/_+/g, '_').replace(/^[_.]+|[_.]+$/g, '').slice(0, 60) || fallback;
 
 // Creates output/<hunts|responses>/<H|R>_<name>_<date>/ (a number is added if that name is already taken) and returns its names.
-function createRunFolder(kind, name, when) {
-  const [letter, group] = GROUPS[kind], date = stamp(when);
+// A quick hunt or response (one host, started from the Shell tab) is named QH_ / QR_ instead and lives in the same folders.
+function createRunFolder(kind, name, when, quick = false) {
+  const [letter0, group] = GROUPS[kind], letter = quick ? `Q${letter0}` : letter0, date = stamp(when);
   fs.mkdirSync(path.join(outputDir, group), { recursive: true });
   const root = `${letter}_${safeName(name, kind)}_${date}`;
   let base = root, n = 2;

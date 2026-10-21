@@ -5,6 +5,7 @@ const { runConcurrency } = require('./config');
 const collections = require('./collections');
 const { createAudit, sha256 } = require('./audit');
 const { safeName, createRunFolder, parseCsv, combine } = require('./output');
+const { runLarge } = require('./large-transfer');
 
 // A hunt runs one or more collections on a set of hosts and writes what comes back under output/hunts/ (the layout is described in
 // src/output.js): a folder per hunt, a folder per host inside it with one CSV per collection, and the hunt's log, All_Hosts CSV and
@@ -17,7 +18,7 @@ const linesToCsv = (text) => ['Output', ...text.replace(/\r\n/g, '\n').replace(/
 // PowerShell output may carry a leading/trailing blank line from Out-String.
 const tidyCsv = (text) => text.replace(/^\s*\r?\n/, '').replace(/\s+$/, '') + '\r\n';
 
-function startHunt({ name, collectionIds, hosts, startedBy, scheduleId }) {
+function startHunt({ name, collectionIds, hosts, startedBy, scheduleId, quick = false }) {
   const chosen = collectionIds.map((cid) => {
     const c = collections.resolveCollection(cid);
     if (!c) throw new Error(`Unknown collection: ${cid}`);
@@ -29,11 +30,11 @@ function startHunt({ name, collectionIds, hosts, startedBy, scheduleId }) {
   if (!huntName) throw new Error('Give the hunt a name');
 
   const started = new Date();
-  const folder = createRunFolder('hunt', huntName, started);
+  const folder = createRunFolder('hunt', huntName, started, quick);
   const label = (h) => h.hostname || h.name || h.address;
 
   const run = {
-    id: id(), kind: 'hunt', name: huntName, startedBy: startedBy || null, ...(scheduleId ? { scheduleId } : {}),
+    id: id(), kind: 'hunt', name: huntName, startedBy: startedBy || null, ...(scheduleId ? { scheduleId } : {}), ...(quick ? { quick: true } : {}),
     collectionIds: chosen.map((c) => c.id), collectionNames: chosen.map((c) => c.name),
     collectionName: chosen.map((c) => c.name).join(', '),
     outputPath: folder.rel, status: 'running', startedAt: started.toISOString(),
@@ -44,7 +45,7 @@ function startHunt({ name, collectionIds, hosts, startedBy, scheduleId }) {
   db.runs.unshift(run);
   save();
   const audit = createAudit(run, path.join(folder.abs, `${folder.base}_Log.csv`));
-  audit.log({ kind: 'hunt', action: 'Hunt started', detail: `${huntName}: ${chosen.length} collection${chosen.length === 1 ? '' : 's'} (${run.collectionName}) on ${hosts.length} host${hosts.length === 1 ? '' : 's'}${startedBy ? `, started by ${startedBy}` : ''}` });
+  audit.log({ kind: 'hunt', action: quick ? 'Quick hunt started' : 'Hunt started', detail: `${huntName}: ${chosen.length} collection${chosen.length === 1 ? '' : 's'} (${run.collectionName}) on ${hosts.length} host${hosts.length === 1 ? '' : 's'}${startedBy ? `, started by ${startedBy}` : ''}` });
   const proto = (h) => (h.protocol === 'ssh' ? 'SSH' : 'WinRM');
   const hostBase = (h) => `${folder.base}_${safeName(h.address, 'host')}`;
 
@@ -62,7 +63,20 @@ function startHunt({ name, collectionIds, hosts, startedBy, scheduleId }) {
           res.status = 'running'; save();
           audit.log({ kind: 'collect', host: host.address, action: 'collection started', artefact: c.name,
             detail: `${c.kind}, footprint ${c.footprint}, returns ${c.returns}${c.dependencies.length ? `; copies ${c.dependencies.join(', ')} to a temporary folder on the host` : ''}` });
-          const out = await collections.executeOnHost(host, c, { csv: true });
+          // A large-transfer collection writes files on the host that are pulled back over SMB (Windows) or SFTP (Linux): <host folder>/raw/<collection>/
+          let rawRel = '';
+          const out = c.transfer === 'large'
+            ? await runLarge(host, c, {
+              csv: true, audit,
+              rawDir: path.join(folder.abs, hostBase(host), 'raw', safeName(path.basename(c.file, path.extname(c.file)), 'collection')),
+              onProgress: (p) => { res.transfer = p; save(); },
+            })
+            : await collections.executeOnHost(host, c, { csv: true });
+          if (c.transfer === 'large') {
+            rawRel = `${hostBase(host)}/raw/${safeName(path.basename(c.file, path.extname(c.file)), 'collection')}`;
+            delete res.transfer;
+            Object.assign(res, { rawPath: rawRel, rawFiles: (out.files || []).filter((f) => f.ok).length, rawBytes: out.transferBytes || 0, transferMethod: out.method, ...(out.warning ? { warning: out.warning } : {}) });
+          }
           const ok = out.exitCode === 0;
           let rows = 0, file = '';
           if (ok) {
@@ -80,7 +94,7 @@ function startHunt({ name, collectionIds, hosts, startedBy, scheduleId }) {
             okRuns++;
             const csv = data.get(`${c.id}|${host.id}`);
             audit.log({ kind: 'collect', host: host.address, action: 'collect', artefact: c.name, size: Buffer.byteLength(csv), receivedHash: sha256(csv),
-              outcome: rows ? 'ok' : 'ok (empty)', detail: `${rows} row${rows === 1 ? '' : 's'} in ${(out.durationMs / 1000).toFixed(1)}s → ${file}` });
+              outcome: rows ? 'ok' : 'ok (empty)', detail: `${rows} row${rows === 1 ? '' : 's'} in ${(out.durationMs / 1000).toFixed(1)}s → ${file}${rawRel ? `; ${res.rawFiles} file${res.rawFiles === 1 ? '' : 's'} (${(res.rawBytes / 1048576).toFixed(1)} MB) pulled over ${out.method} → ${rawRel}` : ''}` });
             if (out.truncated) audit.log({ kind: 'warn', host: host.address, action: 'output truncated', artefact: c.name, outcome: 'warning', detail: 'The output was larger than the size limit and was cut off' });
           } else {
             audit.log({ kind: 'error', host: host.address, action: 'collect', artefact: c.name, outcome: 'error', detail: error });

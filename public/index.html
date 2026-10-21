@@ -246,6 +246,10 @@
   pre.bd-json { max-height:52vh; overflow:auto; margin:0; font-size:11.5px; }
   .page.on > .card.bh-top { flex:2 1 0; } .page.on > .card.bh-detail { flex:3 1 0; }
   /* recurring */
+  .smb-warn { margin:10px 0 0; padding:9px 12px; border:1px solid var(--orange); border-left-width:4px; border-radius:var(--r-s); background:rgba(255,170,60,.08); font-size:13px; line-height:1.5; } .smb-warn[hidden] { display:none; } .smb-warn b { color:var(--orange); } .smb-warn p { margin:4px 0 0; }
+  .smb-note { margin-top:8px; padding:6px 9px; border-left:3px solid var(--orange); background:rgba(255,170,60,.08); font-size:12.5px; }
+  .qtag { display:inline-block; margin-left:6px; padding:0 5px; border:1px solid var(--blue); border-radius:var(--r-s); color:var(--blue); font:700 10.5px var(--f-ui); vertical-align:1px; cursor:help; }
+  .sw-row[hidden], .dlg-tabs button[hidden], .hm-title .act[hidden] { display:none; }
   .rtag { display:inline-block; margin-left:6px; padding:0 5px; border:1px solid var(--ok); border-radius:var(--r-s); color:var(--ok); font:700 10.5px var(--f-ui); vertical-align:1px; cursor:help; }
   .bh-del { text-align:right; white-space:nowrap; } a.dl.bad { color:var(--bad); }
   .rec-box { border:1px solid var(--line); border-radius:var(--r-m); padding:8px 12px; margin:4px 0 8px; } .rec-row { display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin:5px 0; font-size:13px; }
@@ -270,6 +274,8 @@
   .hcoll { display:grid; grid-template-columns:minmax(260px, 2fr) 3fr; gap:10px; flex:1; min-height:0; margin-top:6px; } .hcoll .coll-list { display:flex; flex-direction:column; min-height:0; }
   .hcoll .coll-list .toggle { margin:6px 0 0; } .hcoll .coll-list .pickbox { flex:1; height:auto; min-height:0; }
   .hcoll .coll-detail { min-width:0; }
+  .hcoll .collection-item.sel { background:rgba(140,235,165,.16); box-shadow:inset 3px 0 0 var(--ok); } .hcoll .collection-item.sel:hover { background:rgba(140,235,165,.22); } .hcoll .collection-item.sel.on { box-shadow:inset 3px 0 0 var(--blue); }
+  .hcoll .collection-item.blocked { opacity:.42; filter:grayscale(1); cursor:not-allowed; } .hcoll .collection-item.blocked:hover { background:none; }
   .hcoll .collection-item { display:flex; align-items:flex-start; gap:8px; } .hcoll .collection-item > input { margin-top:3px; flex-shrink:0; } .hcoll .ci-main { flex:1; min-width:0; }
   @media (max-width:760px) { .hcoll { grid-template-columns:1fr; flex:none; } .hcoll .coll-list .pickbox { height:260px; flex:none; } .hcoll .coll-detail { min-height:240px; } }
   .run-layout .act { width:100%; margin-top:6px; }
@@ -1043,6 +1049,7 @@
         <input id="hmName" type="text" placeholder="e.g. Weekly persistence sweep" autocomplete="off">
         <div class="ov-cols"><div><span class="fl" id="hmTargetsHead">Will run against</span><div class="pickbox hm-tlist" id="hmTargets"></div></div>
           <div><span class="fl" id="hmItemsHead">Collections to run</span><div class="pickbox hm-tlist" id="hmItems"></div></div></div>
+        <div class="smb-warn" id="hmSmbWarn" hidden></div>
         <div class="sw-row"><button class="switch" id="hmRecurring" type="button" role="switch" aria-checked="false" aria-label="Recurring hunt"></button><b id="hmRecurringLabel">Recurring hunt: Off</b></div>
         <div class="rec-box" id="hmRecBox" hidden></div>
       </section>

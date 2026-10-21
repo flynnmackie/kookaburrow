@@ -5,6 +5,7 @@ $Tags = @('persistence', 'registry')
 $Footprint = 'none'
 $Returns = 'records'
 $Type = 'command'
+$Transfer = 'none'
 
 # ----------------------------------------------------------------------------
 # COLLECTION TEMPLATE (PowerShell) - copy to collections/powershell/<your-collection>.ps1
@@ -21,6 +22,11 @@ $Type = 'command'
 #                   artefact   collects existing files such as event logs or Prefetch
 #                   tool       deploys a binary from $Dependencies and returns its output
 #     When left out they are worked out: dependencies means tool + transient, otherwise command + none + records.
+#   * $Transfer is optional: 'large' for a collection that leaves big files (a KAPE run, exported logs) for the server to pull back.
+#       The script writes them to $OutDir, a temporary folder on the host. Afterwards Kookaburrow pulls everything in it into the
+#       hunt's raw folder (over SMB for Windows hosts, which is switched on for this hunt only and closed again; over SFTP for Linux),
+#       checks each file's SHA-256 against the host's, then removes the folder. The hunter is warned before the hunt runs.
+#       See event-logs-export.ps1 for a working example. Leave it out or use 'none' for normal collections.
 #   * $Name, $Description, $Dependencies and $Tags must be the first statements in the file.
 #     Comments and blank lines may sit between them; the first other line starts the collection.
 #   * Each value must be a plain literal. The platform reads them as text and never runs
