@@ -24,9 +24,9 @@ const GROUPS = [
     P('actions.run', 'Run actions', 'Run actions on hosts. These change the hosts they run on.', ['actions.view']),
   ] },
   { id: 'hunts', name: 'Hunts and results', permissions: [
-    P('hunts.view', 'View hunts and results', 'See hunts, the activity log, collected data, reports and the evidence files.'),
+    P('hunts.view', 'View hunts and results', 'See hunts, the activity log, collected data, reports and the output files.'),
     P('hunts.run', 'Run hunts', 'Create and run hunts on hosts and delete hunt records.', ['hunts.view']),
-    P('hunts.export', 'Export results', 'Export logs and collected data and download evidence files.', ['hunts.view']),
+    P('hunts.export', 'Export results', 'Export logs and collected data and download output files.', ['hunts.view']),
   ] },
   { id: 'shell', name: 'Shell', permissions: [
     P('shell.open', 'Open shells', 'Open an interactive shell on a host and run commands in it.'),

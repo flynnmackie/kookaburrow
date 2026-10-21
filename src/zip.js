@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 
-// A small zip writer (deflate, no zip64) for downloading a hunt's evidence folder. Symlinks are skipped.
+// A small zip writer (deflate, no zip64) for downloading a hunt's or response's output folder. Symlinks are skipped.
 function walk(dir, prefix, out) {
   for (const name of fs.readdirSync(dir)) {
     const full = path.join(dir, name), st = fs.lstatSync(full);

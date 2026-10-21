@@ -7,7 +7,7 @@ const { StringDecoder } = require('string_decoder');
 const { Client } = require('ssh2');
 const { db, save } = require('./store');
 const { decrypt } = require('./crypto');
-const { evidenceDir } = require('./config');
+const { outputDir } = require('./config');
 
 // Interactive shells for the Shell page. One session per authenticated host:
 //   SSH hosts    a real terminal (pty) through ssh2; keystrokes go straight to the host
@@ -266,7 +266,7 @@ const sha256 = (file) => new Promise((resolve, reject) => {
   fs.createReadStream(file).on('data', (d) => h.update(d)).on('end', () => resolve(h.digest('hex'))).on('error', reject);
 });
 
-// Copies one remote file into evidence/Pulled-Files/<address>/ with its SHA-256, and logs it in pulled-files.csv.
+// Copies one remote file into output/Pulled-Files/<address>/ with its SHA-256, and logs it in pulled-files.csv.
 async function pull(id, remotePath) {
   const s = get(id); s.last = Date.now();
   const remote = String(remotePath || '');
@@ -280,13 +280,13 @@ async function pull(id, remotePath) {
     const when = new Date();
     const base = P(s).basename(remote);
     const dirRel = path.join('Pulled-Files', safeName(s.address));
-    fs.mkdirSync(path.join(evidenceDir, dirRel), { recursive: true });
+    fs.mkdirSync(path.join(outputDir, dirRel), { recursive: true });
     const name = `${stamp(when)}-${safeName(base)}`;
-    await copyOut(tmp, path.join(evidenceDir, dirRel, name));
-    const logFile = path.join(evidenceDir, 'Pulled-Files', 'pulled-files.csv');
+    await copyOut(tmp, path.join(outputDir, dirRel, name));
+    const logFile = path.join(outputDir, 'Pulled-Files', 'pulled-files.csv');
     const head = fs.existsSync(logFile) ? '' : 'Time,Host,Address,RemotePath,File,Bytes,SHA256\r\n';
     fs.appendFileSync(logFile, head + [when.toISOString(), db.hosts.find((h) => h.id === s.hostId)?.hostname || '', s.address, remote, `${dirRel.replace(/\\/g, '/')}/${name}`, st.size, digest].map(csvCell).join(',') + '\r\n');
-    return { name: base, size: st.size, sha256: digest, file: `${dirRel.replace(/\\/g, '/')}/${name}`, folder: `/evidence/${dirRel.replace(/\\/g, '/')}` };
+    return { name: base, size: st.size, sha256: digest, file: `${dirRel.replace(/\\/g, '/')}/${name}`, folder: `/output/${dirRel.replace(/\\/g, '/')}` };
   } finally { fs.promises.unlink(tmp).catch(() => {}); }
 }
 

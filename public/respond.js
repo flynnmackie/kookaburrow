@@ -21,7 +21,7 @@ function renderRespList() {
   $('brList').innerHTML = br.runs.length
     ? `<table class="bh"><thead><tr><th>Response</th><th>Run by</th><th>Status</th><th>Started</th><th>Finished</th><th>Elapsed</th><th></th></tr></thead><tbody>${br.runs.map((r) => `<tr class="bh-row ${r.id === br.sel ? 'on' : ''}" data-id="${esc(r.id)}">
         <td class="bh-name">${esc(huntName(r))}${schedTag(r)}</td><td>${r.startedBy ? esc(r.startedBy) : '<span class="dim">-</span>'}</td><td>${huntStatus(r)}</td>
-        <td class="dim">${esc(new Date(r.startedAt).toLocaleString())}</td><td class="dim">${r.finishedAt ? esc(new Date(r.finishedAt).toLocaleString()) : '-'}</td><td class="dim">${esc(huntElapsed(r))}</td><td class="bh-del"><a class="dl bad" data-del="${esc(r.id)}" data-perm="actions.run" data-perm-what="delete responses" title="Delete this response and its evidence folder">Delete</a></td></tr>`).join('')}</tbody></table>`
+        <td class="dim">${esc(new Date(r.startedAt).toLocaleString())}</td><td class="dim">${r.finishedAt ? esc(new Date(r.finishedAt).toLocaleString()) : '-'}</td><td class="dim">${esc(huntElapsed(r))}</td><td class="bh-del"><a class="dl bad" data-del="${esc(r.id)}" data-perm="actions.run" data-perm-what="delete responses" title="Delete this response and its output folder">Delete</a></td></tr>`).join('')}</tbody></table>`
     : '<p class="dim" style="margin:0">No responses yet. Use New Response to run actions on your hosts.</p>';
 }
 async function showResponse(id) {
@@ -110,8 +110,20 @@ function rmRenderParams() {
 function rmTab(name) {
   document.querySelectorAll('#rmTabs button').forEach((b) => b.classList.toggle('on', b.dataset.pane === name));
   document.querySelectorAll('#respModal .hsec').forEach((p) => { p.hidden = p.dataset.pane !== name; });
-  if (name === 'name') { rmRenderParams(); (rmEl('Params').querySelector('input') || rmEl('Name')).focus(); }
+  rmEl('Run').hidden = name !== 'name'; rmEl('Next').hidden = name === 'name'; // Run Response is only on the last tab
+  if (name === 'name') { rmRenderTargetList(); rmRenderParams(); (rmEl('Params').querySelector('input') || rmEl('Name')).focus(); }
 }
+// The hosts the response will run against: the ticked hosts plus every member of the ticked groups, each once.
+function rmRenderTargetList() {
+  const ids = new Set(rm.selH);
+  for (const l of rm.lists) if (rm.selL.has(l.id)) l.hostIds.forEach((i) => ids.add(i));
+  const list = rm.hosts.filter((h) => ids.has(h.id));
+  rmEl('TargetsHead').textContent = `Will run against ${list.length} host${list.length === 1 ? '' : 's'}`;
+  rmEl('Targets').innerHTML = list.map((h) => `<div class="pick"><span class="pn">${esc(h.name)}</span><span class="pt">${esc(h.address)}</span><span class="proto-${h.protocol === 'ssh' ? 'ssh' : 'winrm'}">${h.protocol === 'ssh' ? 'SSH' : 'WinRM'}</span></div>`).join('')
+    || '<p class="dim" style="margin:6px 10px">No hosts selected yet. Choose them on the Who tab.</p>';
+}
+const RM_ORDER = ['who', 'act', 'name'];
+rmEl('Next').onclick = () => { const cur = document.querySelector('#rmTabs .on')?.dataset.pane; rmTab(RM_ORDER[Math.min(RM_ORDER.indexOf(cur) + 1, RM_ORDER.length - 1)]); };
 function rmSetRecurring(on) {
   rm.recurring = on;
   rmEl('Recurring').setAttribute('aria-checked', on);
@@ -216,7 +228,7 @@ rmEl('Run').onclick = async () => {
       name: rmEl('Name').value.trim(), actionIds: [...rm.selA], hostIds: [...rm.selH], listIds: [...rm.selL], params, schedule: rec?.schedule,
     });
     closeRespModal();
-    toast(`Response "${run.name}" started${rec ? ` and scheduled: ${rec.text.replace(/^Runs now, then /, '')}` : `. Output goes to ${run.evidenceDir}`}`);
+    toast(`Response "${run.name}" started${rec ? ` and scheduled: ${rec.text.replace(/^Runs now, then /, '')}` : `. Output goes to ${run.outputPath}`}`);
     br.sel = run.id;
     await loadRespond();
     showResponse(run.id);

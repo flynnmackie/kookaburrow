@@ -1,6 +1,8 @@
 const express = require('express');
 const config = require('./src/config');
 const { db, save, id } = require('./src/store');
+require('./src/migrate-output')(); // evidence/ from before the output/ layout becomes output/hunts and output/responses
+const outputs = require('./src/output');
 const { encrypt } = require('./src/crypto');
 const scanner = require('./src/scanner');
 const winrm = require('./src/remote/winrm');
@@ -300,19 +302,41 @@ app.post('/api/runs', wrap((req, res) => {
 app.get('/api/runs', (req, res) => res.json(db.runs.map(({ events, ...r }) => ({
   ...r, eventCount: audit.eventsFor({ events, ...r }).length, results: r.results.map(({ stdout, stderr, ...meta }) => meta),
 }))));
-// The data a hunt collected, as JSON: the contents of its All-Hosts CSVs as records (the hunt's own hunt.json, so what is
-// shown here is what is in the evidence folder). Runs that have no hunt.json (older runs) fall back to the stored run.
+// The data a hunt collected, as JSON: the hunt's own <name>_All_Hosts.json (so what is shown here is what is in its output folder).
+// Older runs keep the layout they were made with (All-Hosts/hunt.json); a run with no file falls back to the stored run.
+const jsonFileOf = (r) => {
+  const dir = outputs.runDir(r), fs = require('fs'), path = require('path');
+  if (!dir || !fs.existsSync(dir)) return null;
+  const top = fs.readdirSync(dir).find((n) => /_All_Hosts\.json$/.test(n));
+  if (top) return path.join(dir, top);
+  const old = ['All-Hosts/hunt.json', 'response.json'].map((p) => path.join(dir, p)).find((p) => fs.existsSync(p));
+  return old || null;
+};
 app.get('/api/runs/:id/data', (req, res) => {
   const r = db.runs.find((x) => x.id === req.params.id);
   if (!r) return res.status(404).json({ error: 'Not found' });
-  if (!r.evidenceDir) return res.json(r);
-  const file = require('path').join(config.evidenceDir, r.evidenceDir, 'All-Hosts', 'hunt.json');
-  if (!require('fs').existsSync(file)) {
-    return res.json(r.status === 'running' ? { status: 'running', message: 'This hunt is still running. Its data appears here when it finishes.' } : r);
-  }
+  const file = jsonFileOf(r);
+  if (!file) return res.json(r.status === 'running' ? { status: 'running', message: 'This is still running. Its data appears here when it finishes.' } : r);
   res.type('application/json').send(require('fs').readFileSync(file, 'utf8'));
 });
-// The activity log of one hunt (see src/audit.js), as JSON for Output > Log or as a CSV download.
+// Every file in a run's output folder (the log, All_Hosts files, one folder per host and anything in its raw folder), for the Files tab.
+const filesOf = (r) => {
+  const fs = require('fs'), path = require('path'), out = [], root = outputs.runDir(r);
+  const walk = (dir, rel) => {
+    for (const e of fs.existsSync(dir) ? fs.readdirSync(dir, { withFileTypes: true }) : []) {
+      if (e.isSymbolicLink()) continue;
+      if (e.isDirectory()) walk(path.join(dir, e.name), rel ? `${rel}/${e.name}` : e.name);
+      else out.push({ folder: rel, name: e.name, size: fs.statSync(path.join(dir, e.name)).size, path: `/output/${r.outputPath}${rel ? `/${rel}` : ''}/${e.name}` });
+    }
+  };
+  if (root) walk(root, '');
+  return out;
+};
+app.get('/api/runs/:id/files', (req, res) => {
+  const r = db.runs.find((x) => x.id === req.params.id);
+  r ? res.json(filesOf(r)) : res.status(404).json({ error: 'Not found' });
+});
+// The activity log of one hunt (see src/audit.js), as JSON for Results > Log or as a CSV download.
 app.get('/api/runs/:id/events', (req, res) => {
   const r = db.runs.find((x) => x.id === req.params.id);
   r ? res.json(audit.eventsFor(r)) : res.status(404).json({ error: 'Not found' });
@@ -323,29 +347,29 @@ app.get('/api/runs/:id/log.csv', (req, res) => {
   res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="${String(r.name || r.collectionName || 'hunt').replace(/[^A-Za-z0-9_-]+/g, '-')}-log.csv"` });
   res.send(audit.toCsv(audit.eventsFor(r)));
 });
-// The hunt's whole evidence folder (all hosts, All-Hosts and the log) as one zip.
+// The run's whole output folder (every host, the All_Hosts files and the log) as one zip.
 app.get('/api/runs/:id/download', (req, res) => {
   const r = db.runs.find((x) => x.id === req.params.id);
-  const dir = r?.evidenceDir && require('path').join(config.evidenceDir, r.evidenceDir);
-  if (!dir || !require('fs').existsSync(dir)) return res.status(404).json({ error: 'This hunt has no evidence folder' });
-  res.set({ 'Content-Type': 'application/zip', 'Content-Disposition': `attachment; filename="${r.evidenceDir.replace(/[^w. -]/g, '_')}.zip"` });
-  res.send(require('./src/zip').zipFolder(dir, r.evidenceDir));
+  const dir = r && outputs.runDir(r);
+  if (!dir || !require('fs').existsSync(dir)) return res.status(404).json({ error: 'This run has no output folder' });
+  const name = require('path').basename(dir);
+  res.set({ 'Content-Type': 'application/zip', 'Content-Disposition': `attachment; filename="${name}.zip"` });
+  res.send(require('./src/zip').zipFolder(dir, name));
 });
 app.get('/api/runs/:id', (req, res) => {
   const r = db.runs.find((x) => x.id === req.params.id);
   r ? res.json(r) : res.status(404).json({ error: 'Not found' });
 });
-// Deletes a run's folder under evidence/ (only ever a folder directly inside it).
-function removeEvidence(r) {
-  if (!r.evidenceDir || /[\\/]/.test(r.evidenceDir)) return;
-  const path = require('path'), base = path.resolve(config.evidenceDir), dir = path.resolve(base, r.evidenceDir);
-  if (dir.startsWith(base + path.sep)) require('fs').rmSync(dir, { recursive: true, force: true });
+// Deletes a run's output folder (only ever one folder directly inside output/hunts or output/responses).
+function removeOutput(r) {
+  const dir = outputs.runDir(r);
+  if (dir) require('fs').rmSync(dir, { recursive: true, force: true });
 }
-// ?evidence=1 also deletes the evidence folder (Burrow's delete buttons); the Log page's Delete keeps the folder.
+// ?output=1 also deletes the output folder (Burrow's delete buttons); the Log page's Delete keeps the folder.
 app.delete('/api/runs/:id', wrap((req, res) => {
   const r = db.runs.find((x) => x.id === req.params.id);
   if (r && r.status === 'running') throw new Error('It is still running. Wait for it to finish.');
-  if (r && req.query.evidence === '1') removeEvidence(r);
+  if (r && req.query.output === '1') removeOutput(r);
   db.runs = db.runs.filter((x) => x.id !== req.params.id);
   save();
   res.json({ ok: true });
@@ -496,7 +520,7 @@ app.get('/api/about', (req, res) => {
   });
 });
 
-// ---- Hunts: run collections on hosts/groups and collect the data as CSV under evidence/ ----------
+// ---- Hunts: run collections on hosts/groups and collect the data as CSV under output/hunts/ ----------
 // body: { name, collectionIds: [], hostIds?: [], listIds?: [] }
 app.post('/api/hunts', wrap((req, res) => {
   const b = req.body;
@@ -514,7 +538,7 @@ app.post('/api/hunts', wrap((req, res) => {
   res.json(run);
 }));
 
-// ---- Responses: run actions (scripts that change a host) on hosts/groups; output is kept under evidence/ ----
+// ---- Responses: run actions (scripts that change a host) on hosts/groups; output is kept under output/responses/ ----
 // body: { name, actionIds: [], hostIds?: [], listIds?: [], params?: { [actionId]: { [parameter]: value } } }
 const responseRunner = require('./src/response-runner');
 const scheduler = require('./src/scheduler');
@@ -537,7 +561,7 @@ app.delete('/api/responses/:id', wrap((req, res) => {
   const r = db.runs.find((x) => x.id === req.params.id && x.kind === 'response');
   if (!r) throw new Error('Not found');
   if (r.status === 'running') throw new Error('It is still running. Wait for it to finish.');
-  removeEvidence(r);
+  removeOutput(r);
   db.runs = db.runs.filter((x) => x.id !== r.id);
   save();
   res.json({ ok: true });
@@ -560,28 +584,17 @@ app.get('/api/responses/:id/events', (req, res) => {
   const r = db.runs.find((x) => x.id === req.params.id && x.kind === 'response');
   r ? res.json(audit.eventsFor(r)) : res.status(404).json({ error: 'Not found' });
 });
-// The response's own JSON file (response.json) for the Notebook tab.
+// The response's own JSON file (<name>_All_Hosts.json) for the Notebook tab, and every file in its output folder for the Files tab.
 app.get('/api/responses/:id/data', (req, res) => {
   const r = db.runs.find((x) => x.id === req.params.id && x.kind === 'response');
   if (!r) return res.status(404).json({ error: 'Not found' });
-  const fs = require('fs'), path = require('path'), file = path.join(config.evidenceDir, r.evidenceDir || '', 'response.json');
-  if (!r.evidenceDir || /[\\/]/.test(r.evidenceDir) || !fs.existsSync(file)) return res.json(r.status === 'running' ? { status: 'running', message: 'This response is still running. Its data appears here when it finishes.' } : { message: 'No response.json was saved for this response.' });
-  res.type('application/json').send(fs.readFileSync(file, 'utf8'));
+  const file = jsonFileOf(r);
+  if (!file) return res.json(r.status === 'running' ? { status: 'running', message: 'This response is still running. Its data appears here when it finishes.' } : { message: 'No JSON file was saved for this response.' });
+  res.type('application/json').send(require('fs').readFileSync(file, 'utf8'));
 });
-// Every file in the response's evidence folder (the log, response.json, one folder per host).
 app.get('/api/responses/:id/files', (req, res) => {
   const r = db.runs.find((x) => x.id === req.params.id && x.kind === 'response');
-  if (!r) return res.status(404).json({ error: 'Not found' });
-  const fs = require('fs'), path = require('path'), out = [];
-  const walk = (dir, rel) => {
-    for (const e of fs.existsSync(dir) ? fs.readdirSync(dir, { withFileTypes: true }) : []) {
-      if (e.isSymbolicLink()) continue;
-      if (e.isDirectory()) walk(path.join(dir, e.name), rel ? `${rel}/${e.name}` : e.name);
-      else out.push({ folder: rel, name: e.name, size: fs.statSync(path.join(dir, e.name)).size, path: `/evidence/${r.evidenceDir}${rel ? `/${rel}` : ''}/${e.name}` });
-    }
-  };
-  if (r.evidenceDir) walk(path.join(config.evidenceDir, r.evidenceDir), '');
-  res.json(out);
+  r ? res.json(filesOf(r)) : res.status(404).json({ error: 'Not found' });
 });
 
 // ---- Shell: interactive sessions on authenticated hosts (output streams out by SSE, input comes in by POST) ----
@@ -594,7 +607,7 @@ app.post('/api/shell', shellWrap((req, res) => res.json(shell.create(String(req.
 app.get('/api/shell/:id/stream', shellWrap((req, res) => shell.stream(req.params.id, res)));
 app.post('/api/shell/:id/input', shellWrap((req, res) => { shell.write(req.params.id, req.body.data); res.json({ ok: true }); }));
 app.post('/api/shell/:id/resize', shellWrap((req, res) => { shell.resize(req.params.id, Number(req.body.cols), Number(req.body.rows)); res.json({ ok: true }); }));
-// Files: list a folder on the host, pull a file into evidence/Pulled-Files, or send an uploaded file to the shell's current folder
+// Files: list a folder on the host, pull a file into output/Pulled-Files, or send an uploaded file to the shell's current folder
 app.post('/api/shell/:id/ls', wrap(async (req, res) => res.json(await shell.list(req.params.id, req.body.path))));
 app.post('/api/shell/:id/pull', wrap(async (req, res) => res.json(await shell.pull(req.params.id, req.body.path))));
 app.put('/api/shell/:id/send', wrap(async (req, res) => {
@@ -613,7 +626,7 @@ app.put('/api/shell/:id/send', wrap(async (req, res) => {
 }));
 app.delete('/api/shell/:id', shellWrap((req, res) => { shell.close(req.params.id); res.json({ ok: true }); }));
 
-// ---- Browse: read-only view of collections, actions, binaries and collected evidence --------
+// ---- Browse: read-only view of collections, actions, binaries and what hunts and responses brought back --------
 const browseWrap = (fn) => (req, res) => {
   try { fn(req, res); } catch (e) { res.status(e.status || 400).json({ error: firstLine(e.message) }); }
 };

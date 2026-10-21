@@ -2,16 +2,14 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { db, save, id } = require('./store');
-const { evidenceDir, runConcurrency } = require('./config');
+const { runConcurrency } = require('./config');
 const collections = require('./collections');
 const { createAudit, sha256 } = require('./audit');
-const { createHuntFolder } = require('./hunt-runner');
+const { safeName, createRunFolder, streamsToCsv, combine } = require('./output');
 
-// A response runs one or more actions (scripts that CHANGE a host) on a set of hosts. It mirrors a hunt:
-//   evidence/YYYYMMDD-HHMMSS-<name>/
-//     <ip address>/<action>.txt     what the action printed on that host
-//     response-log.csv              the activity log (every step, timestamped)
-//     response.json                 the response's details: hosts, actions and how each one went
+// A response runs one or more actions (scripts that CHANGE a host) on a set of hosts. It mirrors a hunt, under output/responses/ (the
+// layout is described in src/output.js): a folder per response, a folder per host with one CSV per action (what the action printed,
+// one row per line, with a Stream column), and the response's log, All_Hosts CSV and All_Hosts JSON at the top level.
 // It is kept in db.runs with kind 'response' so Burrow > Respond lists it. Parameter VALUES are used to run the action but are
 // never stored or logged (they can be passwords); only the parameter names are recorded.
 const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -50,20 +48,22 @@ function startResponse({ name, actionIds, hosts, params, startedBy, scheduleId }
   }
 
   const started = new Date();
-  const folder = createHuntFolder(respName, started);
+  const folder = createRunFolder('response', respName, started);
   const label = (h) => h.hostname || h.name || h.address;
   const proto = (h) => (h.protocol === 'ssh' ? 'SSH' : 'WinRM');
+  const hostBase = (h) => `${folder.base}_${safeName(h.address, 'host')}`;
+  const outputs = new Map(); // `${actionId}|${hostId}` -> csv text
   const run = {
     id: id(), kind: 'response', name: respName, startedBy: startedBy || null, ...(scheduleId ? { scheduleId } : {}),
     actionIds: chosen.map((a) => a.id), actionNames: chosen.map((a) => a.name),
     collectionIds: [], collectionName: chosen.map((a) => a.name).join(', '),
     parameterNames: Object.fromEntries(chosen.map((a) => [a.id, a.parameters.map((p) => (a.optionalParameters.includes(p) ? `${p}?` : p))])),
-    evidenceDir: folder, status: 'running', startedAt: started.toISOString(),
+    outputPath: folder.rel, status: 'running', startedAt: started.toISOString(),
     results: hosts.flatMap((h) => chosen.map((a) => ({ hostId: h.id, hostLabel: label(h), address: h.address, actionId: a.id, actionName: a.name, status: 'queued' }))),
   };
   db.runs.unshift(run);
   save();
-  const audit = createAudit(run, path.join(evidenceDir, folder, 'response-log.csv'));
+  const audit = createAudit(run, path.join(folder.abs, `${folder.base}_Log.csv`));
   audit.log({ kind: 'hunt', action: 'Response started', detail: `${respName}: ${chosen.length} action${chosen.length === 1 ? '' : 's'} (${run.collectionName}) on ${hosts.length} host${hosts.length === 1 ? '' : 's'}${startedBy ? `, started by ${startedBy}` : ''}` });
 
   (async () => {
@@ -86,11 +86,12 @@ function startResponse({ name, actionIds, hosts, params, startedBy, scheduleId }
             out = await collections.executeOnHost(host, { ...a, file: tmp, text: full }, { csv: false });
           } finally { fs.promises.unlink(tmp).catch(() => {}); }
           const ok = out.exitCode === 0;
-          const dir = path.join(evidenceDir, folder, String(host.address || 'host').replace(/[^A-Za-z0-9._-]+/g, '-'));
+          const dir = path.join(folder.abs, hostBase(host));
           fs.mkdirSync(dir, { recursive: true });
-          const base = `${path.basename(a.file, path.extname(a.file))}.txt`, file = `${path.basename(dir)}/${base}`;
-          const text = `${out.stdout || ''}${out.stderr ? `${out.stdout ? '\n' : ''}[stderr]\n${out.stderr}` : ''}`;
+          const base = `${safeName(path.basename(a.file, path.extname(a.file)), 'action')}_${folder.date}_${safeName(host.address, 'host')}.csv`, file = `${hostBase(host)}/${base}`;
+          const text = streamsToCsv(out.stdout, out.stderr);
           fs.writeFileSync(path.join(dir, base), text);
+          outputs.set(`${a.id}|${host.id}`, text);
           const error = ok ? '' : String(out.stderr || out.stdout || 'Failed').trim().split(/\r?\n/)[0].slice(0, 300);
           if (ok) {
             okRuns++;
@@ -109,16 +110,25 @@ function startResponse({ name, actionIds, hosts, params, startedBy, scheduleId }
     }));
     run.status = run.results.some((r) => r.status === 'error') ? 'completed_with_errors' : 'completed';
     run.finishedAt = new Date().toISOString();
+    // The All_Hosts CSV (every action on every host in one file) and JSON, at the top level of the response's folder
+    const allBase = `${folder.base}_All_Hosts`;
+    const partsOf = (a) => hosts.filter((h) => outputs.has(`${a.id}|${h.id}`)).map((h) => ({ item: a.name, address: h.address, csv: outputs.get(`${a.id}|${h.id}`) }));
+    const everything = combine(chosen.flatMap(partsOf), { itemLabel: 'Action', withItem: true });
+    if (chosen.some((a) => partsOf(a).length)) {
+      fs.writeFileSync(path.join(folder.abs, `${allBase}.csv`), everything.csv);
+      audit.log({ kind: 'evidence', host: 'All hosts', action: 'output written', artefact: 'All_Hosts.csv', size: Buffer.byteLength(everything.csv), receivedHash: sha256(everything.csv), detail: `${everything.rows} row${everything.rows === 1 ? '' : 's'} → ${allBase}.csv` });
+    }
     const json = JSON.stringify({
-      name: respName, startedBy: startedBy || null, folder, status: run.status, startedAt: run.startedAt, finishedAt: run.finishedAt,
+      name: respName, startedBy: startedBy || null, folder: folder.base, status: run.status, startedAt: run.startedAt, finishedAt: run.finishedAt,
       hosts: hosts.map((h) => ({ hostname: label(h), address: h.address, os: h.os || null, protocol: h.protocol })),
       actions: chosen.map((a) => ({ id: a.id, name: a.name, description: a.description, type: a.type, parameters: a.parameters,
+        output: (partsOf(a).length ? combine(partsOf(a)).records : []), // what the action printed on each host, one object per line, with TargetIP
         hosts: run.results.filter((r) => r.actionId === a.id).map((r) => ({ hostname: r.hostLabel, address: r.address, status: r.status, file: r.file || null, durationMs: r.durationMs ?? null, error: r.error || null })) })),
     }, null, 2) + '\n';
-    fs.writeFileSync(path.join(evidenceDir, folder, 'response.json'), json);
-    audit.log({ kind: 'evidence', host: 'All hosts', action: 'evidence written', artefact: 'response.json', size: Buffer.byteLength(json), receivedHash: sha256(json), detail: 'response.json' });
+    fs.writeFileSync(path.join(folder.abs, `${allBase}.json`), json);
+    audit.log({ kind: 'evidence', host: 'All hosts', action: 'output written', artefact: 'All_Hosts.json', size: Buffer.byteLength(json), receivedHash: sha256(json), detail: `${allBase}.json` });
     const okAll = run.results.filter((r) => r.status === 'ok').length;
-    audit.log({ kind: 'hunt', action: run.status === 'completed' ? 'Response complete' : 'Response completed with errors', outcome: run.status === 'completed' ? 'ok' : 'errors', detail: `${okAll} of ${run.results.length} action runs ok; output saved to evidence/${folder}` });
+    audit.log({ kind: 'hunt', action: run.status === 'completed' ? 'Response complete' : 'Response completed with errors', outcome: run.status === 'completed' ? 'ok' : 'errors', detail: `${okAll} of ${run.results.length} action runs ok; output saved to output/${folder.rel}` });
     save();
   })().catch((e) => {
     run.status = 'failed'; run.error = e.message; run.finishedAt = new Date().toISOString();

@@ -1,15 +1,15 @@
 const fs = require('fs');
 const path = require('path');
-const { collectionsDir, actionsDir, binariesDir, evidenceDir } = require('./config');
+const { collectionsDir, actionsDir, binariesDir, outputDir } = require('./config');
 
 // Read-only file browser behind Browse. Paths are virtual: "/<root>/<...>". Four roots:
-//   collections, actions, binaries, evidence   real folders (never anything outside them, no symlinks followed);
-//   evidence holds one folder per hunt: YYYYMMDD-HHMMSS-HuntName/<host>/<collection>.csv plus hunt-log.csv
+//   collections, actions, binaries, output   real folders (never anything outside them, no symlinks followed);
+//   output holds hunts/ and responses/ (a folder per run, see src/output.js) and Pulled-Files/
 const ROOTS = {
   collections: { dir: collectionsDir, label: 'Collections', desc: 'Read-only scripts that gather data from a host' },
   actions: { dir: actionsDir, label: 'Actions', desc: 'Scripts that change a host' },
   binaries: { dir: binariesDir, label: 'Binaries', desc: 'External tools uploaded for collections to use' },
-  evidence: { dir: evidenceDir, label: 'Evidence', desc: 'Data collected by hunts: a folder per hunt, then per host plus All-Hosts' },
+  output: { dir: outputDir, label: 'Output', desc: 'What hunts and responses brought back: Hunts and Responses folders (a folder per run, then per host), plus pulled files' },
 };
 const MAX_PREVIEW = 512 * 1024;
 

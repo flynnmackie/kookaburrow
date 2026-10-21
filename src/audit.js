@@ -3,8 +3,8 @@ const crypto = require('crypto');
 const { save } = require('./store');
 
 // The hunt activity log (a chain-of-custody trail, same idea as KingfishIR's Log tab). Every action a hunt takes is
-// recorded with a UTC timestamp, in two places: run.events (what Output > Log shows) and a CSV file in the hunt's
-// evidence folder (hunt-log.csv) that is appended to as it happens, so it survives outside the platform.
+// recorded with a UTC timestamp, in two places: run.events (what Results > Log shows) and a CSV file in the hunt's
+// output folder (<name>_Log.csv) that is appended to as it happens, so it survives outside the platform.
 // An event is { t, kind, host, action, artefact, size, sourceHash, receivedHash, match, outcome, detail }.
 // kind drives the row colour: hunt, session (host/tool steps), collect, evidence, warn, error.
 // Credentials and output text must never be put in an event.

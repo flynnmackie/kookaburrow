@@ -258,7 +258,8 @@
   .hm-title { display:flex; align-items:center; gap:12px; padding-bottom:8px; } .hm-title h2 { padding:0; } .hm-title .act { width:auto; margin:0; padding:2px 10px; font-size:12px; }
   .modal .dlg.rr { width:min(900px, 100%); height:min(560px, 100%); } #rrList tr, #rxList tr { cursor:pointer; } #rxList tr.on, #rrList tr.on { background:var(--blue-soft); box-shadow:inset 2px 0 0 var(--blue); }
   .modal .dlg.hunt { width:min(1060px, 100%); height:min(820px, 100%); } .hunt-body { padding:4px 16px 12px; }
-  .hsec { margin-top:8px; }
+  .hm-tlist { height:auto; max-height:200px; margin-bottom:8px; } .hm-tlist .pick { cursor:default; } .hm-tlist .pick:hover { background:none; } #hmRun[hidden], #rmRun[hidden] { display:none; }
+  .hunt-body .tcols .pickbox
   .hsec h3 { display:flex; align-items:center; gap:8px; margin:0 0 4px; font:600 14px var(--f-ui); color:var(--text); }
   .hnum { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:50%; background:var(--blue-soft); border:1px solid var(--blue-d); color:var(--blue); font-size:11.5px; }
   .hcount { font-weight:400; font-size:12px; }
@@ -512,7 +513,7 @@
   .mon-pill.down { color:var(--bad); border-color:rgba(239,91,97,.55); background:rgba(239,91,97,.12); }
   .mon-pill.unknown { color:var(--dim); border-color:var(--line-hi); }
   .mon-foot { font-size:10.5px; color:var(--faint); margin-top:5px; }
-  /* Output > Log: one collapsible block per hunt, a row per action */
+  /* Results > Log: one collapsible block per hunt, a row per action */
   .lg-top { display:flex; align-items:baseline; gap:12px; } .lg-top h2 { margin-bottom:2px; }
   .lg-sub { margin:0 0 8px; font-size:12px; }
   .lg-hunt { border:1px solid var(--line); border-radius:var(--r); margin-bottom:6px; overflow:hidden; }
@@ -1034,11 +1035,12 @@
         <h3>Name it</h3>
         <span class="fl">Hunt name</span>
         <input id="hmName" type="text" placeholder="e.g. Weekly persistence sweep" autocomplete="off">
+        <span class="fl" id="hmTargetsHead">Will run against</span><div class="pickbox hm-tlist" id="hmTargets"></div>
         <div class="sw-row"><button class="switch" id="hmRecurring" type="button" role="switch" aria-checked="false" aria-label="Recurring hunt"></button><b id="hmRecurringLabel">Recurring hunt: Off</b></div>
         <div class="rec-box" id="hmRecBox" hidden></div>
       </section>
     </div>
-    <div class="dlg-foot"><button class="act" id="hmRun" data-perm="hunts.run" data-perm-what="run hunts">Run Hunt</button><button class="act sec" id="hmCancel">Cancel</button><span id="hmMsg"></span><span class="sum" id="hmSummary"></span></div>
+    <div class="dlg-foot"><button class="act" id="hmNext" type="button">Next</button><button class="act" id="hmRun" hidden data-perm="hunts.run" data-perm-what="run hunts">Run Hunt</button><button class="act sec" id="hmCancel">Cancel</button><span id="hmMsg"></span><span class="sum" id="hmSummary"></span></div>
   </div>
 </div>
 <div class="modal" id="rerunModal" hidden role="dialog" aria-modal="true" aria-labelledby="rrTitle">
@@ -1075,12 +1077,13 @@
         <h3>Name it</h3>
         <span class="fl">Response name</span>
         <input id="rmName" type="text" placeholder="e.g. Contain WS-12" autocomplete="off">
+        <span class="fl" id="rmTargetsHead">Will run against</span><div class="pickbox hm-tlist" id="rmTargets"></div>
         <div class="rm-params" id="rmParams"></div>
         <div class="sw-row"><button class="switch" id="rmRecurring" type="button" role="switch" aria-checked="false" aria-label="Recurring response"></button><b id="rmRecurringLabel">Recurring response: Off</b></div>
         <div class="rec-box" id="rmRecBox" hidden></div>
       </section>
     </div>
-    <div class="dlg-foot"><button class="act" id="rmRun" data-perm="actions.run" data-perm-what="run actions">Run Response</button><button class="act sec" id="rmCancel">Cancel</button><span id="rmMsg"></span><span class="sum" id="rmSummary"></span></div>
+    <div class="dlg-foot"><button class="act" id="rmNext" type="button">Next</button><button class="act" id="rmRun" hidden data-perm="actions.run" data-perm-what="run actions">Run Response</button><button class="act sec" id="rmCancel">Cancel</button><span id="rmMsg"></span><span class="sum" id="rmSummary"></span></div>
   </div>
 </div>
 <div class="modal" id="rerunRespModal" hidden role="dialog" aria-modal="true" aria-labelledby="rxTitle">

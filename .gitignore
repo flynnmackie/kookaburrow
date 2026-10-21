@@ -6,5 +6,6 @@ data/
 binaries/*
 !binaries/.gitkeep
 
-# Evidence brought back by hunts
+# What hunts and responses brought back
+output/
 evidence/

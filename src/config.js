@@ -6,7 +6,7 @@ module.exports = {
   dataDir: path.join(__dirname, '..', 'data'),
   collectionsDir: path.join(__dirname, '..', 'collections'),
   actionsDir: path.join(__dirname, '..', 'actions'),
-  evidenceDir: path.join(__dirname, '..', 'evidence'), // what hunts bring back, one folder per hunt
+  outputDir: path.join(__dirname, '..', 'output'), // what hunts and responses bring back (output/hunts, output/responses; see src/output.js)
   binariesDir: path.join(__dirname, '..', 'binaries'), // hunter-provided tools, staged on targets per run
   publicDir: path.join(__dirname, '..', 'public'),
   scan: {

@@ -123,7 +123,7 @@ const NAV = [
     ['discover', 'Discover', 'Add Hosts'], ['manual', 'Manually Add', 'Add Hosts'],
   ] },
   { id: 'burrow', label: 'Burrow!', accent: true, pages: [['hunt', 'Hunt'], ['respond', 'Respond'], ['recurring', 'Recurring']] },
-  { id: 'output', label: 'Output', pages: [['log', 'Log'], ['report', 'Report'], ['json', 'JSON']] },
+  { id: 'output', label: 'Results', pages: [['log', 'Log'], ['report', 'Report'], ['json', 'JSON']] },
   { id: 'browse', label: 'Browse', pages: [['files', 'Files']] },
   // The logo in the header opens this landing page. It has no tab of its own and no side menu.
   { id: 'home', label: 'Home', hidden: true, pages: [['home', 'Home']] },
@@ -689,9 +689,9 @@ const MI = {
   returns: { title: 'Returns', values: {
     records: { label: 'Records', tip: 'Rows of data taken from the script output (saved as CSV and JSON). No files are pulled.',
       svg: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M12 3v18"/>' },
-    files: { label: 'Files', tip: 'Raw files pulled from the host into the evidence folder, with SHA-256 hashes.',
+    files: { label: 'Files', tip: 'Raw files pulled from the host into the output folder, with SHA-256 hashes.',
       svg: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/>' },
-    both: { label: 'Records + files', tip: 'Rows of data and raw files pulled into the evidence folder.',
+    both: { label: 'Records + files', tip: 'Rows of data and raw files pulled into the output folder.',
       svg: '<path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/>' },
   } },
   kind: { title: 'Type', values: {
@@ -1006,10 +1006,10 @@ const addActions = makeEditor({
 // ---- Shared by Hunt and Respond ----
 // A green R after a name marks a run that came from a recurring schedule.
 const schedTag = (r) => (r.scheduleId ? '<span class="rtag" title="Ran on a recurring schedule">R</span>' : '');
-// Confirms, then deletes a hunt or response: its record and its evidence folder. A running one can't be deleted.
+// Confirms, then deletes a hunt or response: its record and its output folder. A running one can't be deleted.
 async function confirmDeleteRun(r, url, noun) {
   if (r.status === 'running') { toast(`That ${noun} is still running. Wait for it to finish.`); return false; }
-  if (!confirm(`Delete the ${noun} "${huntName(r)}"?\n\nThis removes it from the list and deletes its evidence folder${r.evidenceDir ? ` (evidence/${r.evidenceDir})` : ''}. This cannot be undone.`)) return false;
+  if (!confirm(`Delete the ${noun} "${huntName(r)}"?\n\nThis removes it from the list and deletes its output folder${r.outputPath ? ` (output/${r.outputPath})` : ''}. This cannot be undone.`)) return false;
   try { await api('DELETE', url); return true; } catch (e) { toast(e.message); return false; }
 }
 
@@ -1079,17 +1079,8 @@ function renderHuntList() {
   $('bhList').innerHTML = bh.runs.length
     ? `<table class="bh"><thead><tr><th>Hunt</th><th>Run by</th><th>Status</th><th>Started</th><th>Finished</th><th>Elapsed</th><th></th></tr></thead><tbody>${bh.runs.map((r) => `<tr class="bh-row ${r.id === bh.sel ? 'on' : ''}" data-id="${esc(r.id)}">
         <td class="bh-name">${esc(huntName(r))}${schedTag(r)}</td><td>${r.startedBy ? esc(r.startedBy) : '<span class="dim">-</span>'}</td><td>${huntStatus(r)}</td>
-        <td class="dim">${esc(new Date(r.startedAt).toLocaleString())}</td><td class="dim">${r.finishedAt ? esc(new Date(r.finishedAt).toLocaleString()) : '-'}</td><td class="dim">${esc(huntElapsed(r))}</td><td class="bh-del"><a class="dl bad" data-del="${esc(r.id)}" data-perm="hunts.run" data-perm-what="delete hunts" title="Delete this hunt and its evidence folder">Delete</a></td></tr>`).join('')}</tbody></table>`
+        <td class="dim">${esc(new Date(r.startedAt).toLocaleString())}</td><td class="dim">${r.finishedAt ? esc(new Date(r.finishedAt).toLocaleString()) : '-'}</td><td class="dim">${esc(huntElapsed(r))}</td><td class="bh-del"><a class="dl bad" data-del="${esc(r.id)}" data-perm="hunts.run" data-perm-what="delete hunts" title="Delete this hunt and its output folder">Delete</a></td></tr>`).join('')}</tbody></table>`
     : '<p class="dim" style="margin:0">No hunts yet. Use New Hunt to run collections against your hosts.</p>';
-}
-// Every file in a hunt's evidence folder: the hunt log at the top, then All-Hosts, then a folder per host.
-async function huntFiles(r) {
-  if (!r.evidenceDir) return [];
-  const base = `/evidence/${r.evidenceDir}`, get = (p) => api('GET', `/api/browse?path=${encodeURIComponent(p)}`).then((x) => x.entries).catch(() => []);
-  const top = await get(base), files = top.filter((e) => !e.dir).map((e) => ({ folder: '', name: e.name, size: e.size, path: `${base}/${e.name}` }));
-  const subs = await Promise.all(top.filter((e) => e.dir).map(async (d) => (await get(`${base}/${d.name}`)).filter((e) => !e.dir).map((e) => ({ folder: d.name, name: e.name, size: e.size, path: `${base}/${d.name}/${e.name}` }))));
-  const rank = (f) => (f.folder === '' ? 0 : f.folder === 'All-Hosts' ? 1 : 2);
-  return [...files, ...subs.flat()].sort((a, b) => rank(a) - rank(b) || a.folder.localeCompare(b.folder, undefined, { numeric: true }) || a.name.localeCompare(b.name));
 }
 // Clicking a host's error opens its message in a small popup.
 document.addEventListener('click', (e) => {
@@ -1115,6 +1106,8 @@ async function bdNotebook(url) {
   } catch (e) { return `<p class="bad">${esc(e.message)}</p>`; }
 }
 function bdRender({ kind, r, events, files, tab, notebook }) {
+  // the run's own files (log, All_Hosts) first, then each host's folder
+  files = [...files].sort((a, b) => (a.folder === '') !== (b.folder === '') ? (a.folder === '' ? -1 : 1) : a.folder.localeCompare(b.folder, undefined, { numeric: true }) || a.name.localeCompare(b.name));
   const isHunt = kind === 'hunt', noun = isHunt ? 'hunt' : 'response';
   const hosts = new Set(r.results.map((x) => x.hostId)).size, idKey = isHunt ? 'collectionId' : 'actionId', nameKey = isHunt ? 'collectionName' : 'actionName';
   const rows = [...new Map(r.results.map((x) => [x[idKey], x[nameKey]])).entries()].map(([cid, name]) => {
@@ -1130,9 +1123,9 @@ function bdRender({ kind, r, events, files, tab, notebook }) {
   }).join('');
   const problems = events.filter((e) => e.kind === 'error' || e.kind === 'warn' || /^(error|warning|unconfirmed)/.test(e.outcome || ''));
   const dl = (path, text, cls = 'act sec') => `<a class="${cls}" href="/api/browse/download?path=${encodeURIComponent(path)}" download data-perm="hunts.export" data-perm-what="download ${noun} results">${text}</a>`;
-  const jsonName = isHunt ? 'hunt.json' : 'response.json', json = files.find((f) => f.name === jsonName && f.folder === (isHunt ? 'All-Hosts' : ''));
-  const btns = `<div class="bd-btns bd-files-btns">${r.evidenceDir ? `<a class="act" href="/api/runs/${esc(r.id)}/download" download data-perm="hunts.export" data-perm-what="download ${noun} results" title="The whole ${noun} folder as one zip file">Download all (zip)</a>` : ''}<a class="act sec" href="/api/runs/${esc(r.id)}/log.csv" download data-perm="hunts.export" data-perm-what="export logs">Download log (CSV)</a>${json ? dl(json.path, `Download ${jsonName}`) : ''}${r.evidenceDir ? `<a class="act sec" data-evidence="/evidence/${esc(r.evidenceDir)}">Open in Browse</a>` : ''}</div>`;
-  const head = `<div class="bd-head"><div><div class="hd-name">${esc(huntName(r))}${schedTag(r)}</div><div class="hd-file">${esc(r.evidenceDir ? `evidence/${r.evidenceDir}` : 'No evidence folder')}</div></div>
+  const json = files.find((f) => /_All_Hosts.json$/.test(f.name) || /^(hunt|response).json$/.test(f.name)), jsonName = json ? json.name : '';
+  const btns = `<div class="bd-btns bd-files-btns">${r.outputPath ? `<a class="act" href="/api/runs/${esc(r.id)}/download" download data-perm="hunts.export" data-perm-what="download ${noun} results" title="The whole ${noun} folder as one zip file">Download all (zip)</a>` : ''}<a class="act sec" href="/api/runs/${esc(r.id)}/log.csv" download data-perm="hunts.export" data-perm-what="export logs">Download log (CSV)</a>${json ? dl(json.path, 'Download JSON') : ''}${r.outputPath ? `<a class="act sec" data-evidence="/output/${esc(r.outputPath)}">Open in Browse</a>` : ''}</div>`;
+  const head = `<div class="bd-head"><div><div class="hd-name">${esc(huntName(r))}${schedTag(r)}</div><div class="hd-file">${esc(r.outputPath ? `output/${r.outputPath}` : 'No output folder')}</div></div>
       <div class="toggle bd-tabs" role="tablist">${BD_TABS.map(([k, label]) => `<button type="button" role="tab" data-bdtab="${k}" aria-selected="${k === tab}" class="${k === tab ? 'on' : ''}">${label}${k === 'files' ? ` (${files.length})` : ''}</button>`).join('')}</div></div>`;
   let pane;
   if (tab === 'files') {
@@ -1156,7 +1149,7 @@ async function showHunt(id) {
   bh.sel = id; renderHuntList();
   const r = bh.runs.find((x) => x.id === id), box = $('bhDetail'); if (!r) return;
   let events, files, notebook = '';
-  try { [events, files, notebook] = await Promise.all([api('GET', `/api/runs/${id}/events`), huntFiles(r), bh.tab === 'notebook' ? bdNotebook(`/api/runs/${id}/data`) : '']); } catch (e) { box.innerHTML = `<p class="bad">${esc(e.message)}</p>`; return; }
+  try { [events, files, notebook] = await Promise.all([api('GET', `/api/runs/${id}/events`), api('GET', `/api/runs/${id}/files`), bh.tab === 'notebook' ? bdNotebook(`/api/runs/${id}/data`) : '']); } catch (e) { box.innerHTML = `<p class="bad">${esc(e.message)}</p>`; return; }
   if (bh.sel !== id) return; // another hunt was clicked while this loaded
   const keep = box.querySelector('.bd-json')?.scrollTop;
   box.innerHTML = bdRender({ kind: 'hunt', r, events, files, tab: bh.tab, notebook });
@@ -1166,7 +1159,7 @@ $('bhList').onclick = async (e) => {
   const del = e.target.closest('[data-del]');
   if (del) {
     const r = bh.runs.find((x) => x.id === del.dataset.del);
-    if (r && await confirmDeleteRun(r, `/api/runs/${r.id}?evidence=1`, 'hunt')) { if (bh.sel === r.id) { bh.sel = null; $('bhDetail').innerHTML = BH_HINT; } loadBurrowHunts(); }
+    if (r && await confirmDeleteRun(r, `/api/runs/${r.id}?output=1`, 'hunt')) { if (bh.sel === r.id) { bh.sel = null; $('bhDetail').innerHTML = BH_HINT; } loadBurrowHunts(); }
     return;
   }
   const tr = e.target.closest('.bh-row'); if (tr) showHunt(tr.dataset.id);
@@ -1228,8 +1221,20 @@ function hmRenderTargets() {
 function hmTab(name) {
   document.querySelectorAll('#hmTabs button').forEach((b) => b.classList.toggle('on', b.dataset.pane === name));
   document.querySelectorAll('#huntModal .hsec').forEach((p) => { p.hidden = p.dataset.pane !== name; });
-  if (name === 'name') hmEl('Name').focus();
+  hmEl('Run').hidden = name !== 'name'; hmEl('Next').hidden = name === 'name'; // Run Hunt is only on the last tab
+  if (name === 'name') { hmRenderTargetList(); hmEl('Name').focus(); }
 }
+// The hosts the hunt will run against: the ticked hosts plus every member of the ticked groups, each once.
+function hmRenderTargetList() {
+  const ids = new Set(hm.selH);
+  for (const l of hm.lists) if (hm.selL.has(l.id)) l.hostIds.forEach((i) => ids.add(i));
+  const list = hm.hosts.filter((h) => ids.has(h.id));
+  hmEl('TargetsHead').textContent = `Will run against ${list.length} host${list.length === 1 ? '' : 's'}`;
+  hmEl('Targets').innerHTML = list.map((h) => `<div class="pick"><span class="pn">${esc(h.name)}</span><span class="pt">${esc(h.address)}</span><span class="proto-${h.protocol === 'ssh' ? 'ssh' : 'winrm'}">${h.protocol === 'ssh' ? 'SSH' : 'WinRM'}</span></div>`).join('')
+    || '<p class="dim" style="margin:6px 10px">No hosts selected yet. Choose them on the Who tab.</p>';
+}
+const HM_ORDER = ['who', 'coll', 'name'];
+hmEl('Next').onclick = () => { const cur = document.querySelector('#hmTabs .on')?.dataset.pane; hmTab(HM_ORDER[Math.min(HM_ORDER.indexOf(cur) + 1, HM_ORDER.length - 1)]); };
 function hmSetRecurring(on) {
   hm.recurring = on;
   hmEl('Recurring').setAttribute('aria-checked', on);
@@ -1317,7 +1322,7 @@ hmEl('Run').onclick = async () => {
       name: hmEl('Name').value.trim(), collectionIds: [...hm.selC], hostIds: [...hm.selH], listIds: [...hm.selL], schedule: rec?.schedule,
     });
     closeHuntModal();
-    toast(`Hunt "${run.name}" started${rec ? ` and scheduled: ${rec.text.replace(/^Runs now, then /, '')}` : `. Results go to ${run.evidenceDir}`}`);
+    toast(`Hunt "${run.name}" started${rec ? ` and scheduled: ${rec.text.replace(/^Runs now, then /, '')}` : `. Results go to ${run.outputPath}`}`);
     bh.sel = run.id;
     await loadBurrowHunts();
     showHunt(run.id);
@@ -1326,7 +1331,7 @@ hmEl('Run').onclick = async () => {
 };
 
 // ---- Browse ----
-// A read-only file view over collections, actions, binaries and collected evidence. Click a folder to open
+// A read-only file view over collections, actions, binaries and what hunts and responses brought back. Click a folder to open
 // it, click a file to preview it on the right.
 const bb = { path: '/', entries: [], open: null };
 const bbFmt = (n) => (n == null ? '' : n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1048576).toFixed(1)} MB`);
@@ -1368,7 +1373,7 @@ $('bbList').onclick = async (e) => {
     const body = f.binary ? `<p class="dim">Binary file (${bbFmt(f.size)}); no preview. Use Download to save it.</p>`
       : `<pre class="code">${ext === 'ps1' ? highlight(f.text, 'powershell') : ext === 'sh' ? highlight(f.text, 'bash') : ext === 'json' ? highlightJson(f.text) : esc(f.text)}</pre>${f.truncated ? `<p class="dim" style="margin-top:6px">Showing the first 512 KB of ${bbFmt(f.size)}.</p>` : ''}`;
     $('bbPreview').innerHTML = `<div class="bb-head"><div><div class="bb-title">${esc(f.name)}</div><div class="hd-file">${esc(f.path)} · ${bbFmt(f.size)} · ${esc(new Date(f.modified).toLocaleString())}</div></div>
-      <a class="act sec" href="/api/browse/download?path=${encodeURIComponent(f.path)}" download data-perm="hunts.export" data-perm-what="download evidence files">Download</a></div>${body}`;
+      <a class="act sec" href="/api/browse/download?path=${encodeURIComponent(f.path)}" download data-perm="hunts.export" data-perm-what="download output files">Download</a></div>${body}`;
   } catch (err) { $('bbPreview').innerHTML = `<p class="bad">${esc(err.message)}</p>`; }
 };
 
@@ -1973,7 +1978,7 @@ window.addEventListener('resize', () => {
 
 // ---- Shell: Send file / Pull file ----
 // Send: pick files or a folder on this computer; they are pushed into the folder the shell is currently in.
-// Pull: an explorer-style window over the HOST's file system; the file you pick is copied into evidence/Pulled-Files.
+// Pull: an explorer-style window over the HOST's file system; the file you pick is copied into output/Pulled-Files.
 const noteShell = (t) => { $('shellNote').textContent = t; $('shellNote').hidden = !t; };
 function liveShell() {
   const sh = shells.get(shellHost);
@@ -2065,7 +2070,7 @@ async function pullSelected() {
   try {
     const r = await api('POST', `/api/shell/${sh.id}/pull`, { path: pmJoin(pm.path, pm.sel) });
     closePull();
-    toast(`Pulled ${r.name} (${bbFmt(r.size)}) to Evidence${r.folder.replace('/evidence', '')} · SHA-256 ${r.sha256.slice(0, 12)}…`);
+    toast(`Pulled ${r.name} (${bbFmt(r.size)}) to Output${r.folder.replace('/output', '')} · SHA-256 ${r.sha256.slice(0, 12)}…`);
   } catch (e) { $('pmMsg').className = 'bad'; $('pmMsg').textContent = e.message; $('pmPull').disabled = false; }
   pm.busy = false;
 }
@@ -2271,7 +2276,7 @@ $('logBox').onclick = async (e) => {
   const del = e.target.closest('[data-del]');
   if (del) {
     const r = logRuns.find((x) => x.id === del.dataset.del);
-    if (r && confirm(`Delete the log and record of "${r.name || r.collectionName}"? The evidence folder is not deleted.`)) { await api('DELETE', `/api/runs/${r.id}`); logOpen.delete(r.id); logEvents.delete(r.id); loadRuns(); }
+    if (r && confirm(`Delete the log and record of "${r.name || r.collectionName}"? The output folder is not deleted.`)) { await api('DELETE', `/api/runs/${r.id}`); logOpen.delete(r.id); logEvents.delete(r.id); loadRuns(); }
     return;
   }
   if (e.target.closest('[data-stop]')) return;
