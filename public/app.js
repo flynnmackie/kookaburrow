@@ -723,13 +723,17 @@ const miToggle = (group, allowed) => allowed.map((v) => {
 }).join('');
 
 // ---- The search / filter controls (View Collections, View Actions and the New Hunt / New Response dialogs share them) ----
-// A search box (name, description and script text, matched server-side), a tag dropdown (a script must have ALL picked tags),
-// "Dependencies" (only scripts that need an external binary) and "★ Favourites" (only this user's starred ones). Picked tags show as
+// Search box on top (name, description and script text, matched server-side). Under it: the PowerShell / Linux toggle (owned by the
+// caller) with the "Dependencies" and "★ Favourites" switches on the same line (`chips`), then dropdowns to filter by tag (a script
+// must have ALL picked tags) and by type (footprint: none/transient; returns: records/files/both; kind: command/artefact/tool - within one group any
+// picked value matches, across groups all must). Whatever is picked is added underneath as
 // removable chips. `onChange(server)` is called after a change: true means ask the server again, false means redraw what is loaded.
-function makeFilter({ box, search, url, noun, favKind, getType, onChange }) {
-  const f = { query: '', tags: [], deps: false, favOnly: false, tagList: [], favs: new Set() };
-  let timer;
-  f.active = () => !!(f.query || f.tags.length || f.deps || f.favOnly);
+function makeFilter({ box, chips, search, url, noun, favKind, getType, onChange }) {
+  const f = { query: '', tags: [], kinds: [], deps: false, favOnly: false, tagList: [], favs: new Set() };
+  let timer, menuOpen = false, tagOpen = false, tagText = ''; // the type menu, the tag suggestions, and what is typed in the tag box
+  f.active = () => !!(f.query || f.tags.length || f.kinds.length || f.deps || f.favOnly);
+  // the filters the server does not handle: type and favourites
+  f.keep = (h) => (!f.favOnly || f.favs.has(h.id)) && GROUPS.every((g) => { const picked = f.kinds.filter((k) => k.startsWith(g + ':')); return !picked.length || picked.includes(`${g}:${h[g]}`); });
   f.qs = () => {
     const params = new URLSearchParams();
     if (f.query) params.set('q', f.query);
@@ -737,40 +741,74 @@ function makeFilter({ box, search, url, noun, favKind, getType, onChange }) {
     if (f.deps) params.set('deps', '1');
     return params.toString();
   };
+  const GROUPS = ['footprint', 'returns', 'kind'];
+  const kindChip = (k) => { const [g, v] = k.split(':'), x = MI[g].values[v]; return `${MI_SVG(x.svg)}<span>${esc(x.label)}</span>`; };
   f.render = () => {
-    const available = f.tagList.filter((t) => !f.tags.includes(t.tag));
+    const availTags = f.tagList.filter((t) => !f.tags.includes(t.tag)), availKinds = GROUPS.flatMap((g) => Object.keys(MI[g].values).map((v) => `${g}:${v}`)).filter((k) => !f.kinds.includes(k));
+    chips.innerHTML = `
+      <button type="button" class="tagchip ${f.favOnly ? 'on' : ''}" data-favs="1" aria-pressed="${f.favOnly}" title="Only your favourite ${noun}s">★ Favourites</button>`;
     box.innerHTML = `
     <div class="tf-row">
-      <select data-role="tagSelect" ${available.length ? '' : 'disabled'}>
-        <option value="">${f.tagList.length ? (available.length ? 'Filter by tag…' : 'All tags selected') : 'No tags'}</option>
-        ${available.map((t) => `<option value="${esc(t.tag)}">${esc(t.tag)} (${t.count})</option>`).join('')}
-      </select>
-      <button type="button" class="tagchip ${f.deps ? 'on' : ''}" data-deps="1" aria-pressed="${f.deps}" title="Only ${noun}s that need at least one dependency (external binary)">Dependencies</button>
-      <button type="button" class="tagchip ${f.favOnly ? 'on' : ''}" data-favs="1" aria-pressed="${f.favOnly}" title="Only your favourite ${noun}s">★ Favourites</button>
-      ${f.tags.length || f.deps || f.favOnly ?'<a data-clear-tags="1">Clear</a>' : ''}
+      <div class="tf-dd">
+        <input type="text" class="tf-taginput" data-role="tagInput" placeholder="${f.tagList.length ? (availTags.length ? 'Filter by tag…' : 'All tags selected') : 'No tags'}" value="${esc(tagText)}" ${availTags.length ? '' : 'disabled'} autocomplete="off" spellcheck="false">
+        <div class="tf-menu" data-role="tagMenu" hidden></div>
+      </div>
+      <div class="tf-dd">
+        <button type="button" class="tf-ddbtn" data-typemenu="1" ${availKinds.length ? '' : 'disabled'} aria-expanded="${menuOpen}">${availKinds.length ? 'Filter by type…' : 'All types selected'}<span>▾</span></button>
+        <div class="tf-menu" ${menuOpen && availKinds.length ? '' : 'hidden'}>${GROUPS.map((g) => { const mine = availKinds.filter((k) => k.startsWith(g + ':')); return mine.length ? `<div class="tf-mh">${esc(MI[g].title)}</div>${mine.map((k) => `<button type="button" data-kind-add="${k}" title="${esc(MI[g].values[k.split(':')[1]].tip)}">${kindChip(k)}</button>`).join('')}` : ''; }).join('')}</div>
+      </div>
     </div>
-    ${f.tags.length ? `<div class="tf-chips">${f.tags.map((t) => `<button type="button" class="tagchip on" data-remove-tag="${esc(t)}" title="Remove filter">${esc(t)} ×</button>`).join('')}</div>` : ''}`;
+    ${f.tags.length || f.kinds.length ? `<div class="tf-chips">${f.tags.map((t) => `<button type="button" class="tagchip on" data-remove-tag="${esc(t)}" title="Remove this tag">${esc(t)}<b class="x">×</b></button>`).join('')}${f.kinds.map((k) => `<button type="button" class="tagchip on kindchip" data-remove-kind="${k}" title="Remove this filter">${kindChip(k)}<b class="x">×</b></button>`).join('')}</div>` : ''}`;
+    fillTagMenu();
   };
+  // the tag suggestions: the tags not picked yet whose name contains what was typed
+  function fillTagMenu() {
+    const menu = box.querySelector('[data-role=tagMenu]'); if (!menu) return;
+    const q = tagText.trim().toLowerCase(), hits = f.tagList.filter((t) => !f.tags.includes(t.tag) && (!q || t.tag.toLowerCase().includes(q)));
+    menu.innerHTML = hits.map((t) => `<button type="button" data-tag-add="${esc(t.tag)}">${esc(t.tag)} <span class="dim">(${t.count})</span></button>`).join('') || '<div class="tf-none">No tags match</div>';
+    menu.hidden = !tagOpen;
+  }
   // the tags of the current type and this user's favourites (the list itself is fetched by the caller)
   f.loadMeta = async () => {
     const [tags, fv] = await Promise.all([api('GET', `${url}/tags?type=${getType()}`), api('GET', '/api/favourites').catch(() => ({}))]);
-    f.tagList = tags; f.favs = new Set(fv[favKind] || []);
+    f.tagList = [...tags].sort((x, y) => x.tag.localeCompare(y.tag, undefined, { sensitivity: 'base' })); f.favs = new Set(fv[favKind] || []);
     f.render();
   };
-  f.reset = () => { f.query = ''; f.tags = []; f.deps = false; f.favOnly = false; search.value = ''; };
+  f.reset = () => { f.query = ''; f.tags = []; f.kinds = []; f.deps = false; f.favOnly = false; menuOpen = false; tagOpen = false; tagText = ''; search.value = ''; };
   const toggleTag = (tag) => { f.tags = f.tags.includes(tag) ? f.tags.filter((t) => t !== tag) : [...f.tags, tag]; onChange(true); };
-  box.onchange = (e) => { if (e.target.dataset.role === 'tagSelect' && e.target.value) toggleTag(e.target.value); };
+  const pickTag = (tag) => { tagText = ''; tagOpen = false; toggleTag(tag); };
+  box.addEventListener('input', (e) => { if (e.target.dataset.role !== 'tagInput') return; tagText = e.target.value; tagOpen = true; fillTagMenu(); });
+  box.addEventListener('focusin', (e) => { if (e.target.dataset.role === 'tagInput' && !tagOpen) { tagOpen = true; menuOpen = false; box.querySelector('.tf-ddbtn')?.setAttribute('aria-expanded', 'false'); box.querySelector('.tf-menu:not([data-role])')?.setAttribute('hidden', ''); fillTagMenu(); } });
+  box.addEventListener('keydown', (e) => {
+    if (e.target.dataset.role !== 'tagInput') return;
+    if (e.key === 'Escape') { tagOpen = false; fillTagMenu(); }
+    if (e.key === 'Enter') { const first = box.querySelector('[data-tag-add]'); if (first) { e.preventDefault(); pickTag(first.dataset.tagAdd); } }
+  });
   box.onclick = (e) => {
-    const d = e.target.dataset;
-    if (d.clearTags) { f.tags = []; f.deps = false; f.favOnly = false; onChange(true); return; }
-    if (d.favs) { f.favOnly = !f.favOnly; f.render(); onChange(false); return; }
-    if (d.deps) { f.deps = !f.deps; onChange(true); return; }
+    const d = (e.target.closest('[data-typemenu],[data-kind-add],[data-remove-kind],[data-remove-tag],[data-tag-add]') || {}).dataset || {};
+    if (d.tagAdd) { pickTag(d.tagAdd); return; }
+    if (d.typemenu) { menuOpen = !menuOpen; tagOpen = false; f.render(); return; }
+    if (d.kindAdd) { f.kinds = [...f.kinds, d.kindAdd]; menuOpen = false; f.render(); onChange(false); return; }
+    if (d.removeKind) { f.kinds = f.kinds.filter((k) => k !== d.removeKind); f.render(); onChange(false); return; }
     if (d.removeTag) toggleTag(d.removeTag);
   };
+  chips.onclick = (e) => {
+    const d = (e.target.closest('[data-deps],[data-favs]') || {}).dataset || {};
+    if (d.favs) { f.favOnly = !f.favOnly; f.render(); onChange(false); return; }
+    if (d.deps) { f.deps = !f.deps; f.render(); onChange(true); }
+  };
+  // a click outside closes the type menu (a click on a button that was just redrawn is detached from the page, so it is not "outside")
+  document.addEventListener('click', (e) => { if ((menuOpen || tagOpen) && e.target.isConnected && !box.contains(e.target)) { menuOpen = false; tagOpen = false; f.render(); } });
   search.oninput = () => {
     clearTimeout(timer);
     timer = setTimeout(() => { f.query = search.value.trim(); onChange(true); }, 200);
   };
+  // "Clear all" sits to the right of the search box: empties the search and switches off every filter (the PowerShell / Linux toggle stays)
+  const wrap = document.createElement('div'); wrap.className = 'fl-search';
+  const clearAll = document.createElement('button'); clearAll.type = 'button'; clearAll.className = 'act sec fl-clear'; clearAll.textContent = 'Clear all';
+  search.parentNode.insertBefore(wrap, search); wrap.append(search, clearAll);
+  search.removeAttribute('style');
+  clearAll.onclick = () => { clearTimeout(timer); f.reset(); f.render(); onChange(true); };
   return f;
 }
 
@@ -782,7 +820,7 @@ function makeLibrary({ id, url, noun, folder, showParams }) {
   const Noun = noun[0].toUpperCase() + noun.slice(1);
   let type = 'powershell', all = [], req = 0, open = null;
   const favKind = id === 'action' ? 'actions' : 'collections';
-  const f = makeFilter({ box: el('TagFilter'), search: el('Search'), url, noun, favKind, getType: () => type, onChange: (server) => (server ? load() : renderList()) });
+  const f = makeFilter({ box: el('TagFilter'), chips: el('Chips'), search: el('Search'), url, noun, favKind, getType: () => type, onChange: (server) => (server ? load() : renderList()) });
   const starHtml = (sid) => f.favs.has(sid) ? '<span class="fav on" title="One of your favourites">★</span>' : '';
 
   async function load() {
@@ -804,7 +842,7 @@ function makeLibrary({ id, url, noun, folder, showParams }) {
     return h.dependencies.length ? 'met' : '';
   }
   function renderList() {
-    const keep = (h) => !f.favOnly || f.favs.has(h.id);
+    const keep = f.keep;
     const count = (t) => all.filter((h) => h.type === t && keep(h)).length;
     document.querySelectorAll(`#${id}Toggle button`).forEach((b) => {
       b.classList.toggle('on', b.dataset.type === type);
@@ -1315,7 +1353,7 @@ function hmSummary() {
 }
 // The search box and filters are the same as View Collections (makeFilter). A search or tag/dependency filter is answered by the server
 // (hm.matches holds the ids that matched); picked collections stay picked even when a filter hides them.
-const hmF = makeFilter({ box: $('hmTagFilter'), search: $('hmSearch'), url: '/api/collections', noun: 'collection', favKind: 'collections', getType: () => hm.type, onChange: (server) => (server ? hmQuery() : hmRenderCollections()) });
+const hmF = makeFilter({ box: $('hmTagFilter'), chips: $('hmChips'), search: $('hmSearch'), url: '/api/collections', noun: 'collection', favKind: 'collections', getType: () => hm.type, onChange: (server) => (server ? hmQuery() : hmRenderCollections()) });
 async function hmQuery() {
   const qs = hmF.qs(), mine = hm.qn = (hm.qn || 0) + 1;
   try {
@@ -1326,7 +1364,7 @@ async function hmQuery() {
   hmRenderCollections();
 }
 function hmRenderCollections() {
-  const keep = (c) => (!hm.matches || hm.matches.has(c.id)) && (!hmF.favOnly || hmF.favs.has(c.id));
+  const keep = (c) => (!hm.matches || hm.matches.has(c.id)) && hmF.keep(c);
   const shown = hm.collections.filter((c) => c.type === hm.type && keep(c));
   const tag = (m) => !m ? '' : [m.name && 'name', m.script && 'script'].filter(Boolean).join(' + ');
   document.querySelectorAll('#hmToggle button').forEach((b) => {

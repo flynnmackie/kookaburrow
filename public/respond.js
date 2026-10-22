@@ -77,7 +77,7 @@ function rmSummary() {
 }
 // The search box and filters are the same as View Actions (makeFilter). A search or tag/dependency filter is answered by the server
 // (rm.matches holds the ids that matched); picked actions stay picked even when a filter hides them.
-const rmF = makeFilter({ box: $('rmTagFilter'), search: $('rmSearch'), url: '/api/actions', noun: 'action', favKind: 'actions', getType: () => rm.type, onChange: (server) => (server ? rmQuery() : rmRenderActions()) });
+const rmF = makeFilter({ box: $('rmTagFilter'), chips: $('rmChips'), search: $('rmSearch'), url: '/api/actions', noun: 'action', favKind: 'actions', getType: () => rm.type, onChange: (server) => (server ? rmQuery() : rmRenderActions()) });
 async function rmQuery() {
   const qs = rmF.qs(), mine = rm.qn = (rm.qn || 0) + 1;
   try {
@@ -88,7 +88,7 @@ async function rmQuery() {
   rmRenderActions();
 }
 function rmRenderActions() {
-  const keep = (c) => (!rm.matches || rm.matches.has(c.id)) && (!rmF.favOnly || rmF.favs.has(c.id));
+  const keep = (c) => (!rm.matches || rm.matches.has(c.id)) && rmF.keep(c);
   const shown = rm.actions.filter((c) => c.type === rm.type && keep(c));
   const tag = (m) => !m ? '' : [m.name && 'name', m.script && 'script'].filter(Boolean).join(' + ');
   document.querySelectorAll('#rmToggle button').forEach((b) => {
