@@ -21,7 +21,7 @@
   "powershell/firewall-unblock-address.ps1": "3461d29b6df6f6933a7f433f0a15912e55b5d58eb8a48485195adf4131f158e7",
   "powershell/firewall-unblock-port.ps1": "9609eb8386c2aebb953d575bec36dd86d0c24cf87a52d13a188976aa3ba1497f",
   "powershell/host-cancel-shutdown.ps1": "0a240b75fe197b51206476e4675c1320e472801f4deb1f2c39b977322f726f8e",
-  "powershell/host-isolate.ps1": "ea6e2f882e8a92d7e978b459cd4f6c268949e21eed24b81856cba2ffaed7248f",
+  "powershell/host-isolate.ps1": "50666c19eef8cc7802a88c20baf0c5ef1ac47c0f0fa3b2a2512db5c78db4dc1c",
   "powershell/host-release.ps1": "67eb733b6ff3694c29d00e3119c7e1b3fefbcabcb0088ee764359895e00701d5",
   "powershell/host-restart.ps1": "2a19cfa8d5774aa3c6d99748c5b83d55118e5f76aee850593ea6d2b7df58ded4",
   "powershell/host-shutdown.ps1": "cb2b6cf261a88fda3f9eabc669f5d06335dd09820892ae7f5d83385fc2bd77c6",

@@ -41,6 +41,8 @@ const RULES = [
   ['*', /^\/api\/shell\/[^/]+\/(ls|pull|send)$/, ['shell.files']],
   ['*', /^\/api\/shell(\/|$)/, ['shell.open']],
 
+  ['GET', /^\/api\/quarantine(\/log)?$/, ['system.view']],
+  ['*', /^\/api\/quarantine\/[^/]+$/, ['actions.run']], // isolating a host runs the Host - Isolate action
   ['*', /^\/api\/monitor(\/|$)/, ['system.view']],
   ['GET', /^\/api\/settings\/(health|shell)$/, ['system.view']],
   ['*', /^\/api\/settings(\/|$)/, ['system.manage']],

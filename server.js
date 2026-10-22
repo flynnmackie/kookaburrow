@@ -16,6 +16,7 @@ const authTest = require('./src/auth-test');
 const huntRunner = require('./src/hunt-runner');
 const shell = require('./src/shell');
 const monitor = require('./src/monitor');
+const quarantine = require('./src/quarantine');
 const auth = require('./src/auth');
 const permissions = require('./src/permissions');
 const routePerms = require('./src/route-perms');
@@ -729,17 +730,31 @@ app.get('/api/settings/shell', (req, res) => res.json({
 app.put('/api/settings/shell', wrap((req, res) => { shell.setSettings(req.body || {}); res.json({ settings: shell.settings() }); }));
 
 // ---- Health monitor: ping every minute and the WinRM/SSH port every 5 minutes, for every saved host ----
-app.get('/api/monitor', (req, res) => res.json(monitor.snapshot()));
+// the monitor's snapshot with each host's quarantine (null when it is not quarantined)
+const withQuarantine = (snap) => ({ ...snap, hosts: snap.hosts.map((h) => ({ ...h, quarantine: quarantine.get(h.id) })) });
+app.get('/api/monitor', (req, res) => res.json(withQuarantine(monitor.snapshot())));
 app.get('/api/monitor/log', (req, res) => res.json({ enabled: monitor.settings().enabled, entries: monitor.getLog(Math.min(Number(req.query.limit) || 500, 2000)) }));
-app.post('/api/monitor/check', (req, res) => { monitor.checkNow(); res.json(monitor.snapshot()); });
+app.post('/api/monitor/check', (req, res) => { monitor.checkNow(); res.json(withQuarantine(monitor.snapshot())); });
 app.post('/api/monitor/check/:id', wrap(async (req, res) => {
   if (!await monitor.checkHost(req.params.id)) return res.status(404).json({ error: 'Host not found, or health monitoring is off' });
-  res.json(monitor.snapshot());
+  res.json(withQuarantine(monitor.snapshot()));
 }));
+// Quarantine: body { minutes } (leave it out to stay quarantined until released). Both calls return at once; the host is changed in the background.
+app.post('/api/quarantine/:id', wrap(async (req, res) => {
+  const host = db.hosts.find((h) => h.id === req.params.id); if (!host) throw new Error('Host not found');
+  res.json(quarantine.quarantine(host, req.body?.minutes, req.user));
+}));
+app.delete('/api/quarantine/:id', wrap(async (req, res) => {
+  const host = db.hosts.find((h) => h.id === req.params.id); if (!host) throw new Error('Host not found');
+  quarantine.release(host, req.user); res.json({ ok: true });
+}));
+app.get('/api/quarantine', (req, res) => res.json(quarantine.records()));
+app.get('/api/quarantine/log', (req, res) => res.json({ entries: quarantine.getLog(Math.min(Number(req.query.limit) || 500, 2000)) }));
 
 const server = app.listen(config.port, config.host, () => {
   console.log(`Kookaburrow running at http://${config.host}:${config.port}`);
   monitor.start();
+  quarantine.start();
   scheduler.start();
 });
 server.on('error', (e) => {

@@ -95,7 +95,7 @@ const PAGE_PERM = {
   'hosts/view-hosts': 'hosts.view', 'hosts/profiles': 'hosts.view', 'hosts/groups': 'hosts.view', 'hosts/discover': 'hosts.manage', 'hosts/manual': 'hosts.manage',
   'burrow/hunt': 'hunts.view', 'burrow/respond': 'actions.view', 'burrow/recurring': 'hunts.view,actions.view',
   'output/log': 'hunts.view', 'output/report': 'hunts.view', 'output/json': 'hunts.view', 'browse/files': 'hunts.view',
-  'shell/shell': 'shell.open', 'health/monitor': 'system.view', 'health/monitor-log': 'system.view',
+  'shell/shell': 'shell.open', 'health/monitor': 'system.view', 'health/monitor-log': 'system.view', 'health/quarantine-log': 'system.view',
 };
 const pageAllowed = (slug) => can(PAGE_PERM[slug]);
 function refreshTopLocks() {
@@ -132,7 +132,7 @@ const NAV = [
   { id: 'home', label: 'Home', hidden: true, pages: [['home', 'Home']] },
   // Shell and Health are placed apart on the right of the top bar.
   { id: 'shell', label: 'Shell', pages: [['shell', 'Shell']], right: true, hostMenu: true }, // the side menu lists authenticated hosts
-  { id: 'health', label: 'Health', pages: [['monitor', 'Monitor'], ['monitor-log', 'Monitor log']], right: true },
+  { id: 'health', label: 'Health', pages: [['monitor', 'Monitor'], ['monitor-log', 'Monitor log'], ['quarantine-log', 'Quarantine log']], right: true },
 ];
 const loaders = {
   'settings/view-collections': () => loadCollectionList(),
@@ -146,6 +146,7 @@ const loaders = {
   'shell/shell': loadShell,
   'health/monitor': loadMonitor,
   'health/monitor-log': loadMonitorLog,
+  'health/quarantine-log': loadQuarantineLog,
   'settings/user-management': loadUserMgmt,
   'settings/health-settings': loadHealthSettings,
   'settings/shell-settings': loadShellSettings,
@@ -1998,8 +1999,21 @@ async function pollNavStats() {
   clearTimeout(navTimer);
   navTimer = setTimeout(pollNavStats, 10000);
 }
+// Quarantine and release run in the background, so say how each one ended when its card stops showing "…".
+const monQPrev = new Map();
+function monQuarantineToasts() {
+  const now = new Map((monSnap?.hosts || []).map((h) => [h.id, h]));
+  for (const [id, was] of monQPrev) {
+    const h = now.get(id), q = h?.quarantine, name = h?.name || 'The host';
+    if (was === 'pending') { if (!q) toast(`Quarantine of ${name} failed. See the Quarantine log.`, 'bad'); else if (q.status === 'active') toast(`${name} is quarantined`); }
+    if (was === 'releasing') { if (!q) toast(`${name} is no longer quarantined`); else if (q.status === 'active') toast(`Release of ${name} failed. See the Quarantine log.`, 'bad'); }
+  }
+  monQPrev.clear();
+  for (const h of monSnap?.hosts || []) if (h.quarantine && (h.quarantine.status === 'pending' || h.quarantine.status === 'releasing')) monQPrev.set(h.id, h.quarantine.status);
+}
 function renderMonitor() {
   if (!monSnap) return;
+  monQuarantineToasts();
   if (monSnap.enabled === false) {
     $('monSum').innerHTML = '<span class="dim">Monitoring is off</span>';
     $('monGrid').innerHTML = '<p class="dim" style="margin:0">Health monitoring is turned off, so no hosts are being checked. It can be turned back on under Settings → System → Health Settings.</p>';
@@ -2016,14 +2030,16 @@ function renderMonitor() {
     const remTxt = rm.state === 'off' ? 'not monitored' : rm.state === 'up' ? 'open' : rm.state === 'down' ? 'not responding' : 'checking…';
     const hostTip = hp.state === 'off' ? 'Ping is turned off for this host in Settings > System > Health Settings' : hp.state === 'unknown' ? 'Ping has not run yet' : `Ping: ${hp.state === 'up' ? 'replied' : 'no reply'} (checked ${ago(hp.checkedAt)}; ${hp.state === 'up' ? 'up' : 'down'} for ${dur(hp.since)}). Checked every ${pe}.`;
     const remTip = rm.state === 'off' ? `The ${rm.label} port check is turned off for this host in Settings > System > Health Settings` : rm.state === 'unknown' ? `${rm.label} port check has not run yet` : `${rm.label}: ${rm.ports.map((p) => `port ${p.port} ${p.state}`).join(', ')} (checked ${ago(rm.checkedAt)}; ${rm.state === 'up' ? 'up' : 'down'} for ${dur(rm.since)}). Checked every ${re}.`;
-    return `<div class="mon-box ${hp.state === 'off' ? rm.state : hp.state}">
-      <div class="mon-name"><span>${esc(h.name)}</span><span class="mon-proto ${h.protocol === 'ssh' ? 'proto-ssh' : 'proto-winrm'}">${rm.label}</span></div>
+    const q = h.quarantine, qs = q ? q.status || 'active' : '';
+    return `<div class="mon-box ${hp.state === 'off' ? rm.state : hp.state} ${q ? 'quarantined' : ''}">
+      <div class="mon-name"><span>${q ? '<span class="q-warn" title="This host is quarantined (network-isolated)">⚠</span> ' : ''}${esc(h.name)}</span><span class="mon-proto ${h.protocol === 'ssh' ? 'proto-ssh' : 'proto-winrm'}">${rm.label}</span></div>
       <div class="mon-addr">${esc(h.address)}${h.os ? ` · ${esc(String(h.os).replace(/^Microsoft /, '').replace(/\s*\(\d[\d.]*\)$/, ''))}` : ''}</div>
       <div class="mon-pills">
         <span class="mon-pill ${hp.state}" title="${esc(hostTip)}"><i></i><b>Host</b>${esc(hostTxt)}</span>
         <span class="mon-pill ${rm.state}" title="${esc(remTip)}"><i></i><b>Remote</b>${rm.state === 'off' ? '' : `${esc(rm.label)} `}${esc(remTxt)}</span>
       </div>
-      <div class="mon-foot"><button class="act sec mon-check" type="button" data-check="${esc(h.id)}" title="Ping this host and check its ${rm.label} port now">Check</button>${hp.state === 'off' ? 'ping off' : `pinged ${ago(hp.checkedAt)}`} · ${rm.state === 'off' ? `${rm.label} check off` : `${rm.label} checked ${ago(rm.checkedAt)}`}</div></div>`;
+      ${q ? `<div class="q-banner">⚠ ${qs === 'pending' ? 'QUARANTINING…' : qs === 'releasing' ? 'RELEASING…' : `QUARANTINED · ${q.until ? `until ${esc(new Date(q.until).toLocaleString([], { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }))}` : 'until released'}${q.by ? ` · by ${esc(q.by)}` : ''}`}</div>${q.lastError ? `<div class="q-err" title="${esc(q.lastError)}">Last release failed: ${esc(q.lastError)}</div>` : ''}` : ''}
+      <div class="mon-foot"><span class="mon-btns"><button class="act sec mon-check" type="button" data-check="${esc(h.id)}" title="Ping this host and check its ${rm.label} port now">Check</button><button class="act mon-q ${q ? 'on' : ''}" type="button" data-q="${esc(h.id)}" data-qname="${esc(h.name)}" data-qon="${q ? 1 : ''}" ${qs === 'pending' || qs === 'releasing' ? 'disabled' : ''} data-perm="actions.run" data-perm-what="quarantine hosts" title="${q ? 'Lift the quarantine: restore this host\'s network access' : 'Isolate this host from the network with Host - Isolate'}">${qs === 'pending' ? 'Quarantining…' : qs === 'releasing' ? 'Releasing…' : q ? 'Unquarantine' : 'Quarantine'}</button></span>${hp.state === 'off' ? 'ping off' : `pinged ${ago(hp.checkedAt)}`} · ${rm.state === 'off' ? `${rm.label} check off` : `${rm.label} checked ${ago(rm.checkedAt)}`}</div></div>`;
   }).join('') || '<p class="dim" style="margin:0">No saved hosts yet. Add and authenticate hosts under Host Management to monitor them.</p>';
 }
 async function loadMonitor() {
@@ -2040,6 +2056,53 @@ async function loadMonitorLog() {
   clearTimeout(mlTimer);
   if (isActive('health/monitor-log')) mlTimer = setTimeout(loadMonitorLog, 5000);
 }
+// ---- Quarantine: the "for how long?" popup, the "are you sure?" popup, and Health > Quarantine log ----
+let qHost = null;
+function openQuarantine(hostId, name, on) {
+  qHost = { id: hostId, name };
+  $('qMsg').textContent = ''; $('qMsg').className = '';
+  if (on) {
+    $('uqWho').textContent = name; $('uqMsg').textContent = ''; $('uqMsg').className = '';
+    $('uqYes').disabled = false; $('uqYes').textContent = 'Yes, unquarantine'; $('uqModal').hidden = false; $('uqNo').focus();
+  } else {
+    $('qWho').textContent = name; $('qUntil').checked = true; $('qCustom').value = ''; $('qGo').disabled = false; $('qGo').textContent = 'Quarantine'; $('qModal').hidden = false; $('qGo').focus();
+  }
+}
+const closeQ = () => { $('qModal').hidden = true; $('uqModal').hidden = true; };
+$('qX').onclick = $('qCancel').onclick = $('uqX').onclick = $('uqNo').onclick = closeQ;
+$('qModal').onclick = (e) => { if (e.target.id === 'qModal') closeQ(); };
+$('uqModal').onclick = (e) => { if (e.target.id === 'uqModal') closeQ(); };
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && (!$('qModal').hidden || !$('uqModal').hidden)) closeQ(); });
+$('qCustom').oninput = () => { if ($('qCustom').value) $('qCustomRadio').checked = true; };
+$('qGo').onclick = async () => {
+  const v = document.querySelector('#qModal input[name=qlen]:checked')?.value;
+  let minutes = v === 'custom' ? Number($('qCustom').value) : v === 'until' ? 0 : Number(v);
+  if (v === 'custom' && (!Number.isInteger(minutes) || minutes < 1)) { $('qMsg').textContent = 'Enter a whole number of minutes.'; $('qMsg').className = 'bad'; return; }
+  $('qGo').disabled = true;
+  try { await api('POST', `/api/quarantine/${encodeURIComponent(qHost.id)}`, { minutes: minutes || null }); closeQ(); toast(`Quarantining ${qHost.name}…`); loadMonitor(); }
+  catch (e) { $('qMsg').textContent = e.message; $('qMsg').className = 'bad'; $('qGo').disabled = false; $('qGo').textContent = 'Quarantine'; }
+};
+$('uqYes').onclick = async () => {
+  $('uqYes').disabled = true;
+  try { await api('DELETE', `/api/quarantine/${encodeURIComponent(qHost.id)}`); closeQ(); toast(`Releasing ${qHost.name}…`); loadMonitor(); }
+  catch (e) { $('uqMsg').textContent = e.message; $('uqMsg').className = 'bad'; $('uqYes').disabled = false; $('uqYes').textContent = 'Yes, unquarantine'; }
+};
+let qlTimer;
+async function loadQuarantineLog() {
+  let entries;
+  try { entries = (await api('GET', '/api/quarantine/log?limit=1000')).entries; } catch (e) { $('qlBox').innerHTML = `<p class="bad">${esc(e.message)}</p>`; return; }
+  const q = $('qlSearch').value.trim().toLowerCase();
+  const shown = entries.filter((e) => !q || [e.host, e.address, e.action, e.by, e.detail].some((v) => String(v || '').toLowerCase().includes(q)));
+  $('qlCount').textContent = `${shown.length} of ${entries.length} shown`;
+  const bad = (a) => /failed/i.test(a), good = (a) => /^(Quarantined|Released)/.test(a);
+  $('qlBox').innerHTML = shown.length
+    ? `<table class="ml"><thead><tr><th>Time</th><th>Host</th><th>Event</th><th>By</th><th>Detail</th></tr></thead><tbody>${shown.map((e) => `<tr><td class="dim" title="${esc(e.t)}">${esc(new Date(e.t).toLocaleString([], { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }))}</td>
+        <td><b>${esc(e.host)}</b> <span class="dim">${esc(e.address)}</span></td><td class="${bad(e.action) ? 'bad' : e.action === 'Quarantined' ? 'q-text' : good(e.action) ? 'ok' : ''}">${esc(e.action)}</td><td>${e.by ? esc(e.by) : '<span class="dim">-</span>'}</td><td class="mlm ${bad(e.action) ? 'bad' : ''}">${esc(e.detail || '')}</td></tr>`).join('')}</tbody></table>`
+    : `<p class="dim" style="margin:0">${entries.length ? 'Nothing matches.' : 'No host has been quarantined yet.'}</p>`;
+  clearTimeout(qlTimer);
+  if (isActive('health/quarantine-log')) qlTimer = setTimeout(loadQuarantineLog, 5000);
+}
+$('qlSearch').oninput = loadQuarantineLog;
 let mlEnabled = true;
 function renderMonitorLog() {
   const q = $('mlSearch').value.trim().toLowerCase();
@@ -2055,6 +2118,8 @@ function renderMonitorLog() {
 $('mlSearch').oninput = renderMonitorLog;
 $('mlFilter').onclick = (e) => { if (e.target.dataset.f) { mlFilter = e.target.dataset.f; renderMonitorLog(); } };
 $('monGrid').onclick = async (e) => {
+  const qb = e.target.closest('[data-q]');
+  if (qb) { openQuarantine(qb.dataset.q, qb.dataset.qname, !!qb.dataset.qon); return; }
   const b = e.target.closest('[data-check]'); if (!b) return;
   b.disabled = true; b.textContent = 'Checking…';
   try { monSnap = await api('POST', `/api/monitor/check/${encodeURIComponent(b.dataset.check)}`); } catch (err) { toast(err.message, 'bad'); }

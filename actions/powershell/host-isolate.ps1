@@ -1,19 +1,26 @@
 $Name = 'Host - Isolate'
-$Description = 'Network-isolates the host: every enabled Windows Firewall allow rule is switched off (their names are saved so they can be restored), the firewall is turned on for all profiles with inbound and outbound blocked by default, and traffic with AllowedAddresses (comma separated IP addresses or CIDR ranges, which must include this Kookaburrow server or you will lose contact) is allowed in both directions. AutoReleaseMinutes schedules an automatic release as a safety net if you lose contact. Undo it with Host - Release.'
+$Description = 'Network-isolates the host: the firewall is turned on for all profiles with inbound and outbound blocked by default, and Windows Firewall block rules (which override every allow rule) cover every IPv4 address except AllowedAddresses (comma separated IPv4 addresses or CIDR ranges, which must include this Kookaburrow server or you will lose contact); traffic with those addresses is allowed in both directions. On a domain-joined host its domain controllers are allowed too (a domain account cannot log in over WinRM while the host cannot reach a domain controller); set AllowDomainControllers to No to leave them out. No existing rule is changed, so it takes seconds however many rules the host has and release is just removing the new ones. AutoReleaseMinutes schedules an automatic release as a safety net if you lose contact. Undo it with Host - Release.'
 $Dependencies = @()
-$Parameters = @('AllowedAddresses', 'AutoReleaseMinutes?')
+$Parameters = @('AllowedAddresses', 'AutoReleaseMinutes?', 'AllowDomainControllers?')
 $Tags = @('containment', 'network', 'firewall')
 
 $ErrorActionPreference = 'Stop'
 $addrs = @($AllowedAddresses -split '[,; ]+' | Where-Object { $_ })
 if (-not $addrs) { throw 'AllowedAddresses is required: list at least the address of the Kookaburrow server, or you will lose contact with this host' }
-foreach ($a in $addrs) { $ip = $null; if (-not ([Net.IPAddress]::TryParse(($a -split '/')[0], [ref]$ip)) -or ($a -match '/' -and $a -notmatch '/\d{1,3}$')) { throw "Not a valid IP address or range: $a" } }
+foreach ($a in $addrs) { $ip = $null; if (-not ([Net.IPAddress]::TryParse(($a -split '/')[0], [ref]$ip)) -or ($a -match '/' -and $a -notmatch '/\d{1,2}$') -or $ip.AddressFamily -ne 'InterNetwork' -or ($a -match '/(\d+)$' -and [int]$Matches[1] -gt 32)) { throw "Not a valid IPv4 address or range: $a" } }
+# a domain-joined host checks remote logons with a domain controller, so without one nobody (including this server) could log in to release it
+if ($AllowDomainControllers -notmatch '^(no|false|0)$') {
+    $dcIps = @()
+    # found with a DNS lookup of the domain's controller records (an Active Directory query would fail over WinRM: the double-hop limit)
+    try { $cs = Get-CimInstance Win32_ComputerSystem; if ($cs.PartOfDomain) { $dcIps = @(Resolve-DnsName -Type SRV -Name "_ldap._tcp.dc._msdcs.$($cs.Domain)" -ErrorAction Stop | Where-Object { $_.Type -eq 'A' } | ForEach-Object { [string]$_.IPAddress } | Where-Object { $_ -match '^(d{1,3}.){3}d{1,3}$' } | Select-Object -Unique) } } catch { Write-Output "Could not look up the domain controllers: $($_.Exception.Message)" }
+    if ($dcIps) { $addrs = @($addrs + $dcIps | Select-Object -Unique); Write-Output "Domain controllers also allowed so remote logons keep working: $($dcIps -join ', ')" }
+}
 $group = 'Kookaburrow Isolation'
 if (Get-NetFirewallRule -Group $group -ErrorAction SilentlyContinue) { throw 'The host is already isolated. Use Host - Release first.' }
 $dir = 'C:\ProgramData\Kookaburrow'
 New-Item -ItemType Directory -Force -Path $dir | Out-Null
-# what to restore: the allow rules that are on now, and the profile defaults
-$on = @(Get-NetFirewallRule -Enabled True -Action Allow | Where-Object { $_.Direction -in 'Inbound', 'Outbound' } | ForEach-Object { $_.Name })
+# what to restore: the profile defaults (no existing rule is touched, so there is no rule list to save; older isolations that saved one are still restored)
+$on = @()
 $profiles = @(Get-NetFirewallProfile | ForEach-Object { [pscustomobject]@{ Name = $_.Name; Enabled = "$($_.Enabled)"; In = "$($_.DefaultInboundAction)"; Out = "$($_.DefaultOutboundAction)" } })
 [pscustomobject]@{ Rules = $on; Profiles = $profiles; Isolated = (Get-Date).ToString('s') } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath "$dir\isolation-state.json" -Encoding UTF8
 # the release script, used by Host - Release and by the automatic release
@@ -23,7 +30,7 @@ $dir = 'C:\ProgramData\Kookaburrow'
 $s = Get-Content -LiteralPath "$dir\isolation-state.json" -Raw | ConvertFrom-Json
 Get-NetFirewallRule -Group 'Kookaburrow Isolation' -ErrorAction SilentlyContinue | Remove-NetFirewallRule
 foreach ($p in $s.Profiles) { Set-NetFirewallProfile -Profile $p.Name -Enabled $p.Enabled -DefaultInboundAction $p.In -DefaultOutboundAction $p.Out }
-foreach ($r in $s.Rules) { Enable-NetFirewallRule -Name $r -ErrorAction SilentlyContinue }
+$names = @($s.Rules); for ($i = 0; $i -lt $names.Count; $i += 100) { Enable-NetFirewallRule -Name $names[$i..([math]::Min($i + 99, $names.Count - 1))] -ErrorAction SilentlyContinue }
 Remove-Item -LiteralPath "$dir\isolation-state.json" -Force
 schtasks.exe /delete /tn 'Kookaburrow isolation auto-release' /f 2>$null | Out-Null
 '@ | Set-Content -LiteralPath "$dir\release-isolation.ps1" -Encoding UTF8
@@ -35,7 +42,23 @@ if ($AutoReleaseMinutes -match '^\d+$' -and [int]$AutoReleaseMinutes -gt 0) {
     $null = schtasks.exe /create /tn 'Kookaburrow isolation auto-release' /sc once /st $at /ru SYSTEM /rl HIGHEST /f /tr "powershell.exe -NoProfile -ExecutionPolicy Bypass -File $dir\release-isolation.ps1"
     Write-Output "Automatic release scheduled for $at (in about $AutoReleaseMinutes minutes)"
 }
-$null = $on | ForEach-Object { Disable-NetFirewallRule -Name $_ -ErrorAction SilentlyContinue }
-Enable-NetFirewallRule -Group $group
+# block rules beat allow rules, so every address EXCEPT the allowed ones is blocked in both directions: the complement of the allowed ranges
+$ranges = foreach ($a in $addrs) {
+    $parts = $a -split '/'; $b = [Net.IPAddress]::Parse($parts[0]).GetAddressBytes()
+    $n = [uint64]$b[0] * 16777216 + [uint64]$b[1] * 65536 + [uint64]$b[2] * 256 + [uint64]$b[3]
+    $size = [math]::Pow(2, 32 - $(if ($parts.Count -gt 1) { [int]$parts[1] } else { 32 }))
+    $lo = [math]::Floor($n / $size) * $size
+    [pscustomobject]@{ Lo = [uint64]$lo; Hi = [uint64]($lo + $size - 1) }
+}
+$toIp = { param([uint64]$v) '{0}.{1}.{2}.{3}' -f [math]::Floor($v / 16777216), ([math]::Floor($v / 65536) % 256), ([math]::Floor($v / 256) % 256), ($v % 256) }
+$block = @(); $cursor = [uint64]0
+foreach ($r in ($ranges | Sort-Object Lo)) {
+    if ($r.Lo -gt $cursor) { $block += ('{0}-{1}' -f (& $toIp $cursor), (& $toIp ($r.Lo - 1))) }
+    if ($r.Hi + 1 -gt $cursor) { $cursor = $r.Hi + 1 }
+}
+if ($cursor -le 4294967295) { $block += ('{0}-{1}' -f (& $toIp $cursor), '255.255.255.255') }
+$block += '::-ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff' # and all of IPv6
+New-NetFirewallRule -DisplayName 'Kookaburrow isolation block inbound' -Group $group -Direction Inbound -Action Block -RemoteAddress $block -Profile Any | Out-Null
+New-NetFirewallRule -DisplayName 'Kookaburrow isolation block outbound' -Group $group -Direction Outbound -Action Block -RemoteAddress $block -Profile Any | Out-Null
 Set-NetFirewallProfile -All -Enabled True -DefaultInboundAction Block -DefaultOutboundAction Block
-Write-Output "Isolated: $($on.Count) allow rules switched off; only $($addrs -join ', ') can reach this host. Use Host - Release to undo."
+Write-Output "Isolated: everything except the allowed addresses is blocked; only $($addrs -join ', ') can reach this host. Use Host - Release to undo."
