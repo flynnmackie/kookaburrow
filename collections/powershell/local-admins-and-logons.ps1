@@ -1,4 +1,4 @@
-$Name = 'Local admins and recent logons'
+$Name = 'Accounts - Local Admins'
 $Description = 'Local Administrators members and the last 50 successful logons (Windows; logons need admin).'
 $Dependencies = @()
 $Tags = @('accounts', 'logons', 'event-logs')

@@ -1,4 +1,4 @@
-NAME='Linux listeners and cron'
+NAME='Network - Listeners and Cron'
 DESCRIPTION='Listening sockets and cron entries (Linux, run over SSH with bash).'
 DEPENDENCIES=()
 TAGS=(network listening persistence cron)
@@ -11,3 +11,4 @@ find /etc/cron* -type f 2>/dev/null
 echo
 echo '== Current user crontab =='
 crontab -l 2>&1
+exit 0

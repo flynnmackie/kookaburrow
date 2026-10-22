@@ -1,4 +1,4 @@
-$Name = 'Disable local user'
+$Name = 'Accounts - Disable User'
 $Description = 'Disables a local account so it can no longer log on, without deleting it or its profile (reversible).'
 $Dependencies = @()
 $Parameters = @('UserName')

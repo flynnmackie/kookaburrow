@@ -1,4 +1,4 @@
-$Name = 'Running processes'
+$Name = 'Processes - List'
 $Description = 'Process list with path, parent PID and command line (Windows).'
 $Dependencies = @()
 $Tags = @('processes', 'execution', 'discovery')

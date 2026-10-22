@@ -1,4 +1,4 @@
-$Name = 'Recent executables and scripts in user-writable folders'
+$Name = 'Files - Temp Executables'
 $Description = 'Finds executables, libraries and scripts changed in the last 7 days under user temp, downloads, AppData, ProgramData and Public folders, with signature status and SHA-256. Malware is commonly dropped and run from these locations.'
 $Dependencies = @()
 $Tags = @('execution', 'malware', 'filesystem')

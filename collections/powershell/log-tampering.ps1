@@ -1,4 +1,4 @@
-$Name = 'Event log clearing and audit policy changes'
+$Name = 'Event Logs - Tampering'
 $Description = 'Looks for Security log cleared (1102), System log cleared (104) and audit policy changed (4719) events, then shows new service installs (7045). Clearing logs and weakening auditing are common defense evasion steps. Needs administrator rights for the Security log.'
 $Dependencies = @()
 $Tags = @('defense-evasion', 'event-logs', 'persistence')

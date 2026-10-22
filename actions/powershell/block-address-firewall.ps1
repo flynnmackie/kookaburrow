@@ -1,4 +1,4 @@
-$Name = 'Block remote address in firewall'
+$Name = 'Firewall - Block Address'
 $Description = 'Adds inbound and outbound Windows Firewall rules blocking one remote IP address, for example a C2 server.'
 $Dependencies = @()
 $Parameters = @('RemoteAddress')

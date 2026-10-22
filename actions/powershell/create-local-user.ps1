@@ -1,4 +1,4 @@
-$Name = 'Create local user'
+$Name = 'Accounts - Create User'
 $Description = 'Creates a local account with the given password, optionally adding it to a local group such as Administrators.'
 $Dependencies = @()
 $Parameters = @('UserName', 'Password', 'Group?')

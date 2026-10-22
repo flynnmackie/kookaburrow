@@ -1,4 +1,4 @@
-$Name = 'Persistence - Run keys and scheduled tasks'
+$Name = 'Persistence - Run Keys and Tasks'
 $Description = 'Registry Run/RunOnce entries and non-Microsoft scheduled tasks (Windows).'
 $Dependencies = @()
 $Tags = @('persistence', 'registry', 'scheduled-tasks')

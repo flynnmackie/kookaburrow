@@ -1,4 +1,4 @@
-NAME='Processes running deleted or temp-dir binaries'
+NAME='Processes - Suspicious'
 DESCRIPTION='Walks /proc for processes whose executable has been deleted from disk or runs from /tmp, /var/tmp or /dev/shm. Malware often deletes itself after starting or runs from world-writable memory-backed folders. Run as root to see every process.'
 DEPENDENCIES=()
 TAGS=(execution malware processes defense-evasion)
@@ -24,3 +24,4 @@ for p in /proc/[0-9]*; do
   cwd=$(readlink "$p/cwd" 2>/dev/null) || continue
   case "$cwd" in *'(deleted)'*) printf '%s\t%s\n' "${p#/proc/}" "$cwd";; esac
 done
+exit 0

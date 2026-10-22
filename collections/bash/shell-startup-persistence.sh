@@ -1,4 +1,4 @@
-NAME='Shell startup files and suspicious commands'
+NAME='Shell - Startup Persistence'
 DESCRIPTION='Checks system and per-user shell startup files (profile, bashrc, profile.d) changed in the last 30 days, and greps them for download cradles, reverse shell patterns and encoded payloads. These files run on every login so attackers append commands to them.'
 DEPENDENCIES=()
 TAGS=(persistence execution shell)
@@ -27,3 +27,4 @@ for f in $files; do
   fi
 done
 [ "$hit" -eq 0 ] && echo '(none found)'
+exit 0

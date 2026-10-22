@@ -1,4 +1,4 @@
-$Name = 'Prefetch - programs recently executed'
+$Name = 'Prefetch - List'
 $Description = 'Lists Windows Prefetch files, which record that a program ran, with an approximate first and last run time from the file timestamps. Evidence of execution survives even if the binary was deleted. Needs administrator rights, and Prefetch is usually disabled on servers.'
 $Dependencies = @()
 $Tags = @('execution', 'forensics', 'filesystem')

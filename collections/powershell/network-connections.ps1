@@ -1,4 +1,4 @@
-$Name = 'Established network connections'
+$Name = 'Network - Connections'
 $Description = 'Lists established TCP connections to non-loopback addresses with the owning process, its path and its parent, sorted by remote address. A starting point for finding command and control and lateral movement.'
 $Dependencies = @()
 $Tags = @('network', 'c2', 'lateral-movement', 'processes')

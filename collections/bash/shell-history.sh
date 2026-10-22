@@ -1,4 +1,4 @@
-NAME='Shell history for all users'
+NAME='Shell - History'
 DESCRIPTION='Prints the last 100 lines of bash, zsh and sh history for every account with a readable home directory. Command history often shows attacker reconnaissance and tooling. Empty or missing history for an active account can itself be a sign of tampering.'
 DEPENDENCIES=()
 TAGS=(execution history forensics defense-evasion)
@@ -19,3 +19,4 @@ getent passwd | while IFS=: read -r user _ uid _ _ home shell; do
     fi
   done
 done
+exit 0

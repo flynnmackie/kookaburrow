@@ -1,4 +1,4 @@
-$Name = 'WMI event subscription persistence'
+$Name = 'WMI - Persistence'
 $Description = 'Lists permanent WMI event filters, consumers and bindings in root\subscription. Attackers use these to run commands or scripts on a trigger without any file in a startup location.'
 $Dependencies = @()
 $Tags = @('persistence', 'wmi', 'execution')

@@ -1,4 +1,4 @@
-NAME='SUID and SGID binaries'
+NAME='Files - SUID and SGID'
 DESCRIPTION='Finds files with the setuid or setgid bit on the main filesystem and separately lists those outside the standard system directories. Unexpected SUID binaries are a common privilege escalation and persistence trick.'
 DEPENDENCIES=()
 TAGS=(privilege-escalation persistence filesystem)
@@ -10,3 +10,4 @@ printf '%s\n' "$all" | grep -Ev ' /(usr/(bin|sbin|lib|lib64|libexec|local/bin)|b
 echo
 echo "== All SUID/SGID files ($(printf '%s\n' "$all" | grep -c .) total, mode owner date path) =="
 printf '%s\n' "$all"
+exit 0

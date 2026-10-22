@@ -20,6 +20,18 @@ Env vars: `KB_HOST` (default 127.0.0.1), `KB_PORT` (default 46200).
 3. **Hosts**: saved hosts can be grouped into lists.
 4. **Collections**: PowerShell collections live in `collections/powershell/*.ps1` and Linux collections in `collections/bash/*.sh`; each shows up in Settings → View Collections automatically, where you can search names and script text and filter by tag. Run one against a host or list. Output is stored in `data/db.json`.
 
+## The library
+
+About 200 hunts (`collections/`) and 115 actions (`actions/`) ship with the app, written in PowerShell for Windows and bash for Linux and signed (see below). They are re-implementations of the techniques in Velociraptor, KAPE and UAC artifacts, not copies of them.
+
+- **Naming**: every name is `Area - Thing`, short and title case, for example `Prefetch - List`, `Prefetch - Parse`, `Prefetch - Collect`, `Event Logs - Logons`, `Host - Isolate`. The file name is the same in kebab case. The variants of one artefact share the area: *List* shows it, *Parse* decodes it, *Collect* brings the raw files back.
+- **Parameters**: a hunt or action lists the inputs it takes in `$Parameters = @('LogName', 'LastMinutes?')` (`PARAMETERS=(DAYS? PATTERN)` in bash); a trailing `?` makes one optional. They are set on the Parameters tab of New Hunt / New Response. Event log hunts take `LastMinutes`, or `StartTime` and `EndTime` (`yyyy-MM-dd HH:mm`), and default to the last 24 hours. The values are set as variables on the first lines of the script, so a parameter must not be called `Name`, `Description`, `Type` and so on (PowerShell) or `NAME`, `PATH`, `SECONDS`, `HOSTNAME`, `UID` (bash), which the script itself uses.
+- **Raw files** (`$Transfer = 'large'`): hunts that bring files back (Prefetch, hives, event logs, SRUM, jump lists, browser data, memory, captures) write them to `$OutDir` and the server pulls them over SMB (Windows) or SFTP (Linux). See *Large file transfers*.
+- **Nothing to install on targets**: parsing of Prefetch, Shimcache, Amcache, UserAssist, BAM, the Recycle Bin and the USN journal is done natively in PowerShell, so no .NET tools are needed on hosts. Collections that do need a tool declare it as a dependency, and it must be one standalone file: Sysinternals `sigcheck64.exe`, `handle64.exe`, `listdlls64.exe`, `accesschk64.exe`, `procdump64.exe`, `autorunsc.exe`; `winpmem.exe`; `yara64.exe` (with your own rules as `kb-rules.yar`); NirSoft `BrowsingHistoryView.exe`; plus `kape.zip` and `uac.tar.gz` for the KAPE and UAC hunts. They all show as "not uploaded" under Settings → Binaries until you add them, and a hunt that needs one stays greyed out in the New Hunt dialog.
+- **Active Directory hunts** (`AD - ...`) use built-in ADSI and must be run against a domain controller (from a member server over WinRM the double-hop limit stops the query, and the hunt says so).
+- **Signed**: `collections/verified.json` and `actions/verified.json` hold the SHA-256 of each shipped script; a script that still matches is "standard", an edited or added one is "custom". After changing a script run `node scripts/verify-collections.js` once you have reviewed it.
+- **Actions that can cut you off** (`Host - Isolate`, `Network - Disable Adapter`, `SSH - Disable Password Login`) refuse to run without the information that keeps you connected (an allow list that must include the Kookaburrow server, or an explicit `CONFIRM`), and Host - Isolate can schedule an automatic release.
+
 ## Writing a collection
 
 Copy [TEMPLATE.ps1](collections/TEMPLATE.ps1) or [TEMPLATE.sh](collections/TEMPLATE.sh). Every collection starts with four plain-literal metadata variables, which the platform reads as text without running the script:

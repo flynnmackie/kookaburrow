@@ -1,4 +1,4 @@
-NAME='Authentication log activity'
+NAME='Logs - Auth Activity'
 DESCRIPTION='Summarises SSH logins and sudo use from the authentication log (auth.log or secure, or journald): successful logins, failed attempts grouped by source address, and recent sudo commands. Run as root to read the logs.'
 DEPENDENCIES=()
 TAGS=(logons event-logs brute-force accounts)
@@ -34,3 +34,4 @@ src | grep -E 'sudo:.*COMMAND=' | tail -n 30
 echo
 echo '== New users and group changes =='
 src | grep -E 'useradd|usermod|groupadd|new user|new group|added .* to group' | tail -n 30
+exit 0

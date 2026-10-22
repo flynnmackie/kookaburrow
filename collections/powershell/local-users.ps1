@@ -1,4 +1,4 @@
-$Name = 'Local users and profiles'
+$Name = 'Accounts - Local Users'
 $Description = 'Lists local accounts with enabled state, last logon and password age, plus user profiles on disk with last use time. Helps find new, dormant or unexpected accounts.'
 $Dependencies = @()
 $Tags = @('accounts', 'persistence', 'discovery')

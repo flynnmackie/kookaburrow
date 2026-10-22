@@ -1,4 +1,4 @@
-$Name = 'Listening ports'
+$Name = 'Network - Listening Ports'
 $Description = 'TCP listeners and owning process (Windows).'
 $Dependencies = @()
 $Tags = @('network', 'listening', 'discovery')

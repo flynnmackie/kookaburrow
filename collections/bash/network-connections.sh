@@ -1,4 +1,4 @@
-NAME='Established connections and listeners'
+NAME='Network - Connections'
 DESCRIPTION='Lists established TCP connections and all listening sockets with the owning process, falling back to netstat when ss is missing. Run as root to see process names for every socket.'
 DEPENDENCIES=()
 TAGS=(network c2 lateral-movement listening)
@@ -18,3 +18,4 @@ fi
 echo
 echo '== ARP / neighbour table =='
 ip neigh 2>/dev/null || arp -an 2>/dev/null
+exit 0

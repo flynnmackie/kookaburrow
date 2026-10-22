@@ -1,4 +1,4 @@
-$Name = 'Log off user sessions'
+$Name = 'Accounts - Log Off User'
 $Description = 'Logs off every interactive or RDP session belonging to the given user name.'
 $Dependencies = @()
 $Parameters = @('UserName')

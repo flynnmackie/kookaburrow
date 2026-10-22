@@ -1,4 +1,4 @@
-$Name = 'Stop and disable service'
+$Name = 'Services - Stop and Disable'
 $Description = 'Stops a Windows service and sets its start type to Disabled so it does not come back after a reboot.'
 $Dependencies = @()
 $Parameters = @('ServiceName')

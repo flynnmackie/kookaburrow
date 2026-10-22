@@ -1,4 +1,4 @@
-NAME='Kernel modules and library preloading'
+NAME='Kernel - Modules and Preload'
 DESCRIPTION='Checks for rootkit style persistence: loaded kernel modules, the kernel taint flag, /etc/ld.so.preload and LD_PRELOAD set in running processes. Preloaded libraries and unknown modules can hide files, processes and connections.'
 DEPENDENCIES=()
 TAGS=(persistence rootkit defense-evasion)
@@ -25,3 +25,4 @@ for p in /proc/[0-9]*; do
   fi
 done
 [ "$found" -eq 0 ] && echo '(none found, or /proc/*/environ not readable)'
+exit 0

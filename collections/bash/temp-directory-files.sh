@@ -1,4 +1,4 @@
-NAME='Executables and hidden files in temp directories'
+NAME='Files - Temp Directories'
 DESCRIPTION='Finds executable files, scripts and hidden entries in /tmp, /var/tmp and /dev/shm, plus world-writable directories elsewhere without the sticky bit. Attackers stage tools in these world-writable locations.'
 DEPENDENCIES=()
 TAGS=(malware filesystem execution)
@@ -22,3 +22,4 @@ find $dirs -mindepth 1 -name '.*' -printf '%TY-%Tm-%Td %TH:%TM  %u  %p\n' 2>/dev
 echo
 echo '== World-writable directories without the sticky bit (outside /proc and /sys) =='
 find / -xdev -type d -perm -0002 ! -perm -1000 -not -path '/proc/*' -not -path '/sys/*' 2>/dev/null | head -n 100
+exit 0

@@ -1,4 +1,4 @@
-$Name = 'Kill process by name'
+$Name = 'Processes - Kill by Name'
 $Description = 'Stops every running process with the given image name (for example evil.exe) and reports what was stopped.'
 $Dependencies = @()
 $Parameters = @('ProcessName')

@@ -1,4 +1,4 @@
-$Name = 'KAPE SANS Triage + EZParser (large transfer)'
+$Name = 'KAPE - SANS Triage'
 $Description = 'Runs KAPE on the host: collects the !SANS_Triage target set (event logs, registry hives, MFT, Prefetch, browser and user artefacts) and parses it with the !EZParser modules. Everything is packed into one zip that comes back as a raw file, then removed from the host. Needs kape.zip: your whole KAPE folder (kape.exe with Targets and Modules, including the EZ Tools under Modules\bin), zipped. Takes a while, and the archive can be several GB, so it comes back over SMB, which is switched on for this collection only. Needs administrator rights and roughly twice the archive size free on the host.'
 $Dependencies = @('kape.zip')
 $Tags = @('forensics', 'triage', 'filesystem', 'event-logs')

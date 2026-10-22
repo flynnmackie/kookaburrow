@@ -1,0 +1,22 @@
+$Name = 'Processes - Suspend'
+$Description = 'Freezes a process (all its threads stop running) without ending it, by process id. The process stays in memory with its connections, so you can image or inspect it, and continue it with Processes - Resume. Refuses system PIDs (4 and below).'
+$Dependencies = @()
+$Parameters = @('ProcessId')
+$Tags = @('containment', 'process')
+
+if (-not ($ProcessId -as [int]) -or [int]$ProcessId -le 4) { throw 'ProcessId is required and must be a number above 4' }
+Add-Type -TypeDefinition @'
+using System; using System.Runtime.InteropServices;
+public static class KbProc {
+    [DllImport("ntdll.dll")] public static extern uint NtSuspendProcess(IntPtr h);
+    [DllImport("ntdll.dll")] public static extern uint NtResumeProcess(IntPtr h);
+    [DllImport("kernel32.dll")] public static extern IntPtr OpenProcess(uint access, bool inherit, int pid);
+    [DllImport("kernel32.dll")] public static extern bool CloseHandle(IntPtr h);
+}
+'@
+$p = Get-Process -Id ([int]$ProcessId) -ErrorAction Stop
+$h = [KbProc]::OpenProcess(0x800, $false, $p.Id) # PROCESS_SUSPEND_RESUME
+if ($h -eq [IntPtr]::Zero) { throw "Could not open PID $($p.Id) (access denied)" }
+$r = [KbProc]::NtSuspendProcess($h); [void][KbProc]::CloseHandle($h)
+if ($r -ne 0) { throw "NtSuspendProcess failed with status 0x$($r.ToString('x'))" }
+Write-Output "Suspended PID $($p.Id) $($p.ProcessName)"

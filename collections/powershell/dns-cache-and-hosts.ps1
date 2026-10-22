@@ -1,4 +1,4 @@
-$Name = 'DNS cache and hosts file'
+$Name = 'DNS - Cache and Hosts'
 $Description = 'Dumps the client DNS resolver cache and any active entries in the hosts file. Useful for spotting command and control domains a host has recently resolved and for hosts file tampering.'
 $Dependencies = @()
 $Tags = @('network', 'dns', 'c2', 'discovery')

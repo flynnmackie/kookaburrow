@@ -1,4 +1,4 @@
-NAME='systemd services, timers and startup scripts'
+NAME='Systemd - Persistence'
 DESCRIPTION='Lists enabled services, systemd unit files created or changed in the last 30 days, timers, user-level units and legacy startup scripts (rc.local, init.d). New units are a common way to keep access on Linux.'
 DEPENDENCIES=()
 TAGS=(persistence systemd services)
@@ -23,3 +23,4 @@ echo
 echo '== Legacy startup scripts =='
 ls -l /etc/rc.local 2>/dev/null && grep -Ev '^\s*(#|$)' /etc/rc.local 2>/dev/null
 find /etc/init.d -type f -mtime -30 -printf '%TY-%Tm-%Td %TH:%TM  %p\n' 2>/dev/null
+exit 0

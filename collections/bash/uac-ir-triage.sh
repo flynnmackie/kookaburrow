@@ -1,4 +1,4 @@
-NAME='UAC IR triage (large transfer)'
+NAME='UAC - IR Triage'
 DESCRIPTION='Runs UAC (Unix-like Artifacts Collector) with the ir_triage profile on the host: live response data, system and user artefacts, logs and configuration, as one tar.gz plus the UAC log and hash file. Everything comes back as raw files over SFTP and is then removed from the host. Needs uac.tar.gz: the UAC release tarball (for example uac-3.x.x.tar.gz from the UAC GitHub releases page, uploaded under the name uac.tar.gz). Needs root, or an account with passwordless sudo. Can take a while and produce hundreds of MB.'
 DEPENDENCIES=(uac.tar.gz)
 TAGS=(forensics triage filesystem)
@@ -37,3 +37,4 @@ echo "Archive size MB: $(( $(stat -c %s "$archive") / 1048576 ))"
 echo "Profile: ir_triage"
 echo "UAC exit code: $uac_exit"
 echo "Minutes: $(( ($(date +%s) - started) / 60 ))"
+exit 0

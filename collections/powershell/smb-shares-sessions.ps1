@@ -1,4 +1,4 @@
-$Name = 'SMB shares, sessions and mapped drives'
+$Name = 'SMB - Shares and Sessions'
 $Description = 'Shows the shares this host exposes, who is connected to them right now, and the SMB connections and drive mappings this host has made outward. Useful for spotting lateral movement over SMB and unexpected shares.'
 $Dependencies = @()
 $Tags = @('lateral-movement', 'network', 'smb', 'discovery')

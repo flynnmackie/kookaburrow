@@ -1,4 +1,4 @@
-$Name = 'PowerShell history and suspicious script blocks'
+$Name = 'PowerShell - Activity'
 $Description = 'Reads each user PSReadLine command history (last 50 lines) and searches the PowerShell Operational log for script blocks (event 4104) containing common attacker patterns such as encoded commands, download cradles and in-memory loading. Script block logging must be enabled for 4104 events to exist.'
 $Dependencies = @()
 $Tags = @('execution', 'powershell', 'event-logs', 'defense-evasion')

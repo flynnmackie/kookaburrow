@@ -1,4 +1,4 @@
-NAME='SSH authorized keys and server config'
+NAME='SSH - Keys and Config'
 DESCRIPTION='Lists authorized_keys entries for every user (key type, comment and a short fingerprint source, not the key itself), the size of known_hosts files, and the security-relevant sshd settings. Added authorized keys are a quiet persistence method.'
 DEPENDENCIES=()
 TAGS=(persistence ssh lateral-movement accounts)
@@ -29,3 +29,4 @@ if command -v sshd >/dev/null 2>&1 && sshd -T 2>/dev/null | grep -Ei '^(permitro
 else
   grep -Ei '^\s*(PermitRootLogin|PasswordAuthentication|PermitEmptyPasswords|PubkeyAuthentication|AuthorizedKeysFile|AuthorizedKeysCommand|Port|AllowUsers|AllowGroups)\b' /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf 2>/dev/null || echo '(sshd config not readable)'
 fi
+exit 0

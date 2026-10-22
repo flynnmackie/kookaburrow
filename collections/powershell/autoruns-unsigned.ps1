@@ -1,4 +1,4 @@
-$Name = 'Autoruns - unsigned autostart entries'
+$Name = 'Autoruns - Unsigned'
 $Description = 'Runs Sysinternals Autoruns (autorunsc) across every autostart location and lists entries that are not signed by a verified publisher, with hashes and launch strings. The hunter supplies autorunsc.exe; the platform copies it to a temporary folder on the target, runs this collection, and deletes the folder afterwards.'
 $Dependencies = @('autorunsc.exe')
 $Tags = @('persistence', 'autoruns', 'signing')
