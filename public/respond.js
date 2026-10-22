@@ -162,7 +162,7 @@ function rmSetRecurring(on) {
 function rmQuickUi(host) {
   rm.quick = host || null;
   const q = !!host;
-  $('rmTitle').textContent = q ? `Quick response · ${host.hostname || host.name}` : 'New response';
+  $('rmTitle').textContent = q ? `Quick response · ${host.name || host.hostname}` : 'New response';
   rmEl('TabWho').hidden = q; rmEl('Rerun').hidden = q;
   rmEl('TabAct').querySelector('.hnum').textContent = q ? '1' : '2';
   rmEl('TabParams').querySelector('.hnum').textContent = q ? '2' : '3';

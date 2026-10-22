@@ -27,7 +27,7 @@ function startResponse({ name, actionIds, hosts, params, startedBy, scheduleId, 
 
   const started = new Date();
   const folder = createRunFolder('response', respName, started, quick);
-  const label = (h) => h.hostname || h.name || h.address;
+  const label = (h) => h.name || h.hostname || h.address;
   const proto = (h) => (h.protocol === 'ssh' ? 'SSH' : 'WinRM');
   const hostBase = (h) => `${folder.base}_${safeName(h.address, 'host')}`;
   const outputs = new Map(); // `${actionId}|${hostId}` -> csv text

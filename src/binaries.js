@@ -4,6 +4,8 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { Transform } = require('stream');
+const { pipeline } = require('stream/promises');
 const { binariesDir } = require('./config');
 const collections = require('./collections');
 
@@ -59,6 +61,37 @@ function saveBinary(name, data) {
   fs.renameSync(tmp, dest);
 }
 
+// The same rules as saveBinary, for a file that arrives as a stream (copied from another location). An existing binary is only replaced
+// when overwrite is true (otherwise { skipped: true }). The stream is checked while it is written, so a file over the limit stops early;
+// an expected SHA-256, when given, must match or nothing is kept.
+async function importStream(name, stream, { overwrite = false, expectedSha256 = '' } = {}) {
+  if (!isSafeName(name)) throw new Error('Invalid binary name');
+  if (!collections.listCollections().some((h) => h.dependencies.includes(name))) throw new Error(`No collection requires "${name}"`);
+  const expected = String(expectedSha256 ?? '').trim().toLowerCase();
+  if (expected && !/^[0-9a-f]{64}$/.test(expected)) throw new Error('The expected SHA-256 must be 64 hex characters');
+  const dest = path.join(binariesDir, name);
+  if (fs.existsSync(dest) && !overwrite) { stream.destroy?.(); return { skipped: true }; }
+  fs.mkdirSync(binariesDir, { recursive: true });
+  const tmp = `${dest}.upload`;
+  const hash = crypto.createHash('sha256');
+  let size = 0, head = Buffer.alloc(0);
+  const watch = new Transform({ transform(chunk, enc, cb) {
+    size += chunk.length;
+    if (size > MAX_BYTES) return cb(new Error(`File is too large (the limit is ${MAX_BYTES / 1024 / 1024} MB)`));
+    if (head.length < 2) head = Buffer.concat([head, chunk.subarray(0, 2 - head.length)]);
+    hash.update(chunk); cb(null, chunk);
+  } });
+  try {
+    await pipeline(stream, watch, fs.createWriteStream(tmp));
+    const sha256 = hash.digest('hex');
+    if (!size) throw new Error('The file is empty');
+    if (/.(exe|dll|sys)$/i.test(name) && head.toString('latin1') !== 'MZ') throw new Error('That does not look like a Windows executable (missing MZ header)');
+    if (expected && sha256 !== expected) throw new Error(`The SHA-256 does not match (got ${sha256})`);
+    fs.renameSync(tmp, dest);
+    return { size, sha256 };
+  } catch (e) { fs.rmSync(tmp, { force: true }); throw e; }
+}
+
 function removeBinary(name) {
   if (!isSafeName(name)) throw new Error('Invalid binary name');
   const file = path.join(binariesDir, name);
@@ -73,4 +106,4 @@ function summary() {
   return { uploaded, missing: declared.size - uploaded };
 }
 
-module.exports = { summary, listBinaries, saveBinary, removeBinary, MAX_BYTES };
+module.exports = { summary, listBinaries, saveBinary, importStream, removeBinary, MAX_BYTES };

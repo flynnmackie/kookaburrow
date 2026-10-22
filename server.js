@@ -206,6 +206,16 @@ app.post('/api/hosts', wrap(async (req, res) => {
 }));
 
 app.get('/api/hosts', (req, res) => res.json(db.hosts.map(publicHost)));
+// Rename a saved host. An empty name goes back to the name discovered for it (its hostname, or its address).
+app.put('/api/hosts/:id', wrap(async (req, res) => {
+  const h = db.hosts.find((x) => x.id === req.params.id);
+  if (!h) throw new Error('Host not found');
+  const name = String(req.body?.name ?? '').trim();
+  if (/[\u0000-\u001f]/.test(name) || name.length > 100) throw new Error('The name must be under 100 characters, with no control characters');
+  h.name = name || h.hostname || h.address;
+  save();
+  res.json(publicHost(h));
+}));
 app.delete('/api/hosts/:id', (req, res) => {
   db.hosts = db.hosts.filter((h) => h.id !== req.params.id);
   db.lists.forEach((l) => { l.hostIds = l.hostIds.filter((x) => x !== req.params.id); });
@@ -253,6 +263,19 @@ app.delete('/api/lists/:id', (req, res) => {
 // ---- Binaries ---------------------------------------------------------------------------
 app.get('/api/binaries', wrap((req, res) => res.json(binaries.listBinaries())));
 // Upload: the request body is the raw file; the :name slot decides what it is stored as.
+// Upload from server: search an external location for the binaries the collections need, then import the ones picked.
+// body of search: { type: 'folder'|'smb'|'webdav'|'sftp', ...the fields of that type }. Nothing about the source is stored.
+const binarySources = require('./src/binary-sources');
+app.get('/api/binaries/source/browse', wrap(async (req, res) => res.json(await binarySources.browse(req.query.path))));
+app.post('/api/binaries/source/search', wrap(async (req, res) => res.json(await binarySources.search(req.body || {}))));
+app.post('/api/binaries/source/import', wrap(async (req, res) => {
+  res.json({ results: await binarySources.importItems(req.body?.session, req.body?.items, req.body?.overwrite), binaries: binaries.listBinaries() });
+}));
+// Sign in with Nextcloud (Login Flow v2): start returns a link for the user's browser, status is polled until they have approved it.
+app.post('/api/binaries/source/nextcloud/start', wrap(async (req, res) => res.json(await binarySources.ncStart(req.body?.url, req.body?.insecure))));
+app.get('/api/binaries/source/nextcloud/:id', wrap(async (req, res) => res.json(await binarySources.ncStatus(req.params.id))));
+app.delete('/api/binaries/source/nextcloud/:id', wrap(async (req, res) => { await binarySources.endNextcloud(req.params.id); res.json({ ok: true }); }));
+app.delete('/api/binaries/source/:session', (req, res) => { binarySources.end(req.params.session); res.json({ ok: true }); });
 app.put('/api/binaries/:name', express.raw({ type: '*/*', limit: binaries.MAX_BYTES }), wrap((req, res) => {
   binaries.saveBinary(req.params.name, req.body);
   res.json(binaries.listBinaries().find((b) => b.name === req.params.name));

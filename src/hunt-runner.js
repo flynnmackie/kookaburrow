@@ -44,7 +44,7 @@ function startHunt({ name, collectionIds, hosts, params, startedBy, scheduleId, 
 
   const started = new Date();
   const folder = createRunFolder('hunt', huntName, started, quick);
-  const label = (h) => h.hostname || h.name || h.address;
+  const label = (h) => h.name || h.hostname || h.address;
 
   const run = {
     id: id(), kind: 'hunt', name: huntName, startedBy: startedBy || null, ...(scheduleId ? { scheduleId } : {}), ...(quick ? { quick: true } : {}),

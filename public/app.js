@@ -527,7 +527,7 @@ function renderHosts() {
     const pc = h.protocol === 'ssh' ? 'proto-ssh' : 'proto-winrm';
     const rc = h.remoteCheck || { up: true, at: h.verifiedAt };
     return `<tr data-hostrow="${esc(h.id)}"><td class="hdotc"><span class="hdot ${rc.up ? '' : 'down'}" data-dot="${esc(h.id)}"></span></td><td class="rown">${i + 1}</td>
-    <td>${esc(h.name)}</td><td>${esc(h.address)}</td><td class="${pc}" title="${esc(h.os)}">${esc(String(h.os || '').replace(/^Microsoft /, '').replace(/\s*\(\d[\d.]*\)$/, ''))}</td><td class="${pc}">${h.protocol === 'ssh' ? 'SSH' : 'WinRM'}</td>
+    <td class="hname" data-hname="${esc(h.id)}">${esc(h.name)} <a class="hren" data-rename="${esc(h.id)}" data-perm="hosts.manage" data-perm-what="rename hosts" title="Rename this host. Leave the name empty to go back to the discovered name">Rename</a></td><td>${esc(h.address)}</td><td class="${pc}" title="${esc(h.os)}">${esc(String(h.os || '').replace(/^Microsoft /, '').replace(/\s*\(\d[\d.]*\)$/, ''))}</td><td class="${pc}">${h.protocol === 'ssh' ? 'SSH' : 'WinRM'}</td>
     <td class="dim" title="The credential profile this host was authenticated with">${esc(h.profileName || '-')}</td>
     <td class="${rc.up ? 'ok' : 'bad'}" data-lastver="${esc(h.id)}">${fmtVerified(rc.at)}</td>
     <td>${groupCell(h)}</td>
@@ -582,10 +582,28 @@ const foldGroup = (e) => {
 };
 $('groupBox').onclick = foldGroup;
 $('hosts/view-hosts').onclick = async (e) => {
+  const rn = e.target.closest('[data-rename]');
+  if (rn) { hostRenameStart(rn.dataset.rename); return; }
   const m = e.target.closest('[data-manage]');
   if (m) { gmHost = m.dataset.manage; renderGroupsModal(); $('groupsModal').hidden = false; $('gmDone').focus(); return; }
   if (e.target.dataset.delHost) { await api('DELETE', `/api/hosts/${e.target.dataset.delHost}`); loadHosts(); return; }
 };
+// Rename: the name cell becomes a text box. Enter saves, Esc cancels, and an empty name goes back to the discovered one.
+function hostRenameStart(hid) {
+  const h = hosts.find((x) => x.id === hid), cell = document.querySelector(`[data-hname="${hid}"]`); if (!h || !cell) return;
+  cell.innerHTML = `<input type="text" class="hren-in" maxlength="100" value="${esc(h.name)}" placeholder="${esc(h.hostname || h.address)}" spellcheck="false" autocomplete="off">`;
+  const inp = cell.firstChild; inp.focus(); inp.select();
+  let done = false;
+  const finish = async (save) => {
+    if (done) return; done = true;
+    if (save && inp.value.trim() !== h.name) {
+      try { await api('PUT', `/api/hosts/${hid}`, { name: inp.value }); } catch (err) { alert(err.message); }
+      await loadHosts();
+    } else renderHosts();
+  };
+  inp.onkeydown = (e) => { if (e.key === 'Enter') finish(true); else if (e.key === 'Escape') finish(false); };
+  inp.onblur = () => finish(true);
+}
 // Manage groups: the groups the host is in, and a tick box for every group. Each tick adds or removes the host straight away.
 let gmHost = null;
 function renderGroupsModal() {
@@ -1502,7 +1520,7 @@ function hmSetRecurring(on) {
 function hmQuickUi(host) {
   hm.quick = host || null;
   const q = !!host;
-  $('hmTitle').textContent = q ? `Quick hunt · ${host.hostname || host.name}` : 'New hunt';
+  $('hmTitle').textContent = q ? `Quick hunt · ${host.name || host.hostname}` : 'New hunt';
   hmEl('TabWho').hidden = q; hmEl('Rerun').hidden = q;
   hmEl('TabColl').querySelector('.hnum').textContent = q ? '1' : '2';
   hmEl('TabParams').querySelector('.hnum').textContent = q ? '2' : '3';
@@ -2229,7 +2247,7 @@ function renderShellList() {
   const hostBtn = (h) => {
     const live = shells.get(h.id) && shells.get(h.id).status !== 'ended';
     return `<button class="shellhost ${h.id === shellHost ? 'on' : ''} ${shellDenied(h.id) ? 'denied' : ''}" data-shell-host="${esc(h.id)}" title="${esc(shellDenied(h.id) ? (shellCfg && !shellCfg.enabled ? 'Shell access is turned off in Shell Settings' : 'Shells to this host are not allowed in Shell Settings') : h.os || '')}">
-      <span class="sh-name">${live ? '<i class="dot"></i>' : ''}${esc(h.hostname || h.name)}</span><span class="sh-ip">${esc(h.address)}</span></button>`;
+      <span class="sh-name">${live ? '<i class="dot"></i>' : ''}${esc(h.name || h.hostname)}</span><span class="sh-ip">${esc(h.address)}</span></button>`;
   };
   el.innerHTML = groups.map((g) => {
     const folded = shellFolded.has(g.id) && !q;
@@ -2240,7 +2258,7 @@ function renderShellMain() {
   const h = hostOf(shellHost), sh = shells.get(shellHost);
   const [cls, label] = !sh ? ['grey', 'Not connected'] : { connecting: ['grey', 'Connecting…'], connected: ['green', 'Connected'], ended: ['red', 'Session ended'] }[sh.status];
   $('shellHead').innerHTML = h
-    ? `<span class="sh-title">${esc(h.hostname || h.name)}</span><span class="dim">${esc(h.address)} · ${h.protocol === 'ssh' ? 'SSH' : 'WinRM'}</span><span class="badge ${cls}">${label}</span>${shellCfg && !shellCfg.enabled ? '<span class="badge red" title="Turned off in Settings > System > Shell Settings">Shell access is off</span>' : shellDenied(shellHost) ? '<span class="badge red" title="Change this in Settings > System > Shell Settings">Not allowed for this host</span>' : ''}
+    ? `<span class="sh-title">${esc(h.name || h.hostname)}</span><span class="dim">${esc(h.address)} · ${h.protocol === 'ssh' ? 'SSH' : 'WinRM'}</span><span class="badge ${cls}">${label}</span>${shellCfg && !shellCfg.enabled ? '<span class="badge red" title="Turned off in Settings > System > Shell Settings">Shell access is off</span>' : shellDenied(shellHost) ? '<span class="badge red" title="Change this in Settings > System > Shell Settings">Not allowed for this host</span>' : ''}
        <span class="shell-actions"><button class="act sec" data-shell-act="Send file" data-perm="shell.files" data-perm-what="send files to hosts">Send file</button><button class="act sec" data-shell-act="Pull file" data-perm="shell.files" data-perm-what="pull files from hosts">Pull file</button><button class="act sec" data-shell-act="Quick hunt" data-perm="hunts.run" data-perm-what="run hunts">Quick hunt</button><button class="act sec" data-shell-act="Quick response" data-perm="actions.run" data-perm-what="run actions">Quick response</button></span>`
     : '<span class="dim">Select a host on the left, then press Start shell.</span>';
   for (const [id, s] of shells) s.el.hidden = id !== shellHost;
@@ -2424,7 +2442,7 @@ function pmRender() {
 async function openPull() {
   const sh = liveShell(); if (!sh) return;
   const h = hostOf(shellHost);
-  $('pmTitle').textContent = `Pull file from ${h ? h.hostname || h.name : 'host'}`;
+  $('pmTitle').textContent = `Pull file from ${h ? h.name || h.hostname : 'host'}`;
   $('pullModal').hidden = false;
   let start = '';
   try { start = (await api('GET', '/api/shell')).find((o) => o.id === sh.id)?.cwd || ''; } catch { /* start at the top */ }
@@ -2581,11 +2599,154 @@ async function loadBinaries() {
     </div></td></tr>`).join('') || '<tr><td colspan="4" class="dim">No collection declares a binary dependency</td></tr>';
 }
 let uploadSlot = null;
-$('binFromServer').onclick = () => { $('fsModal').hidden = false; $('fsOk').focus(); };
-const closeFs = () => { $('fsModal').hidden = true; };
+// ---- Upload from server ----
+// Point the server at an external location (a folder, an SMB share, Nextcloud / WebDAV or SFTP); it searches below it for the binaries the
+// collections need, then copies the ones ticked into the binaries folder. Nothing about the location is remembered: the values live in this
+// page until the popup is closed (the password too), and the server keeps them in memory for a few minutes only.
+const FS_TYPES = {
+  folder: { label: 'Folder on the server', fields: [['path', 'Folder', 'text', 'D:\\Tools  or  /srv/tools']], note: 'A folder this server can open: a local disk, a mounted share or a network path it is already signed in to.' },
+  smb: { label: 'SMB share', fields: [['path', 'Share and folder', 'text', '\\\\server\\share\\tools'], ['username', 'Username', 'text', 'DOMAIN\\user'], ['password', 'Password', 'password', '']], note: 'Searches the folder and everything below it. A Linux server needs smbclient installed.' },
+  nextcloud: { label: 'Nextcloud', fields: [['url', 'Nextcloud address', 'text', 'https://cloud.example.com'], ['insecure', 'Allow a self-signed certificate', 'checkbox', '']], nc: true, note: 'Enter the web address of your Nextcloud and press Sign in: you sign in on your Nextcloud page as usual (single sign-on works) and approve access. Kookaburrow only receives a temporary app password, which is removed from Nextcloud again when you close this popup.' },
+  webdav: { label: 'WebDAV (manual)', fields: [['url', 'Folder address', 'text', 'https://cloud.example.com/apps/files/?dir=/Tools'], ['username', 'Username', 'text', ''], ['password', 'Password', 'password', 'app password'], ['insecure', 'Allow a self-signed certificate', 'checkbox', '']], note: 'Paste the folder\'s web address, its WebDAV address (.../remote.php/dav/files/USER/Tools) or a public share link (.../s/TOKEN, with the share password if it has one). Use an app password if two-factor sign-in is on.' },
+  sftp: { label: 'SFTP', fields: [['host', 'Server', 'text', 'files.example.com'], ['port', 'Port', 'text', '22'], ['username', 'Username', 'text', ''], ['password', 'Password', 'password', ''], ['path', 'Folder', 'text', '/tools']], note: 'Searches the folder and everything below it.' },
+};
+const fsx = { type: 'folder', vals: {}, session: null, result: null, nc: null }; // nc: the Nextcloud sign-in { id, status, user, loginUrl }
+let fsNcTimer;
+const fsBytes = (n) => (n == null ? '-' : fmtSize(n));
+function fsRender() {
+  const t = FS_TYPES[fsx.type], v = (fsx.vals[fsx.type] ||= {});
+  $('fsBody').innerHTML = `<div class="toggle fs-types" id="fsTypes">${Object.entries(FS_TYPES).map(([k, x]) => `<button type="button" data-fstype="${k}" class="${k === fsx.type ? 'on' : ''}">${esc(x.label)}</button>`).join('')}</div>
+    <div class="fs-form">${t.fields.map(([k, label, kind, ph]) => kind === 'checkbox'
+      ? `<span></span><label class="fs-opts" style="margin:0"><input type="checkbox" data-fsf="${k}" ${v[k] ? 'checked' : ''}> ${esc(label)}</label>`
+      : `<label for="fsf_${k}">${esc(label)}</label>${fsx.type === 'folder' && k === 'path' ? '<div class="fs-inline">' : ''}<input type="${kind}" id="fsf_${k}" data-fsf="${k}" placeholder="${esc(ph)}" value="${esc(v[k] || '')}" autocomplete="off" spellcheck="false">${fsx.type === 'folder' && k === 'path' ? '<button type="button" class="act sec" id="fsBrowseBtn" title="Choose the folder from this server\'s disks">Browse…</button></div>' : ''}`).join('')}</div><div id="fsBrowse" class="fs-browse" hidden></div>
+    <div class="fs-note">${esc(t.note)}</div>${t.nc ? '<div id="fsNc"></div>' : ''}<div class="fs-res" id="fsRes"></div>`;
+  fsRenderNc(); fsRenderResult();
+}
+// Sign in with Nextcloud: the button, the waiting message, and once signed in who it is plus an optional folder to look in.
+function fsRenderNc() {
+  const box = $('fsNc'); if (!box) return;
+  const n = fsx.nc, v = fsx.vals.nextcloud || {};
+  box.innerHTML = !n ? '<button type="button" class="act" id="fsNcStart">Sign in with Nextcloud</button>'
+    : n.status === 'waiting' ? `<div class="fs-note" style="margin:6px 0">Waiting for you to sign in and approve access in the Nextcloud tab that opened… <a href="${esc(n.loginUrl)}" target="_blank" rel="noopener">Open it again</a> · <a id="fsNcCancel">Cancel</a></div>`
+    : `<div class="fs-ok" style="margin:6px 0">✓ Signed in as <b>${esc(n.user)}</b> · <a id="fsNcOut">Sign out</a></div>
+       <div class="fs-form"><label for="fsf_folder">Folder (optional)</label><input type="text" id="fsf_folder" data-fsf="folder" placeholder="/Tools  (leave empty to search all your files)" value="${esc(v.folder || '')}" autocomplete="off" spellcheck="false"></div>`;
+}
+async function fsNcForget() {
+  clearInterval(fsNcTimer);
+  const n = fsx.nc; fsx.nc = null;
+  if (n) { try { await api('DELETE', `/api/binaries/source/nextcloud/${n.id}`); } catch { /* it expires on the server anyway */ } }
+}
+function fsNcPoll() {
+  clearInterval(fsNcTimer);
+  fsNcTimer = setInterval(async () => {
+    const n = fsx.nc; if (!n || n.status !== 'waiting') { clearInterval(fsNcTimer); return; }
+    try {
+      const r = await api('GET', `/api/binaries/source/nextcloud/${n.id}`);
+      if (fsx.nc !== n) return;
+      if (r.status === 'done') { n.status = 'done'; n.user = r.user; clearInterval(fsNcTimer); fsRenderNc(); fsSay('Signed in. Press Search.', 'ok'); }
+      else if (r.status === 'expired') { fsx.nc = null; clearInterval(fsNcTimer); fsRenderNc(); fsSay('The sign-in timed out. Press Sign in again.', 'bad'); }
+    } catch { /* try again on the next tick */ }
+  }, 2000);
+}
+$('fsBody').addEventListener('click', async (e) => {
+  if (e.target.closest('#fsNcStart')) {
+    const v = fsx.vals.nextcloud || {};
+    const w = window.open('', '_blank'); if (w) w.opener = null; // the browser tab for signing in; opened now so the click is allowed to open it
+    fsSay('');
+    try {
+      const r = await api('POST', '/api/binaries/source/nextcloud/start', { url: v.url, insecure: !!v.insecure });
+      fsx.nc = { id: r.id, status: 'waiting', loginUrl: r.loginUrl };
+      if (w) w.location.href = r.loginUrl;
+      fsRenderNc(); fsNcPoll();
+    } catch (err) { if (w) w.close(); fsSay(err.message, 'bad'); }
+  } else if (e.target.closest('#fsNcCancel') || e.target.closest('#fsNcOut')) { await fsNcForget(); fsx.result = null; fsEnd(); fsRenderNc(); fsRenderResult(); fsSay(''); }
+});
+function fsRenderResult() {
+  const box = $('fsRes'), r = fsx.result; if (!box) return;
+  $('fsImport').hidden = !(r && r.found.length);
+  if (!r) { box.innerHTML = ''; return; }
+  const rows = r.found.map((f, i) => `<tr data-fsrow="${i}"><td><input type="checkbox" class="fs-pick" checked></td><td><b>${esc(f.binary)}</b>${f.present ? ' <span class="badge orange" title="A file with this name is already uploaded">already uploaded</span>' : ''}</td>
+      <td>${f.copies.length > 1 ? `<select class="fs-copy">${f.copies.map((c, j) => `<option value="${j}">${esc(c.path)} · ${esc(fsBytes(c.size))}${c.modifiedAt ? ` · ${esc(new Date(c.modifiedAt).toLocaleDateString())}` : ''}</option>`).join('')}</select>` : `<span title="${esc(f.copies[0].path)}">${esc(f.copies[0].path)}</span> <span class="dim">· ${esc(fsBytes(f.copies[0].size))}${f.copies[0].modifiedAt ? ` · ${esc(new Date(f.copies[0].modifiedAt).toLocaleDateString())}` : ''}</span>`}</td>
+      <td><input type="text" class="fs-hash" placeholder="Expected SHA-256 (optional)" spellcheck="false" autocomplete="off"></td><td class="fs-status"></td></tr>`).join('');
+  box.innerHTML = r.found.length
+    ? `<table><thead><tr><th></th><th>Binary</th><th>Found at</th><th>Check</th><th>Result</th></tr></thead><tbody>${rows}</tbody></table>
+       <label class="fs-opts"><input type="checkbox" id="fsOverwrite"> Overwrite binaries that are already uploaded</label>`
+    : '<p class="fs-warn" style="margin:0">None of the binaries were found there.</p>';
+  box.innerHTML += `<div class="fs-note">${r.missing.length ? `Not found (${r.missing.length}): ${esc(r.missing.join(', '))}. ` : 'Everything on the list was found. '}${r.stats.method === 'folder walk' ? `Searched ${r.stats.scanned.toLocaleString()} items in ${r.stats.seconds}s` : `Searched on the server in ${r.stats.seconds}s`}${r.stats.truncated ? ' <span class="fs-warn">(stopped early: the location is very large or slow, so some folders were not searched)</span>' : ''}${r.stats.unreadable ? `; ${r.stats.unreadable} folder${r.stats.unreadable === 1 ? '' : 's'} could not be read` : ''}.</div>`;
+}
+// Browse…: a small folder picker over this server's disks (drives on Windows, / on Linux). Click a folder to open it, then Use this folder.
+async function fsBrowseTo(p) {
+  const box = $('fsBrowse'); if (!box) return;
+  box.hidden = false;
+  let d;
+  try { d = await api('GET', `/api/binaries/source/browse?path=${encodeURIComponent(p || '')}`); } catch (e) { box.innerHTML = `<div class="fs-bad" style="padding:6px 8px">${esc(e.message)}</div><div style="padding:0 8px 8px"><button type="button" class="act sec" data-fsdir="">Back to the top</button> <button type="button" class="act sec" id="fsBrowseClose">Close</button></div>`; return; }
+  box.dataset.path = d.path;
+  box.innerHTML = `<div class="fs-bhead"><button type="button" class="act sec" data-fsdir="${esc(d.parent ?? '')}" ${d.parent === null ? 'disabled' : ''} title="Up one level">↑ Up</button>
+      <input type="text" id="fsBrowsePath" value="${esc(d.path)}" placeholder="${d.path === '' ? 'Drives' : ''}" spellcheck="false" autocomplete="off" title="Type a path and press Enter">
+      <button type="button" class="act" id="fsBrowseUse" ${d.path === '' ? 'disabled' : ''}>Use this folder</button><button type="button" class="act sec" id="fsBrowseClose">Close</button></div>
+    <div class="fs-blist">${d.entries.map((e) => `<button type="button" class="fs-bitem" data-fsdir="${esc(e.path)}" title="${esc(e.path)}">📁 ${esc(e.name)}</button>`).join('') || '<div class="dim" style="padding:6px 8px">No folders in here.</div>'}${d.truncated ? '<div class="dim" style="padding:6px 8px">Only the first 2,000 folders are shown. Type the path above to go further.</div>' : ''}</div>`;
+}
+$('fsBody').addEventListener('click', (e) => {
+  if (e.target.closest('#fsBrowseBtn')) { fsBrowseTo((fsx.vals.folder || {}).path || ''); return; }
+  const go = e.target.closest('[data-fsdir]');
+  if (go) { fsBrowseTo(go.dataset.fsdir); return; }
+  if (e.target.closest('#fsBrowseClose')) { $('fsBrowse').hidden = true; return; }
+  if (e.target.closest('#fsBrowseUse')) {
+    const p = ($('fsBrowsePath').value || '').trim(); if (!p) return;
+    (fsx.vals.folder ||= {}).path = p; $('fsf_path').value = p; $('fsBrowse').hidden = true; fsx.result = null; fsRenderResult(); fsSay('');
+  }
+});
+$('fsBody').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.id === 'fsBrowsePath') { e.preventDefault(); e.stopPropagation(); fsBrowseTo(e.target.value); } }, true);
+function fsSay(text, cls) { $('fsMsg').textContent = text; $('fsMsg').className = cls || ''; }
+async function fsEnd() { if (fsx.session) { try { await api('DELETE', `/api/binaries/source/${fsx.session}`); } catch { /* it expires anyway */ } fsx.session = null; } }
+$('binFromServer').onclick = () => { fsx.result = null; fsx.session = null; fsSay(''); fsRender(); $('fsModal').hidden = false; };
+const closeFs = () => { $('fsModal').hidden = true; fsEnd(); fsNcForget(); fsx.vals = {}; fsx.result = null; $('fsBody').innerHTML = ''; }; // the typed values, passwords included, are dropped
 $('fsOk').onclick = $('fsX').onclick = closeFs;
 $('fsModal').onclick = (e) => { if (e.target.id === 'fsModal') closeFs(); };
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('fsModal').hidden) closeFs(); });
+$('fsBody').onclick = (e) => {
+  const b = e.target.closest('[data-fstype]'); if (!b) return;
+  fsx.type = b.dataset.fstype; fsx.result = null; fsEnd(); fsSay(''); fsRender();
+};
+$('fsBody').addEventListener('input', (e) => { const k = e.target.dataset.fsf; if (k) (fsx.vals[fsx.type] ||= {})[k] = e.target.type === 'checkbox' ? e.target.checked : e.target.value; });
+$('fsBody').addEventListener('change', (e) => { const k = e.target.dataset.fsf; if (k && e.target.type === 'checkbox') (fsx.vals[fsx.type] ||= {})[k] = e.target.checked; });
+$('fsBody').onkeydown = (e) => { if (e.key === 'Enter' && e.target.dataset.fsf) $('fsSearch').click(); };
+$('fsSearch').onclick = async () => {
+  await fsEnd(); fsx.result = null; fsRenderResult();
+  $('fsSearch').disabled = true; fsSay('Searching… this can take a while on a large location.', 'dim');
+  try {
+    if (FS_TYPES[fsx.type].nc && fsx.nc?.status !== 'done') throw new Error('Press Sign in with Nextcloud first.');
+    const body = FS_TYPES[fsx.type].nc ? { type: 'nextcloud', credential: fsx.nc.id, folder: (fsx.vals.nextcloud || {}).folder || '' } : { type: fsx.type, ...(fsx.vals[fsx.type] || {}) };
+    const r = await api('POST', '/api/binaries/source/search', body);
+    fsx.session = r.session; fsx.result = r; fsRenderResult();
+    fsSay(r.found.length ? `Found ${r.found.length} of ${r.found.length + r.missing.length}. Tick what to import.` : 'Nothing found.', r.found.length ? 'ok' : 'bad');
+  } catch (e) { fsSay(e.message, 'bad'); } finally { $('fsSearch').disabled = false; }
+};
+$('fsImport').onclick = async () => {
+  const r = fsx.result; if (!r) return;
+  const items = [], rows = [];
+  document.querySelectorAll('#fsRes tr[data-fsrow]').forEach((tr) => {
+    if (!tr.querySelector('.fs-pick').checked) return;
+    const f = r.found[+tr.dataset.fsrow], sel = tr.querySelector('.fs-copy'), copy = f.copies[sel ? +sel.value : 0];
+    items.push({ binary: f.binary, path: copy.path, sha256: tr.querySelector('.fs-hash').value.trim() });
+    rows.push(tr);
+  });
+  if (!items.length) { fsSay('Tick at least one binary.', 'bad'); return; }
+  $('fsImport').disabled = true; fsSay('Importing…', 'dim');
+  rows.forEach((tr) => { tr.querySelector('.fs-status').textContent = 'Waiting…'; });
+  try {
+    const out = await api('POST', '/api/binaries/source/import', { session: fsx.session, items, overwrite: $('fsOverwrite').checked });
+    out.results.forEach((x, i) => {
+      const td = rows[i].querySelector('.fs-status');
+      td.className = `fs-status ${x.status === 'imported' ? 'fs-ok' : x.status === 'skipped' ? 'fs-warn' : 'fs-bad'}`;
+      td.textContent = x.status === 'imported' ? `Imported (${fsBytes(x.size)})` : x.message;
+      td.title = x.sha256 ? `SHA-256 ${x.sha256}` : '';
+    });
+    const n = out.results.filter((x) => x.status === 'imported').length;
+    fsSay(`Imported ${n} of ${out.results.length}.`, n === out.results.length ? 'ok' : 'bad');
+    loadBinaries();
+  } catch (e) { fsSay(e.message, 'bad'); rows.forEach((tr) => { tr.querySelector('.fs-status').textContent = ''; }); } finally { $('fsImport').disabled = false; }
+};
 $('binTable').onclick = async (e) => {
   const { upload, remove } = e.target.dataset;
   $('binMsg').textContent = '';
