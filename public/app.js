@@ -115,14 +115,17 @@ const NAV = [
   // { heading: 'Name' } is a titled dropdown with no pages yet.
   { id: 'settings', label: 'Settings', pages: [
     ['user-management', 'User Management', 'System'], ['shell-settings', 'Shell Settings', 'System'], ['health-settings', 'Health Settings', 'System'],
-    ['view-collections', 'View Collections', 'Collections'], ['add-collections', 'Add Collections', 'Collections'], ['binaries', 'Binaries', 'Collections'],
+    ['view-collections', 'View Collections', 'Collections'], ['add-collections', 'Add Collections', 'Collections'],
     ['view-actions', 'View Actions', 'Actions'], ['add-actions', 'Add Actions', 'Actions'],
+    ['binaries', 'View Binaries'],
   ] },
   { id: 'hosts', label: 'Host Management', pages: [
     ['view-hosts', 'View Hosts', 'Hosts'], ['profiles', 'Profiles', 'Hosts'], ['groups', 'Groups', 'Hosts'],
     ['discover', 'Discover', 'Add Hosts'], ['manual', 'Manually Add', 'Add Hosts'],
   ] },
-  { id: 'burrow', label: 'Burrow!', accent: true, pages: [['hunt', 'Hunt'], ['respond', 'Respond'], ['recurring', 'Recurring']] },
+  { id: 'burrow', label: 'Burrow!', accent: true, pages: [['hunt', 'Hunt'], ['respond', 'Respond'], ['recurring', 'Recurring']],
+    // Hyperlink-style shortcuts under the pages: [label, slug of the page they open]
+    links: [['View Collections (Hunt)', 'settings/view-collections'], ['View Actions (Respond)', 'settings/view-actions'], ['View Binaries', 'settings/binaries']] },
   { id: 'output', label: 'Results', pages: [['log', 'Log'], ['report', 'Report'], ['json', 'JSON']] },
   { id: 'browse', label: 'Browse', pages: [['files', 'Files']] },
   // The logo in the header opens this landing page. It has no tab of its own and no side menu.
@@ -192,6 +195,7 @@ function renderSide() {
     const locked = !pageAllowed(`${tab.id}/${pid}`);
     html += `<button data-tab="${tab.id}" data-page="${pid}" class="${group ? 'sub' : ''} ${currentSlug === `${tab.id}/${pid}` ? 'on' : ''} ${locked ? 'locked' : ''}"${locked ? ` title="Locked: needs ${esc(permLabel(PAGE_PERM[`${tab.id}/${pid}`]))}"` : ''}>${locked ? LOCK : ''}${esc(label)}</button>`;
   }
+  for (const [label, slug] of tab.links || []) html += `<button class="sidelink" data-link="${esc(slug)}">${esc(label)}</button>`;
   $('sidenav').innerHTML = html;
 }
 
@@ -243,6 +247,8 @@ $('sidenav').onclick = (e) => {
     if (cur && cur.status !== 'ended') endShell(shellHost); else startShell();
     return;
   }
+  const link = e.target.closest('button[data-link]');
+  if (link) { const [t, p] = link.dataset.link.split('/'); go(t, p); return; }
   const head = e.target.closest('button[data-group]');
   if (head) { // titles only open/close their group
     const key = head.dataset.group;
@@ -1184,7 +1190,78 @@ $('bhDetail').onclick = (e) => {
 
 // ---- New hunt dialog ----
 // 1. who (groups and hosts)  2. which collections (the View Collections list, with the full detail on the right)  3. name, and the recurring switch.
-const hm = { collections: [], hosts: [], lists: [], selC: new Set(), selH: new Set(), selL: new Set(), q: '', type: 'powershell', shown: null, recurring: false, quick: null };
+// ---- The Parameters tab of the New Hunt and New Response dialogs (one implementation for both) ----
+// It lists the picked collections / actions that take parameters, each coloured by whether it is ready:
+//   red     it needs parameters and they are not set yet
+//   orange  it takes only optional parameters and they are not set (it can still run as it is)
+//   green   its parameters are set: Set parameters was pressed with every required one filled in
+// Typing in a parameter un-sets it again. Run is refused while anything is red. Values live in st.params for this dialog only.
+function makeParamsPane({ root, p, st, noun, items }) {
+  const el = (x) => $(p + x);
+  const taking = () => items().filter((x) => x.parameters.length);
+  const required = (x) => x.parameters.filter((q) => !x.optionalParameters.includes(q));
+  const stateOf = (x) => (st.setP.has(x.id) ? 'green' : required(x).length ? 'red' : 'orange');
+  const LABEL = { red: 'Needs parameters', orange: 'Optional parameters', green: 'Parameters set' };
+  const HELP = { red: 'Fill in the required parameters, then press Set parameters.', orange: 'Optional: it can run as it is, or fill these in and press Set parameters.', green: 'Parameters set.' };
+  const secret = (q) => /pass|secret|token|key/i.test(q);
+  const say = (t, cls) => { const m = el('PMsg'); if (m) { m.textContent = t; m.className = `pr-msg ${cls || ''}`; } };
+  function paintList() {
+    const list = taking();
+    if (!list.some((x) => x.id === st.pShown)) st.pShown = list[0]?.id || null;
+    el('PList').innerHTML = list.length
+      ? list.map((x) => `<div class="collection-item pi ${stateOf(x)} ${x.id === st.pShown ? 'on' : ''}" data-pi="${esc(x.id)}"><div class="ci-main"><div class="hn">${esc(x.name)}</div><div class="pi-s">${LABEL[stateOf(x)]}</div></div></div>`).join('')
+      : `<p class="dim" style="margin:6px 10px">None of the picked ${noun}s take parameters.</p>`;
+    const btn = el('TabParams'), states = list.map(stateOf);
+    btn.lastChild.textContent = list.length ? `Parameters (${list.length})` : 'Parameters';
+    btn.classList.remove('p-red', 'p-orange', 'p-green');
+    if (list.length) btn.classList.add(states.includes('red') ? 'p-red' : states.includes('orange') ? 'p-orange' : 'p-green');
+  }
+  function paintState() {
+    const x = taking().find((i) => i.id === st.pShown), t = el('PState');
+    if (x && t) { t.className = `pr-state ${stateOf(x)}`; t.textContent = stateOf(x) === 'green' ? HELP.green : `${LABEL[stateOf(x)]}. ${HELP[stateOf(x)]}`; }
+  }
+  function paintDetail() {
+    const x = taking().find((i) => i.id === st.pShown);
+    if (!x) { el('PDetail').innerHTML = `<p class="dim" style="padding:10px 4px">${taking().length ? `Click a ${noun} on the left to set its parameters.` : `None of the picked ${noun}s take parameters, so there is nothing to set here.`}</p>`; return; }
+    const v = st.params[x.id] || {};
+    el('PDetail').innerHTML = `<div class="hd-name">${esc(x.name)}</div><div class="hd-file">${esc(x.id)}</div><div class="pr-desc dim">${esc(x.description)}</div>
+      <div class="pr-state" id="${p}PState"></div>
+      ${x.parameters.map((q) => `<label class="rm-prow"><span>${esc(q)} ${x.optionalParameters.includes(q) ? '<i class="dim">(optional)</i>' : '<i class="pr-req">required</i>'}</span><input type="${secret(q) ? 'password' : 'text'}" data-pi="${esc(x.id)}" data-pp="${esc(q)}" value="${esc(v[q] || '')}" autocomplete="off" spellcheck="false"></label>`).join('')}
+      <div class="pr-foot"><button type="button" class="act" id="${p}PSet">Set parameters</button><span class="pr-msg" id="${p}PMsg"></span></div>`;
+    paintState();
+  }
+  const render = () => { paintList(); paintDetail(); };
+  function setParams() {
+    const x = taking().find((i) => i.id === st.pShown); if (!x) return;
+    const v = st.params[x.id] || {};
+    const missing = required(x).filter((q) => !String(v[q] ?? '').trim());
+    el('PDetail').querySelectorAll('input[data-pp]').forEach((i) => i.classList.toggle('bad', missing.includes(i.dataset.pp)));
+    if (missing.length) { st.setP.delete(x.id); paintList(); paintState(); say(`Cannot set: enter a value for ${missing.join(', ')}.`, 'bad'); return; }
+    st.setP.add(x.id); paintList(); paintState(); say('Parameters set.', 'ok');
+  }
+  $(root).addEventListener('click', (e) => {
+    const row = e.target.closest(`#${p}PList [data-pi]`);
+    if (row) { st.pShown = row.dataset.pi; render(); return; }
+    if (e.target.closest(`#${p}PSet`)) setParams();
+  });
+  $(root).addEventListener('input', (e) => {
+    const d = e.target.dataset; if (!d.pp || !d.pi) return;
+    (st.params[d.pi] ||= {})[d.pp] = e.target.value;
+    e.target.classList.remove('bad');
+    if (st.setP.delete(d.pi)) { paintList(); paintState(); say('Changed: press Set parameters again.', ''); } // editing un-sets it
+  });
+  return {
+    render,
+    reset() { st.params = {}; st.setP.clear(); st.pShown = null; },
+    problem: () => taking().find((x) => stateOf(x) === 'red') || null, // the first one still red: it blocks Run
+    show(id) { st.pShown = id; render(); },
+    values() { const out = {}; for (const x of taking()) { const v = st.params[x.id] || {}; out[x.id] = Object.fromEntries(x.parameters.map((q) => [q, v[q] ?? ''])); } return out; },
+    any: () => taking().length > 0,
+  };
+}
+
+const hm = { collections: [], hosts: [], lists: [], selC: new Set(), selH: new Set(), selL: new Set(), q: '', type: 'powershell', shown: null, recurring: false, quick: null, params: {}, setP: new Set(), pShown: null };
+const hmParams = makeParamsPane({ root: 'huntModal', p: 'hm', st: hm, noun: 'collection', items: () => hm.collections.filter((c) => hm.selC.has(c.id)) });
 const hmEl = (s) => $('hm' + s);
 function hmCount() {
   const ids = new Set(hm.selH);
@@ -1196,6 +1273,7 @@ function hmSummary() {
   hmEl('Summary').textContent = `${c} collection${c === 1 ? '' : 's'} · ${h} host${h === 1 ? '' : 's'}`;
   hmEl('TabWho').lastChild.textContent = h ? `Who (${h})` : 'Who';
   hmEl('TabColl').lastChild.textContent = c ? `Collections (${c})` : 'Collections';
+  hmParams.render(); // the Parameters tab follows what is picked
 }
 function hmRenderCollections() {
   const q = hm.q.toLowerCase(), inType = hm.collections.filter((c) => c.type === hm.type);
@@ -1231,6 +1309,7 @@ function hmTab(name) {
   document.querySelectorAll('#hmTabs button').forEach((b) => b.classList.toggle('on', b.dataset.pane === name));
   document.querySelectorAll('#huntModal .hsec').forEach((p) => { p.hidden = p.dataset.pane !== name; });
   hmEl('Run').hidden = name !== 'name'; hmEl('Next').hidden = name === 'name'; // Run Hunt is only on the last tab
+  if (name === 'params') hmParams.render();
   if (name === 'name') { hmRenderTargetList(); hmEl('Name').focus(); }
 }
 // The hosts the hunt will run against: the ticked hosts plus every member of the ticked groups, each once.
@@ -1255,7 +1334,7 @@ function hmRenderTargetList() {
     ${win.length || !list.length ? `<p><b>SMB will be enabled temporarily</b> on ${win.length ? `${win.length} Windows host${win.length === 1 ? '' : 's'} (${names(win)})` : 'Windows hosts'} for this hunt. Before the collection runs, port 445 is switched on for this server's address only; the files are pulled over SMB; then SMB is switched off again and checked. If SMB was already on, it is left as it was found.</p>` : ''}
     ${lin.length ? `<p>${lin.length} Linux host${lin.length === 1 ? '' : 's'} (${names(lin)}): the files come back over SFTP on the SSH connection, so nothing is switched on.</p>` : ''}` : '';
 }
-const HM_ORDER = ['who', 'coll', 'name'];
+const HM_ORDER = ['who', 'coll', 'params', 'name'];
 hmEl('Next').onclick = () => { const cur = document.querySelector('#hmTabs .on')?.dataset.pane; hmTab(HM_ORDER[Math.min(HM_ORDER.indexOf(cur) + 1, HM_ORDER.length - 1)]); };
 function hmSetRecurring(on) {
   hm.recurring = on;
@@ -1270,12 +1349,13 @@ function hmQuickUi(host) {
   $('hmTitle').textContent = q ? `Quick hunt · ${host.hostname || host.name}` : 'New hunt';
   hmEl('TabWho').hidden = q; hmEl('Rerun').hidden = q;
   hmEl('TabColl').querySelector('.hnum').textContent = q ? '1' : '2';
-  hmEl('TabName').querySelector('.hnum').textContent = q ? '2' : '3';
+  hmEl('TabParams').querySelector('.hnum').textContent = q ? '2' : '3';
+  hmEl('TabName').querySelector('.hnum').textContent = q ? '3' : '4';
   hmEl('Recurring').closest('.sw-row').hidden = q;
   hmEl('Run').textContent = q ? 'Run Quick Hunt' : 'Run Hunt';
 }
 async function openHuntModal(quickHost) {
-  hm.selC.clear(); hm.selH.clear(); hm.selL.clear(); hm.q = ''; hm.type = 'powershell';
+  hm.selC.clear(); hm.selH.clear(); hm.selL.clear(); hm.q = ''; hm.type = 'powershell'; hmParams.reset();
   hmQuickUi(quickHost);
   if (quickHost) { hm.selH.add(quickHost.id); hm.type = quickHost.protocol === 'ssh' ? 'bash' : 'powershell'; } // open on the host's own kind of collections
   hm.shown = null; hmEl('Detail').innerHTML = '<p class="dim">Click a collection to see what it does.</p>';
@@ -1338,26 +1418,29 @@ $('rrUse').onclick = () => {
   const r = rr.runs.find((x) => x.id === rr.sel); if (!r) return;
   const hostIds = new Set(r.results.map((x) => x.hostId)), cids = r.collectionIds || [r.collectionId].filter(Boolean);
   hm.selH = new Set(hm.hosts.filter((h) => hostIds.has(h.id)).map((h) => h.id)); hm.selL.clear();
-  hm.selC = new Set(cids.filter((c) => hm.collections.some((x) => x.id === c)));
+  hm.selC = new Set(cids.filter((c) => hm.collections.some((x) => x.id === c))); hmParams.reset();
   const lostH = hostIds.size - hm.selH.size, lostC = cids.length - hm.selC.size;
   hm.shown = null; hmEl('Detail').innerHTML = '<p class="dim">Click a collection to see what it does.</p>';
   hmEl('Name').value = `${huntName(r)}_rerun`;
   hmRenderTargets(); hmRenderCollections(); hmSummary(); hmSetRecurring(false);
   const gone = [lostH && `${lostH} host${lostH === 1 ? ' is' : 's are'}`, lostC && `${lostC} collection${lostC === 1 ? ' is' : 's are'}`].filter(Boolean).join(' and ');
-  hmEl('Msg').textContent = gone ? `${gone} no longer available and left out.` : ''; hmEl('Msg').className = gone ? 'bad' : '';
-  closeRerun(); hmTab('name');
+  const needs = hmParams.any(); // parameter values are never kept, so they are set again
+  hmEl('Msg').textContent = [gone && `${gone} no longer available and left out.`, needs && 'Set the parameters again on the Parameters tab.'].filter(Boolean).join(' '); hmEl('Msg').className = gone ? 'bad' : '';
+  closeRerun(); hmTab(needs ? 'params' : 'name');
 };
 hmEl('Run').onclick = async () => {
   const msg = (t, cls) => { hmEl('Msg').textContent = t; hmEl('Msg').className = cls; };
   if (!hmCount()) { hmTab('who'); return msg('Select at least one host or group.', 'bad'); }
   if (!hm.selC.size) { hmTab('coll'); return msg('Select at least one collection.', 'bad'); }
+  const unset = hmParams.problem();
+  if (unset) { hmTab('params'); hmParams.show(unset.id); return msg(`${unset.name}: its parameters are not set. Fill them in and press Set parameters.`, 'bad'); }
   if (!hmEl('Name').value.trim()) { hmTab('name'); return msg('Give the hunt a name.', 'bad'); }
   const rec = hm.recurring ? recRead('hm') : null;
   if (rec?.error) { hmTab('name'); return msg(rec.error, 'bad'); }
   hmEl('Run').disabled = true;
   try {
     const run = await api('POST', '/api/hunts', {
-      name: hmEl('Name').value.trim(), collectionIds: [...hm.selC], hostIds: [...hm.selH], listIds: [...hm.selL], schedule: rec?.schedule, quick: !!hm.quick,
+      name: hmEl('Name').value.trim(), collectionIds: [...hm.selC], hostIds: [...hm.selH], listIds: [...hm.selL], params: hmParams.values(), schedule: rec?.schedule, quick: !!hm.quick,
     });
     closeHuntModal();
     toast(`Hunt "${run.name}" started${rec ? ` and scheduled: ${rec.text.replace(/^Runs now, then /, '')}` : `. Results go to ${run.outputPath}`}`);
@@ -2124,39 +2207,47 @@ const fmtUptime = (sec) => {
   const d = Math.floor(sec / 86400), h = Math.floor(sec % 86400 / 3600), m = Math.floor(sec % 3600 / 60);
   return d ? `${d}d ${h}h` : h ? `${h}h ${m}m` : `${m}m ${sec % 60}s`;
 };
+const fmtBytes = (n) => (n < 1073741824 ? `${(n / 1048576).toFixed(0)} MB` : n < 1099511627776 ? `${(n / 1073741824).toFixed(1)} GB` : `${(n / 1099511627776).toFixed(2)} TB`);
 async function loadHome() {
-  const rows = [];
+  const rows = [], stats = [];
   try {
     const a = await api('GET', '/api/about');
-    rows.push(['Server', esc(a.hostname) + (a.dnsDomain ? `<span class="dim">.${esc(a.dnsDomain.toLowerCase())}</span>` : '')],
+    const split = (c) => `${c.standard} standard · ${c.custom} custom`;
+    rows.push({ section: 'System' }, ['Server', esc(a.hostname) + (a.dnsDomain ? `<span class="dim">.${esc(a.dnsDomain.toLowerCase())}</span>` : '')],
       ['Listening on', `${esc(a.bind)} <span class="dim">(this PC only)</span>`],
       ['IP addresses', a.addresses.length ? a.addresses.slice(0, 4).map(esc).join('<br>') : '<span class="dim">none found</span>'],
       ['Version', esc(a.version)],
       ['Runtime', `Node ${esc(a.node)}`],
       ['System', esc(a.os)],
       ['Uptime', fmtUptime(a.uptimeSec)],
-      ['Library', `${a.collections} collections · ${a.actions} actions`],
-      ['Saved', `${a.hosts} hosts · ${a.profiles} profiles · ${a.runs} runs`]);
+      ['Storage', a.storage ? `${fmtBytes(a.storage.used)} used / ${fmtBytes(a.storage.free)} available` : '<span class="dim">unknown</span>'],
+      ['Timezone', `${esc(a.timezone.name)} <span class="dim">(${esc(a.timezone.offset)})</span>`],
+      { section: 'System artefacts' },
+      ['Users', String(a.users)],
+      ['Roles', String(a.roles)],
+      ['Hunts (collections)', split(a.collections)],
+      ['Responses (actions)', split(a.actions)],
+      ['Binaries uploaded', `${a.binaries.uploaded}${a.binaries.missing ? ` <span class="dim">(${a.binaries.missing} still needed)</span>` : ''}`]);
+    stats.push(['Saved hosts', a.hosts], ['Profiles', a.profiles], ['Hunts ran', a.huntsRan], ['Actions ran', a.responsesRan]);
   } catch (e) { rows.push(['Server', `<span class="bad">${esc(e.message)}</span>`]); }
   try {
     const me = await api('GET', '/api/auth/me');
-    const who = me.roleNames.length ? `${me.username} (${me.roleNames.join(', ')})` : me.username; // e.g. admin (admin)
-    rows.push(['Signed in as', esc(who)]);
-    $('signOutMsg').textContent = who; // shown beside the Sign out button
+    $('signOutMsg').textContent = me.roleNames.length ? `${me.username} (${me.roleNames.join(', ')})` : me.username; // shown beside the Sign out button
     renderHomeAccess(me, await api('GET', '/api/permissions'));
   } catch { /* a 401 already redirected */ }
-  $('homeInfo').innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
+  $('homeInfo').innerHTML = rows.map((r) => (Array.isArray(r) ? `<dt>${r[0]}</dt><dd>${r[1]}</dd>` : `<dt class="hsec">${r.section}</dt>`)).join('');
+  $('homeStats').innerHTML = stats.map(([k, v]) => `<div class="hs"><b>${v}</b><span>${esc(k)}</span></div>`).join('');
 }
-// Right of the logo: the signed-in user's roles, what they can do (green) and what they can't (red).
+// Right of the logo: the signed-in user's roles, their permissions (green) and restrictions (red).
 function renderHomeAccess(me, groups) {
   const options = groups.flatMap((g) => g.permissions), has = new Set(me.permissions);
   const can = options.filter((p) => has.has(p.key)), cant = options.filter((p) => !has.has(p.key));
   const list = (items, cls, mark, empty) => (items.length ? items.map((p) => `<li class="${cls}" title="${esc(p.desc)}"><i>${mark}</i>${esc(p.label)}</li>`).join('') : `<li class="dim">${empty}</li>`);
   $('homePerms').innerHTML = `<div class="hp-title">Your access</div>
     <div class="hp-roles">${me.roleNames.length ? me.roleNames.map((r) => `<span class="um-chip">${esc(r)}</span>`).join('') : '<span class="dim">No roles</span>'}</div>
-    <div class="hp-head can">Can do${me.all ? ' <span class="dim">(full access)</span>' : ''}</div>
+    <div class="hp-head can">Permissions${me.all ? ' <span class="dim">(full access)</span>' : ''}</div>
     <ul>${list(can, 'can', '✓', 'Nothing')}</ul>
-    <div class="hp-head cant">Can't do</div>
+    <div class="hp-head cant">Restrictions</div>
     <ul>${list(cant, 'cant', '✗', 'Nothing is restricted')}</ul>`;
 }
 // ---- Change your own password ----

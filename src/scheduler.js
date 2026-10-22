@@ -38,7 +38,7 @@ function prepare({ kind, name, hostIds, listIds, itemIds, params, schedule, crea
   const sched = parseSchedule(schedule);
   return {
     id: id(), kind, name: String(name || '').trim(), hostIds: [...hostIds], listIds: [...listIds], itemIds: [...itemIds],
-    params: kind === 'response' && params ? encrypt(JSON.stringify(params)) : '',
+    params: params && Object.keys(params).length ? encrypt(JSON.stringify(params)) : '',
     ...sched, createdBy: createdBy || null, createdAt: new Date().toISOString(),
     nextRun: null, lastRun: null, runCount: 0, runIds: [], status: 'active', lastError: '',
   };
@@ -61,7 +61,7 @@ function hostsOf(s) {
 function startRun(s) {
   const hosts = hostsOf(s);
   if (!hosts.length) throw new Error('None of its hosts exist any more');
-  if (s.kind === 'hunt') return huntRunner.startHunt({ name: s.name, collectionIds: s.itemIds, hosts, startedBy: s.createdBy, scheduleId: s.id });
+  if (s.kind === 'hunt') return huntRunner.startHunt({ name: s.name, collectionIds: s.itemIds, hosts, params: s.params ? JSON.parse(decrypt(s.params)) : {}, startedBy: s.createdBy, scheduleId: s.id });
   return responseRunner.startResponse({ name: s.name, actionIds: s.itemIds, hosts, params: s.params ? JSON.parse(decrypt(s.params)) : {}, startedBy: s.createdBy, scheduleId: s.id });
 }
 

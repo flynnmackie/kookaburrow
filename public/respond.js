@@ -55,7 +55,8 @@ $('brDetail').onclick = (e) => {
 
 // ---- New response dialog ----
 // Who (groups and hosts) / Actions (the View Actions list, detail on the right) / Name (parameters, name, recurring switch).
-const rm = { actions: [], hosts: [], lists: [], selA: new Set(), selH: new Set(), selL: new Set(), q: '', type: 'powershell', shown: null, recurring: false, params: {}, quick: null };
+const rm = { actions: [], hosts: [], lists: [], selA: new Set(), selH: new Set(), selL: new Set(), q: '', type: 'powershell', shown: null, recurring: false, params: {}, quick: null, setP: new Set(), pShown: null };
+const rmParams = makeParamsPane({ root: 'respModal', p: 'rm', st: rm, noun: 'action', items: () => rm.actions.filter((a) => rm.selA.has(a.id)) });
 const rmEl = (s) => $('rm' + s);
 function rmCount() {
   const ids = new Set(rm.selH);
@@ -67,6 +68,7 @@ function rmSummary() {
   rmEl('Summary').textContent = `${a} action${a === 1 ? '' : 's'} · ${h} host${h === 1 ? '' : 's'}`;
   rmEl('TabWho').lastChild.textContent = h ? `Who (${h})` : 'Who';
   rmEl('TabAct').lastChild.textContent = a ? `Actions (${a})` : 'Actions';
+  rmParams.render(); // the Parameters tab follows what is picked
 }
 function rmRenderActions() {
   const q = rm.q.toLowerCase(), inType = rm.actions.filter((c) => c.type === rm.type);
@@ -99,18 +101,12 @@ function rmRenderTargets() {
       <span class="pn">${esc(h.name)}</span><span class="pt">${esc(h.address)}</span></label>`).join('')
     || '<p class="dim" style="margin:6px 10px">No saved hosts yet.</p>';
 }
-// One input per parameter of each chosen action. Typed values live in rm.params while the dialog is open.
-function rmRenderParams() {
-  const chosen = rm.actions.filter((a) => rm.selA.has(a.id) && a.parameters.length);
-  rmEl('Params').innerHTML = chosen.length
-    ? `<span class="fl">Parameters</span>${chosen.map((a) => `<div class="rm-pa"><div class="rm-pn">${esc(a.name)}</div>${a.parameters.map((p) => `<label class="rm-prow"><span>${esc(p)}${a.optionalParameters.includes(p) ? ' <i class="dim">(optional)</i>' : ''}</span><input type="${/pass|secret|token|key/i.test(p) ? 'password' : 'text'}" data-pa="${esc(a.id)}" data-pp="${esc(p)}" value="${esc((rm.params[a.id] || {})[p] || '')}" autocomplete="off" spellcheck="false"></label>`).join('')}</div>`).join('')}`
-    : '';
-}
 function rmTab(name) {
   document.querySelectorAll('#rmTabs button').forEach((b) => b.classList.toggle('on', b.dataset.pane === name));
   document.querySelectorAll('#respModal .hsec').forEach((p) => { p.hidden = p.dataset.pane !== name; });
   rmEl('Run').hidden = name !== 'name'; rmEl('Next').hidden = name === 'name'; // Run Response is only on the last tab
-  if (name === 'name') { rmRenderTargetList(); rmRenderParams(); (rmEl('Params').querySelector('input') || rmEl('Name')).focus(); }
+  if (name === 'params') rmParams.render();
+  if (name === 'name') { rmRenderTargetList(); rmEl('Name').focus(); }
 }
 // The hosts the response will run against: the ticked hosts plus every member of the ticked groups, each once.
 function rmRenderTargetList() {
@@ -126,7 +122,7 @@ function rmRenderTargetList() {
   rmEl('Items').innerHTML = items.map((a) => `<div class="pick"><span class="pn" title="${esc(a.description)}">${esc(a.name)}</span>${metaIcons(a)}<span class="pt">${a.type === 'bash' ? 'Linux' : 'PowerShell'}</span></div>`).join('')
     || '<p class="dim" style="margin:6px 10px">No actions selected yet. Choose them on the Actions tab.</p>';
 }
-const RM_ORDER = ['who', 'act', 'name'];
+const RM_ORDER = ['who', 'act', 'params', 'name'];
 rmEl('Next').onclick = () => { const cur = document.querySelector('#rmTabs .on')?.dataset.pane; rmTab(RM_ORDER[Math.min(RM_ORDER.indexOf(cur) + 1, RM_ORDER.length - 1)]); };
 function rmSetRecurring(on) {
   rm.recurring = on;
@@ -141,12 +137,13 @@ function rmQuickUi(host) {
   $('rmTitle').textContent = q ? `Quick response · ${host.hostname || host.name}` : 'New response';
   rmEl('TabWho').hidden = q; rmEl('Rerun').hidden = q;
   rmEl('TabAct').querySelector('.hnum').textContent = q ? '1' : '2';
-  rmEl('TabName').querySelector('.hnum').textContent = q ? '2' : '3';
+  rmEl('TabParams').querySelector('.hnum').textContent = q ? '2' : '3';
+  rmEl('TabName').querySelector('.hnum').textContent = q ? '3' : '4';
   rmEl('Recurring').closest('.sw-row').hidden = q;
   rmEl('Run').textContent = q ? 'Run Quick Response' : 'Run Response';
 }
 async function openRespModal(quickHost) {
-  rm.selA.clear(); rm.selH.clear(); rm.selL.clear(); rm.q = ''; rm.type = 'powershell'; rm.params = {};
+  rm.selA.clear(); rm.selH.clear(); rm.selL.clear(); rm.q = ''; rm.type = 'powershell'; rmParams.reset();
   rmQuickUi(quickHost);
   if (quickHost) { rm.selH.add(quickHost.id); rm.type = quickHost.protocol === 'ssh' ? 'bash' : 'powershell'; } // open on the host's own kind of actions
   rm.shown = null; rmEl('Detail').innerHTML = '<p class="dim">Click an action to see what it does.</p>';
@@ -179,13 +176,11 @@ $('rmActions').onclick = (e) => {
 rmEl('Search').oninput = () => { rm.q = rmEl('Search').value.trim(); rmRenderActions(); };
 $('respModal').onchange = (e) => {
   const d = e.target.dataset;
-  if (d.pa) { (rm.params[d.pa] ||= {})[d.pp] = e.target.value; return; }
   const set = d.h ? [rm.selH, d.h] : d.l ? [rm.selL, d.l] : null;
   if (!set) return;
   if (e.target.checked) set[0].add(set[1]); else set[0].delete(set[1]);
   rmSummary();
 };
-$('respModal').oninput = (e) => { const d = e.target.dataset; if (d.pa) (rm.params[d.pa] ||= {})[d.pp] = e.target.value; };
 
 // Rerun past response: pick an earlier response and its hosts and actions are ticked and the name becomes "<name>_rerun". Parameter
 // values are not kept anywhere, so they are typed again on the Name tab. Nothing runs until Run Response is pressed.
@@ -213,16 +208,16 @@ $('rxUse').onclick = () => {
   const r = rx.runs.find((x) => x.id === rx.sel); if (!r) return;
   const hostIds = new Set(r.results.map((x) => x.hostId)), aids = r.actionIds || [];
   rm.selH = new Set(rm.hosts.filter((h) => hostIds.has(h.id)).map((h) => h.id)); rm.selL.clear();
-  rm.selA = new Set(aids.filter((a) => rm.actions.some((x) => x.id === a))); rm.params = {};
+  rm.selA = new Set(aids.filter((a) => rm.actions.some((x) => x.id === a))); rmParams.reset();
   const lostH = hostIds.size - rm.selH.size, lostA = aids.length - rm.selA.size;
   rm.shown = null; rmEl('Detail').innerHTML = '<p class="dim">Click an action to see what it does.</p>';
   rmEl('Name').value = `${huntName(r)}_rerun`;
   rmRenderTargets(); rmRenderActions(); rmSummary(); rmSetRecurring(false);
   const gone = [lostH && `${lostH} host${lostH === 1 ? ' is' : 's are'}`, lostA && `${lostA} action${lostA === 1 ? ' is' : 's are'}`].filter(Boolean).join(' and ');
-  const needs = [...rm.selA].some((a) => rm.actions.find((x) => x.id === a)?.parameters.length);
-  rmEl('Msg').textContent = [gone && `${gone} no longer available and left out.`, needs && 'Enter the parameter values again.'].filter(Boolean).join(' ');
+  const needs = rmParams.any(); // parameter values are never kept, so they are set again
+  rmEl('Msg').textContent = [gone && `${gone} no longer available and left out.`, needs && 'Set the parameters again on the Parameters tab.'].filter(Boolean).join(' ');
   rmEl('Msg').className = gone ? 'bad' : '';
-  closeRerunResp(); rmTab('name');
+  closeRerunResp(); rmTab(needs ? 'params' : 'name');
 };
 
 rmEl('Run').onclick = async () => {
@@ -230,14 +225,9 @@ rmEl('Run').onclick = async () => {
   if (!rmCount()) { rmTab('who'); return msg('Select at least one host or group.', 'bad'); }
   if (!rm.selA.size) { rmTab('act'); return msg('Select at least one action.', 'bad'); }
   if (!rmEl('Name').value.trim()) { rmTab('name'); return msg('Give the response a name.', 'bad'); }
-  const params = {};
-  for (const a of rm.actions.filter((x) => rm.selA.has(x.id))) {
-    for (const p of a.parameters) {
-      const v = (rm.params[a.id] || {})[p];
-      if (!v && !a.optionalParameters.includes(p)) { rmTab('name'); return msg(`${a.name}: enter a value for ${p}.`, 'bad'); }
-      (params[a.id] ||= {})[p] = v || '';
-    }
-  }
+  const unset = rmParams.problem();
+  if (unset) { rmTab('params'); rmParams.show(unset.id); return msg(`${unset.name}: its parameters are not set. Fill them in and press Set parameters.`, 'bad'); }
+  const params = rmParams.values();
   const a = rm.selA.size, h = rmCount();
   if (!confirm(`Run ${a} action${a === 1 ? '' : 's'} on ${h} host${h === 1 ? '' : 's'}?\n\nActions change the hosts they run on.`)) return;
   const rec = rm.recurring ? recRead('rm') : null;

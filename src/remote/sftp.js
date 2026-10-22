@@ -30,6 +30,8 @@ async function list({ sftp }, dir) {
 }
 
 const fetch = ({ sftp }, remotePath, dest, onBytes) => copyStream(sftp.createReadStream(remotePath, { highWaterMark: 1024 * 1024 }), dest, onBytes);
+// Uploads a local file (used to stage a collection's binaries on the host).
+const put = ({ sftp }, local, remote) => new Promise((resolve, reject) => sftp.fastPut(local, remote, { mode: 0o700 }, (e) => (e ? reject(e) : resolve())));
 const close = ({ conn }) => { try { conn.end(); } catch { /* closed */ } };
 
-module.exports = { open, list, fetch, close };
+module.exports = { open, list, fetch, put, close };

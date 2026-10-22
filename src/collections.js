@@ -207,16 +207,41 @@ function resolveBinaries(collection) {
 }
 
 // outDir (large-transfer collections): the folder on the host the script writes its files to, given to it as $OutDir / $OUT_DIR.
+// Parameters (hunts and responses): a collection or action lists the inputs it takes in $Parameters / PARAMETERS (a trailing ? marks an
+// optional one). The values typed in the New Hunt / New Response dialog are set as variables of the same name on the first lines of the
+// script for that run. They are never stored or logged (they can be passwords); only the names are recorded.
+const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
+const psQuote = (v) => `'${String(v).replace(/'/g, "''")}'`;
+const shQuote = (v) => `'${String(v).replace(/'/g, "'\\''")}'`;
+// Checks what was given for one item and returns { parameter: value }. Throws when a required one is blank.
+function paramValues(item, given) {
+  const g = (given && typeof given === 'object' && given) || {}, v = {};
+  for (const p of item.parameters) {
+    if (!IDENT.test(p)) throw new Error(`${item.name}: "${p}" is not a valid parameter name`);
+    const x = g[p] == null ? '' : g[p];
+    if (String(x) === '' && !item.optionalParameters.includes(p)) throw new Error(`${item.name}: enter a value for ${p}`);
+    if (String(x).includes('\0')) throw new Error(`${item.name}: ${p} has an invalid character`);
+    v[p] = String(x);
+  }
+  return v;
+}
+// The script with its parameters set as variables on the first lines.
+function withParams(item, values) {
+  const lines = item.parameters.map((p) => (item.type === 'bash' ? `${p}=${shQuote(values[p])}` : `$${p} = ${psQuote(values[p])}`));
+  if (!lines.length) return item.text;
+  const nl = item.type === 'bash' ? '\n' : '\r\n';
+  return `${lines.join(nl)}${nl}${item.text}`;
+}
+
 async function executeOnHost(host, collection, { csv = false, outDir = '', timeoutMs } = {}) {
   const started = Date.now();
   let r;
   try {
     const bins = resolveBinaries(collection);
     if (bins.missing.length) throw new Error(`Missing binaries: ${bins.missing.join(', ')}. Place them in the binaries folder and run again.`);
-    if (bins.found.length && host.protocol !== 'winrm') throw new Error('Binary staging over SSH is not implemented yet');
 
     if (collection.type === 'powershell' && host.protocol === 'winrm') r = await winrm.runScript(host, collection.file, bins.found, { csv, outDir, timeoutMs });
-    else if (host.protocol === 'ssh') r = await ssh.runScript(host, collection.text, collection.type, { outDir, timeoutMs });
+    else if (host.protocol === 'ssh') r = await ssh.runScript(host, collection.text, collection.type, { outDir, timeoutMs, binaries: bins.found });
     else throw new Error(`${collection.type} collections cannot run over ${host.protocol}`);
   } catch (e) {
     r = { exitCode: -1, stdout: '', stderr: e.message, truncated: false };
@@ -260,4 +285,4 @@ const listCollections = (...a) => listScripts(collectionsDir, ...a);
 const listActions = (...a) => listScripts(actionsDir, ...a);
 const resolveAction = (id) => resolveCollection(id, actionsDir);
 
-module.exports = { FOOTPRINTS, RETURNS, KINDS, parseCollection, loadVerified, hashText, listCollections, listActions, listTags, resolveCollection, resolveAction, startRun, executeOnHost, collectionsDir, actionsDir };
+module.exports = { FOOTPRINTS, RETURNS, KINDS, parseCollection, loadVerified, hashText, listCollections, listActions, listTags, resolveCollection, resolveAction, startRun, executeOnHost, paramValues, withParams, collectionsDir, actionsDir };

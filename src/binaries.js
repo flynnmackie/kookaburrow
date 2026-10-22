@@ -7,7 +7,7 @@ const crypto = require('crypto');
 const { binariesDir } = require('./config');
 const collections = require('./collections');
 
-const MAX_BYTES = 200 * 1024 * 1024;
+const MAX_BYTES = 500 * 1024 * 1024;
 
 // Bare file names only: no separators, no leading dot, no traversal.
 const isSafeName = (n) => typeof n === 'string' && n.length <= 100 && /^[A-Za-z0-9_][A-Za-z0-9_. -]*$/.test(n) && n === path.basename(n);
@@ -48,7 +48,7 @@ function saveBinary(name, data) {
   if (!isSafeName(name)) throw new Error('Invalid binary name');
   if (!collections.listCollections().some((h) => h.dependencies.includes(name))) throw new Error(`No collection requires "${name}"`);
   if (!Buffer.isBuffer(data) || !data.length) throw new Error('No file received');
-  if (data.length > MAX_BYTES) throw new Error('File is too large');
+  if (data.length > MAX_BYTES) throw new Error(`File is too large (the limit is ${MAX_BYTES / 1024 / 1024} MB)`);
   if (/\.(exe|dll|sys)$/i.test(name) && data.subarray(0, 2).toString('latin1') !== 'MZ') {
     throw new Error('That does not look like a Windows executable (missing MZ header)');
   }
@@ -65,4 +65,12 @@ function removeBinary(name) {
   if (fs.existsSync(file)) fs.unlinkSync(file);
 }
 
-module.exports = { listBinaries, saveBinary, removeBinary, MAX_BYTES };
+// How many of the binaries the collections ask for have been uploaded (a count only: nothing is hashed, so it is cheap enough for the Home page).
+function summary() {
+  const declared = new Set(collections.listCollections().flatMap((h) => h.dependencies));
+  const have = (n) => isSafeName(n) && fs.existsSync(path.join(binariesDir, n));
+  const uploaded = [...declared].filter(have).length;
+  return { uploaded, missing: declared.size - uploaded };
+}
+
+module.exports = { summary, listBinaries, saveBinary, removeBinary, MAX_BYTES };

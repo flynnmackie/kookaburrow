@@ -18,7 +18,7 @@ const { localPath } = require('./remote/copy');
 //     3. smb-list   names every file with its size and SHA-256 on the host; each is copied and its hash compared.
 //     4. smb-close  removes the folder (only when every file arrived intact) and restores the service and rule as they were; the
 //                   server then checks that port 445 really is closed again. If SMB was already on, it is left as it was found.
-//   Linux hosts (SSH): over SFTP on the existing SSH port, nothing to open. Folder: /tmp/kb-out-<id>.
+//   Linux hosts (SSH): over SFTP on the existing SSH port, nothing to open. Folder: /var/tmp/kb-out-<id> (not /tmp, which is often RAM).
 //
 // Every step is written to the hunt's log. Files land in <host folder>/raw/<collection>/.
 
@@ -130,7 +130,7 @@ const q = (v) => `'${String(v).replace(/'/g, `'\\''`)}'`; // bash single quotes
 async function runSftp(host, c, ctx) {
   const A = host.address;
   const log = (action, detail, outcome = 'ok', kind = 'session') => ctx.audit.log({ kind, host: A, action, artefact: c.name, outcome, detail });
-  const outDir = `/tmp/kb-out-${crypto.randomBytes(8).toString('hex')}`;
+  const outDir = `/var/tmp/kb-out-${crypto.randomBytes(8).toString('hex')}`;
   let script = { exitCode: -1, stdout: '', stderr: '', truncated: false, durationMs: 0 };
   let pulled = { ok: false, bytes: 0, files: [] }, problem = '', session = null, made = false, ran = false;
   try {

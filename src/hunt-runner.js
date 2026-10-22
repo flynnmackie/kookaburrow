@@ -1,4 +1,5 @@
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const { db, save, id } = require('./store');
 const { runConcurrency } = require('./config');
@@ -18,7 +19,7 @@ const linesToCsv = (text) => ['Output', ...text.replace(/\r\n/g, '\n').replace(/
 // PowerShell output may carry a leading/trailing blank line from Out-String.
 const tidyCsv = (text) => text.replace(/^\s*\r?\n/, '').replace(/\s+$/, '') + '\r\n';
 
-function startHunt({ name, collectionIds, hosts, startedBy, scheduleId, quick = false }) {
+function startHunt({ name, collectionIds, hosts, params, startedBy, scheduleId, quick = false }) {
   const chosen = collectionIds.map((cid) => {
     const c = collections.resolveCollection(cid);
     if (!c) throw new Error(`Unknown collection: ${cid}`);
@@ -29,6 +30,18 @@ function startHunt({ name, collectionIds, hosts, startedBy, scheduleId, quick = 
   const huntName = String(name || '').trim();
   if (!huntName) throw new Error('Give the hunt a name');
 
+  // a collection that takes parameters runs from a temporary copy with the values set on its first lines (the values are never stored or logged)
+  const values = new Map(); // collection id -> { parameter: value }
+  for (const c of chosen) values.set(c.id, collections.paramValues(c, params && params[c.id]));
+  const tmpFiles = [];
+  const runnable = new Map(chosen.map((c) => {
+    if (!c.parameters.length) return [c.id, c];
+    const full = collections.withParams(c, values.get(c.id));
+    const tmp = path.join(os.tmpdir(), `kb-col-${id()}${path.extname(c.file)}`);
+    fs.writeFileSync(tmp, full); tmpFiles.push(tmp);
+    return [c.id, { ...c, file: tmp, text: full }];
+  }));
+
   const started = new Date();
   const folder = createRunFolder('hunt', huntName, started, quick);
   const label = (h) => h.hostname || h.name || h.address;
@@ -37,6 +50,7 @@ function startHunt({ name, collectionIds, hosts, startedBy, scheduleId, quick = 
     id: id(), kind: 'hunt', name: huntName, startedBy: startedBy || null, ...(scheduleId ? { scheduleId } : {}), ...(quick ? { quick: true } : {}),
     collectionIds: chosen.map((c) => c.id), collectionNames: chosen.map((c) => c.name),
     collectionName: chosen.map((c) => c.name).join(', '),
+    parameterNames: Object.fromEntries(chosen.filter((c) => c.parameters.length).map((c) => [c.id, c.parameters.map((p) => (c.optionalParameters.includes(p) ? `${p}?` : p))])),
     outputPath: folder.rel, status: 'running', startedAt: started.toISOString(),
     results: hosts.flatMap((h) => chosen.map((c) => ({
       hostId: h.id, hostLabel: label(h), address: h.address, collectionId: c.id, collectionName: c.name, status: 'queued',
@@ -66,12 +80,12 @@ function startHunt({ name, collectionIds, hosts, startedBy, scheduleId, quick = 
           // A large-transfer collection writes files on the host that are pulled back over SMB (Windows) or SFTP (Linux): <host folder>/raw/<collection>/
           let rawRel = '';
           const out = c.transfer === 'large'
-            ? await runLarge(host, c, {
+            ? await runLarge(host, runnable.get(c.id), {
               csv: true, audit,
               rawDir: path.join(folder.abs, hostBase(host), 'raw', safeName(path.basename(c.file, path.extname(c.file)), 'collection')),
               onProgress: (p) => { res.transfer = p; save(); },
             })
-            : await collections.executeOnHost(host, c, { csv: true });
+            : await collections.executeOnHost(host, runnable.get(c.id), { csv: true });
           if (c.transfer === 'large') {
             rawRel = `${hostBase(host)}/raw/${safeName(path.basename(c.file, path.extname(c.file)), 'collection')}`;
             delete res.transfer;
@@ -145,7 +159,7 @@ function startHunt({ name, collectionIds, hosts, startedBy, scheduleId, quick = 
     audit.log({ kind: 'hunt', action: run.status === 'completed' ? 'Hunt complete' : 'Hunt completed with errors', outcome: run.status === 'completed' ? 'ok' : 'errors',
       detail: `${okAll} of ${run.results.length} collection runs ok; output saved to output/${folder.rel}` });
     save();
-  })().catch((e) => {
+  })().finally(() => { for (const f of tmpFiles) fs.promises.unlink(f).catch(() => {}); }).catch((e) => {
     run.status = 'failed'; run.error = e.message; run.finishedAt = new Date().toISOString();
     audit.log({ kind: 'error', action: 'Hunt failed', outcome: 'error', detail: e.message });
     save();

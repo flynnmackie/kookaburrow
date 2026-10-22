@@ -2,14 +2,16 @@ const fs = require('fs');
 const path = require('path');
 const { collectionsDir, actionsDir, binariesDir, outputDir } = require('./config');
 
-// Read-only file browser behind Browse. Paths are virtual: "/<root>/<...>". Four roots:
-//   collections, actions, binaries, output   real folders (never anything outside them, no symlinks followed);
-//   output holds hunts/ and responses/ (a folder per run, see src/output.js) and Pulled-Files/
+// Read-only file browser behind Browse. Paths are virtual: "/<root>/<...>". Five roots:
+//   collections, actions, binaries, output, reports   real folders (never anything outside them, no symlinks followed);
+//   output holds hunts/ and responses/ (a folder per run, see src/output.js) and Pulled-Files/;
+//   reports is output/reports, shown as a root of its own and hidden from output.
 const ROOTS = {
   collections: { dir: collectionsDir, label: 'Collections', desc: 'Read-only scripts that gather data from a host' },
   actions: { dir: actionsDir, label: 'Actions', desc: 'Scripts that change a host' },
   binaries: { dir: binariesDir, label: 'Binaries', desc: 'External tools uploaded for collections to use' },
-  output: { dir: outputDir, label: 'Output', desc: 'What hunts and responses brought back: Hunts and Responses folders (a folder per run, then per host), Reports, and pulled files' },
+  output: { dir: outputDir, label: 'Output', desc: 'What hunts and responses brought back: Hunts and Responses folders (a folder per run, then per host), and pulled files', hide: ['reports'] },
+  reports: { dir: path.join(outputDir, 'reports'), label: 'Reports', desc: 'HTML reports generated from hunts and responses, one file per run' },
 };
 const MAX_PREVIEW = 512 * 1024;
 
@@ -23,6 +25,7 @@ function segments(vpath) {
 
 // ---- real folders --------------------------------------------------------------------------
 function realNode(root, segs) {
+  if (root.hide && root.hide.includes(segs[0])) throw bad('Not found'); // lives under its own root instead
   const base = path.resolve(root.dir);
   const full = path.resolve(base, ...segs);
   if (full !== base && !full.startsWith(base + path.sep)) throw bad('Not found');
@@ -34,6 +37,7 @@ function realNode(root, segs) {
     const entries = [];
     for (const name of fs.readdirSync(full)) {
       if (name.startsWith('.') || name.endsWith('.tmp')) continue;
+      if (root.hide && segs.length === 0 && root.hide.includes(name)) continue;
       let s; try { s = fs.lstatSync(path.join(full, name)); } catch { continue; }
       if (s.isSymbolicLink()) continue;
       entries.push(s.isDirectory()

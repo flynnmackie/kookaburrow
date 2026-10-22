@@ -545,8 +545,19 @@ app.get('/api/about', (req, res) => {
     bind: `${config.host}:${config.port}`, addresses,
     os: `${os.version()} ${os.release()} (${os.arch()})`,
     uptimeSec: Math.round(process.uptime()), started: new Date(Date.now() - process.uptime() * 1000).toISOString(),
-    collections: collections.listCollections().length, actions: collections.listActions().length,
-    hosts: db.hosts.length, profiles: db.profiles.length, runs: db.runs.length,
+    // the library: "standard" is a script that still matches the shipped, verified version; "custom" is anything added or edited
+    ...(() => {
+      const std = (l) => ({ standard: l.filter((x) => x.verified).length, custom: l.filter((x) => !x.verified).length });
+      return { collections: std(collections.listCollections()), actions: std(collections.listActions()) };
+    })(),
+    binaries: binaries.summary(),
+    users: db.users.length, roles: db.roles.length,
+    hosts: db.hosts.length, profiles: db.profiles.length,
+    huntsRan: db.runs.filter((r) => r.kind !== 'response').length, responsesRan: db.runs.filter((r) => r.kind === 'response').length,
+    storage: (() => { // the drive that holds the output folder
+      try { const st = require('fs').statfsSync(config.outputDir); const total = st.blocks * st.bsize, free = st.bavail * st.bsize; return { total, free, used: total - free }; } catch { return null; }
+    })(),
+    timezone: (() => { const o = -new Date().getTimezoneOffset(), a = Math.abs(o); return { name: Intl.DateTimeFormat().resolvedOptions().timeZone, offset: `UTC${o < 0 ? '-' : '+'}${String(Math.floor(a / 60)).padStart(2, '0')}:${String(a % 60).padStart(2, '0')}` }; })(),
   });
 });
 
@@ -563,8 +574,8 @@ app.post('/api/hunts', wrap((req, res) => {
   const hosts = [...new Set(hostIds)].map((hid) => db.hosts.find((h) => h.id === hid)).filter(Boolean);
   const collectionIds = Array.isArray(b.collectionIds) ? b.collectionIds : [];
   if (b.quick && (b.schedule || (b.listIds || []).length || hosts.length !== 1)) throw new Error('A quick hunt runs once, on exactly one host');
-  const sched = b.schedule ? scheduler.prepare({ kind: 'hunt', name: b.name, hostIds: Array.isArray(b.hostIds) ? b.hostIds : [], listIds: Array.isArray(b.listIds) ? b.listIds : [], itemIds: collectionIds, schedule: b.schedule, createdBy: req.user }) : null;
-  const run = huntRunner.startHunt({ name: b.name, collectionIds, hosts, startedBy: req.user, scheduleId: sched?.id, quick: !!b.quick });
+  const sched = b.schedule ? scheduler.prepare({ kind: 'hunt', name: b.name, hostIds: Array.isArray(b.hostIds) ? b.hostIds : [], listIds: Array.isArray(b.listIds) ? b.listIds : [], itemIds: collectionIds, params: b.params, schedule: b.schedule, createdBy: req.user }) : null;
+  const run = huntRunner.startHunt({ name: b.name, collectionIds, hosts, params: b.params, startedBy: req.user, scheduleId: sched?.id, quick: !!b.quick });
   if (sched) scheduler.activate(sched, run);
   res.json(run);
 }));

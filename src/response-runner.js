@@ -12,18 +12,6 @@ const { safeName, createRunFolder, streamsToCsv, combine } = require('./output')
 // one row per line, with a Stream column), and the response's log, All_Hosts CSV and All_Hosts JSON at the top level.
 // It is kept in db.runs with kind 'response' so Burrow > Respond lists it. Parameter VALUES are used to run the action but are
 // never stored or logged (they can be passwords); only the parameter names are recorded.
-const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
-const psQuote = (v) => `'${String(v).replace(/'/g, "''")}'`;
-const shQuote = (v) => `'${String(v).replace(/'/g, "'\\''")}'`;
-
-// The action with its parameters set as variables of the same name on the first lines.
-function withParams(action, values) {
-  const lines = action.parameters.map((p) => (action.type === 'bash' ? `${p}=${shQuote(values[p])}` : `$${p} = ${psQuote(values[p])}`));
-  if (!lines.length) return action.text;
-  const nl = action.type === 'bash' ? '\n' : '\r\n';
-  return `${lines.join(nl)}${nl}${action.text}`;
-}
-
 function startResponse({ name, actionIds, hosts, params, startedBy, scheduleId, quick = false }) {
   const chosen = actionIds.map((aid) => {
     const a = collections.resolveAction(aid);
@@ -35,17 +23,7 @@ function startResponse({ name, actionIds, hosts, params, startedBy, scheduleId, 
   const respName = String(name || '').trim();
   if (!respName) throw new Error('Give the response a name');
   const values = new Map(); // action id -> { parameter: value }
-  for (const a of chosen) {
-    const given = (params && typeof params[a.id] === 'object' && params[a.id]) || {}, v = {};
-    for (const p of a.parameters) {
-      if (!IDENT.test(p)) throw new Error(`${a.name}: "${p}" is not a valid parameter name`);
-      const x = given[p] == null ? '' : given[p];
-      if (String(x) === '' && !a.optionalParameters.includes(p)) throw new Error(`${a.name}: enter a value for ${p}`);
-      if (String(x).includes('\0')) throw new Error(`${a.name}: ${p} has an invalid character`);
-      v[p] = String(x);
-    }
-    values.set(a.id, v);
-  }
+  for (const a of chosen) values.set(a.id, collections.paramValues(a, params && params[a.id]));
 
   const started = new Date();
   const folder = createRunFolder('response', respName, started, quick);
@@ -78,7 +56,7 @@ function startResponse({ name, actionIds, hosts, params, startedBy, scheduleId, 
           res.status = 'running'; save();
           audit.log({ kind: 'collect', host: host.address, action: 'action started', artefact: a.name,
             detail: `${a.kind}, footprint ${a.footprint}${a.parameters.length ? `; parameters: ${a.parameters.join(', ')}` : ''}${a.dependencies.length ? `; copies ${a.dependencies.join(', ')} to a temporary folder on the host` : ''}` });
-          const full = withParams(a, values.get(a.id));
+          const full = collections.withParams(a, values.get(a.id));
           const tmp = path.join(os.tmpdir(), `kb-act-${id()}${path.extname(a.file)}`);
           let out;
           try {
