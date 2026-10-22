@@ -159,6 +159,16 @@ function checkNow() {
   tick();
 }
 
+// Checks one host now (its ping and its remote port, whichever are monitored) and resolves when both have finished.
+async function checkHost(id) {
+  const h = db.hosts.find((x) => x.id === id);
+  if (!h || !settings().enabled) return false;
+  for (const r of [pings.get(h.address), ...portsFor(h).map((p) => ports.get(`${h.address}:${p}`))]) if (r) r.startedAt = 0;
+  const mine = jobs(Date.now()).filter((j) => j.key === `ping|${h.address}` || j.key.startsWith(`remote|${h.address}|`));
+  await Promise.all(mine.map(async (j) => { inflight.add(j.key); try { await j.run(); } catch { /* the log has it */ } finally { inflight.delete(j.key); } }));
+  return true;
+}
+
 function snapshot() {
   const cfg = settings();
   if (!cfg.enabled) {
@@ -205,4 +215,4 @@ function start() {
   setInterval(tick, TICK_MS).unref();
 }
 
-module.exports = { start, snapshot, checkNow, settings, setSettings, getLog, DEFAULTS, LIMITS };
+module.exports = { start, snapshot, checkNow, checkHost, settings, setSettings, getLog, DEFAULTS, LIMITS };

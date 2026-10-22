@@ -6,6 +6,7 @@ const OPEN = 'open';
 const RULES = [
   ['*', /^\/api\/auth\/(login|logout|me)$/, OPEN],
   ['GET', /^\/api\/(permissions|about)$/, OPEN],
+  ['*', /^\/api\/favourites(\/|$)/, OPEN], // your own list; the handler only touches the signed-in user
   ['PUT', /^\/api\/users\/[^/]+\/password$/, OPEN], // checked in the handler: your own needs the current password, others need Manage users
 
   ['GET', /^\/api\/(hosts|lists)$/, ['hosts.view', 'shell.open', 'hunts.run', 'actions.run']],

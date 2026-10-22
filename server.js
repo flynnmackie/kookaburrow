@@ -63,6 +63,23 @@ app.get('/api/auth/me', (req, res) => {
   res.json({ id: u?.id, username: req.user, ...(u ? access(u) : { roles: [], permissions: [], all: false }) });
 });
 
+// Each user's starred hunts and actions: ids like "powershell/prefetch-list.ps1", kept on the user record.
+app.get('/api/favourites', (req, res) => {
+  const u = db.users.find((x) => x.username === req.user);
+  res.json({ collections: u?.favourites?.collections || [], actions: u?.favourites?.actions || [] });
+});
+app.put('/api/favourites/:kind', (req, res) => {
+  const u = db.users.find((x) => x.username === req.user);
+  const kind = req.params.kind, id = String(req.body?.id || '');
+  if (!u || !['collections', 'actions'].includes(kind) || !id) return res.status(400).json({ error: 'Bad request' });
+  u.favourites = u.favourites || { collections: [], actions: [] };
+  const set = new Set(u.favourites[kind] || []);
+  if (req.body.on) set.add(id); else set.delete(id);
+  u.favourites[kind] = [...set];
+  save();
+  res.json(u.favourites);
+});
+
 // ---- Permissions: every API route needs the permission listed in src/route-perms.js (admin has all of them) ----
 const labelOf = Object.fromEntries(permissions.GROUPS.flatMap((g) => g.permissions).map((p) => [p.key, p.label]));
 app.use((req, res, next) => {
@@ -715,6 +732,10 @@ app.put('/api/settings/shell', wrap((req, res) => { shell.setSettings(req.body |
 app.get('/api/monitor', (req, res) => res.json(monitor.snapshot()));
 app.get('/api/monitor/log', (req, res) => res.json({ enabled: monitor.settings().enabled, entries: monitor.getLog(Math.min(Number(req.query.limit) || 500, 2000)) }));
 app.post('/api/monitor/check', (req, res) => { monitor.checkNow(); res.json(monitor.snapshot()); });
+app.post('/api/monitor/check/:id', wrap(async (req, res) => {
+  if (!await monitor.checkHost(req.params.id)) return res.status(404).json({ error: 'Host not found, or health monitoring is off' });
+  res.json(monitor.snapshot());
+}));
 
 const server = app.listen(config.port, config.host, () => {
   console.log(`Kookaburrow running at http://${config.host}:${config.port}`);

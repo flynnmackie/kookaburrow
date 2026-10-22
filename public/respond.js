@@ -55,9 +55,14 @@ $('brDetail').onclick = (e) => {
 
 // ---- New response dialog ----
 // Who (groups and hosts) / Actions (the View Actions list, detail on the right) / Name (parameters, name, recurring switch).
-const rm = { actions: [], hosts: [], lists: [], selA: new Set(), selH: new Set(), selL: new Set(), q: '', type: 'powershell', shown: null, recurring: false, params: {}, quick: null, setP: new Set(), pShown: null };
-const rmParams = makeParamsPane({ root: 'respModal', p: 'rm', st: rm, noun: 'action', items: () => rm.actions.filter((a) => rm.selA.has(a.id)) });
+const rm = { actions: [], hosts: [], lists: [], selA: new Set(), selH: new Set(), selL: new Set(), matches: null, type: 'powershell', shown: null, recurring: false, params: {}, quick: null, setP: new Set(), pShown: null };
+const rmParams = makeParamsPane({ root: 'respModal', p: 'rm', st: rm, noun: 'action', items: () => rm.actions.filter((a) => rm.selA.has(a.id)), onRemove: (id) => rmUnpick(id) });
 const rmEl = (s) => $('rm' + s);
+// A group counts as picked while every one of its hosts is picked: clicking a group picks all its hosts, and taking one host out of it
+// (here or on the Overview tab) makes the group neutral again while the others stay picked. The ids go to the server as listIds.
+function rmSyncGroups() {
+  rm.selL = new Set(rm.lists.filter((l) => l.hostIds.length && l.hostIds.every((i) => rm.selH.has(i))).map((l) => l.id));
+}
 function rmCount() {
   const ids = new Set(rm.selH);
   for (const l of rm.lists) if (rm.selL.has(l.id)) l.hostIds.forEach((i) => ids.add(i));
@@ -70,14 +75,36 @@ function rmSummary() {
   rmEl('TabAct').lastChild.textContent = a ? `Actions (${a})` : 'Actions';
   rmParams.render(); // the Parameters tab follows what is picked
 }
+// The search box and filters are the same as View Actions (makeFilter). A search or tag/dependency filter is answered by the server
+// (rm.matches holds the ids that matched); picked actions stay picked even when a filter hides them.
+const rmF = makeFilter({ box: $('rmTagFilter'), search: $('rmSearch'), url: '/api/actions', noun: 'action', favKind: 'actions', getType: () => rm.type, onChange: (server) => (server ? rmQuery() : rmRenderActions()) });
+async function rmQuery() {
+  const qs = rmF.qs(), mine = rm.qn = (rm.qn || 0) + 1;
+  try {
+    const [list] = await Promise.all([qs ? api('GET', `/api/actions?${qs}`) : null, rmF.loadMeta()]);
+    if (mine !== rm.qn) return; // a newer search is in flight
+    rm.matches = list ? new Map(list.map((c) => [c.id, c.match])) : null;
+  } catch (e) { rmEl('Msg').textContent = e.message; rmEl('Msg').className = 'bad'; }
+  rmRenderActions();
+}
 function rmRenderActions() {
-  const q = rm.q.toLowerCase(), inType = rm.actions.filter((c) => c.type === rm.type);
-  const shown = inType.filter((c) => !q || [c.name, c.file, c.description, ...c.tags].some((s) => String(s).toLowerCase().includes(q)));
-  document.querySelectorAll('#rmToggle button').forEach((b) => b.classList.toggle('on', b.dataset.type === rm.type));
-  rmEl('Actions').innerHTML = shown.map((c) => `<div class="collection-item ${c.id === rm.shown ? 'on' : ''} ${rm.selA.has(c.id) ? 'sel' : ''} ${c.missingDependencies.length ? 'blocked' : ''}" data-view="${esc(c.id)}" ${c.missingDependencies.length ? `aria-disabled="true" title="Required binary missing: ${esc(c.missingDependencies.join(', '))}"` : ''}>
-      <div class="ci-main">${c.verified ? VERIFIED : ''}${metaIcons(c)}<div class="hn">${esc(c.name)}</div><div class="hd" title="${esc(c.description)}">${esc(c.description)}</div>
-      ${c.tags.length ? `<div class="htags">${c.tags.map((t) => `<span class="htag">${esc(t)}</span>`).join('')}</div>` : ''}</div></div>`).join('')
-    || '<p class="dim" style="margin:6px 10px">No actions match.</p>';
+  const keep = (c) => (!rm.matches || rm.matches.has(c.id)) && (!rmF.favOnly || rmF.favs.has(c.id));
+  const shown = rm.actions.filter((c) => c.type === rm.type && keep(c));
+  const tag = (m) => !m ? '' : [m.name && 'name', m.script && 'script'].filter(Boolean).join(' + ');
+  document.querySelectorAll('#rmToggle button').forEach((b) => {
+    b.classList.toggle('on', b.dataset.type === rm.type);
+    b.textContent = (b.dataset.type === 'bash' ? 'Linux' : 'PowerShell') + (rmF.active() ? ` (${rm.actions.filter((c) => c.type === b.dataset.type && keep(c)).length})` : '');
+  });
+  rmEl('Actions').innerHTML = shown.map((c) => { const m = rm.matches?.get(c.id); return `<div class="collection-item ${c.id === rm.shown ? 'on' : ''} ${rm.selA.has(c.id) ? 'sel' : ''} ${c.missingDependencies.length ? 'blocked' : ''}" data-view="${esc(c.id)}" ${c.missingDependencies.length ? `aria-disabled="true" title="Required binary missing: ${esc(c.missingDependencies.join(', '))}"` : ''}>
+      <div class="ci-main">${c.verified ? VERIFIED : ''}${rmF.favs.has(c.id) ? '<span class="fav on" title="One of your favourites">★</span>' : ''}<div class="hn">${esc(c.name)} ${m ? `<span class="mtag">${tag(m)}</span>` : ''}</div><div class="hd" title="${esc(c.description)}">${esc(c.description)}</div>
+      <div class="hmeta">${metaIcons(c)}</div>${m && !m.name && m.line ? `<div class="hl">${esc(m.line)}</div>` : ''}</div></div>`; }).join('')
+    || `<p class="dim" style="margin:6px 10px">No ${rmF.active() ? 'actions match.' : 'actions.'}</p>`;
+}
+// the X on the Parameters and Overview tabs: take an action out of the response
+function rmUnpick(id) {
+  rm.selA.delete(id); delete rm.params[id]; rm.setP.delete(id);
+  rmSummary(); rmRenderActions();
+  if (document.querySelector('#rmTabs .on')?.dataset.pane === 'name') rmRenderTargetList();
 }
 async function rmShow(id) {
   rm.shown = id;
@@ -94,11 +121,12 @@ async function rmShow(id) {
   } catch (e) { rmEl('Detail').innerHTML = `<p class="bad">${esc(e.message)}</p>`; }
 }
 function rmRenderTargets() {
-  rmEl('Groups').innerHTML = rm.lists.map((l) => `<label class="pick"><input type="checkbox" data-l="${esc(l.id)}" ${rm.selL.has(l.id) ? 'checked' : ''}>
-      <span class="pn">${esc(l.name)}</span><span class="pt">${l.hostIds.length} host${l.hostIds.length === 1 ? '' : 's'}</span></label>`).join('')
+  rmSyncGroups();
+  rmEl('Groups').innerHTML = rm.lists.map((l) => `<div class="pick pk ${rm.selL.has(l.id) ? 'sel' : ''}" data-l="${esc(l.id)}">
+      <span class="pn">${esc(l.name)}</span><span class="pt">${l.hostIds.length} host${l.hostIds.length === 1 ? '' : 's'}</span></div>`).join('')
     || '<p class="dim" style="margin:6px 10px">No groups yet.</p>';
-  rmEl('Hosts').innerHTML = rm.hosts.map((h) => `<label class="pick"><input type="checkbox" data-h="${esc(h.id)}" ${rm.selH.has(h.id) ? 'checked' : ''}>
-      <span class="pn">${esc(h.name)}</span><span class="pt">${esc(h.address)}</span></label>`).join('')
+  rmEl('Hosts').innerHTML = rm.hosts.map((h) => `<div class="pick pk ${rm.selH.has(h.id) ? 'sel' : ''}" data-h="${esc(h.id)}">
+      <span class="pn">${esc(h.name)}</span><span class="pt">${esc(h.address)}</span></div>`).join('')
     || '<p class="dim" style="margin:6px 10px">No saved hosts yet.</p>';
 }
 function rmTab(name) {
@@ -114,12 +142,12 @@ function rmRenderTargetList() {
   for (const l of rm.lists) if (rm.selL.has(l.id)) l.hostIds.forEach((i) => ids.add(i));
   const list = rm.hosts.filter((h) => ids.has(h.id));
   rmEl('TargetsHead').textContent = `Will run against ${list.length} host${list.length === 1 ? '' : 's'}`;
-  rmEl('Targets').innerHTML = list.map((h) => `<div class="pick"><span class="pn">${esc(h.name)}</span><span class="pt">${esc(h.address)}</span><span class="proto-${h.protocol === 'ssh' ? 'ssh' : 'winrm'}">${h.protocol === 'ssh' ? 'SSH' : 'WinRM'}</span></div>`).join('')
+  rmEl('Targets').innerHTML = list.map((h) => `<div class="pick"><span class="pn">${esc(h.name)}</span><span class="pt">${esc(h.address)}</span><span class="proto-${h.protocol === 'ssh' ? 'ssh' : 'winrm'}">${h.protocol === 'ssh' ? 'SSH' : 'WinRM'}</span><button type="button" class="unpick" data-unpick-host="${esc(h.id)}" title="Remove this host from the response" aria-label="Remove">×</button></div>`).join('')
     || '<p class="dim" style="margin:6px 10px">No hosts selected yet. Choose them on the Who tab.</p>';
   // and what will run on them
   const items = rm.actions.filter((a) => rm.selA.has(a.id));
   rmEl('ItemsHead').textContent = `${items.length} action${items.length === 1 ? '' : 's'} to run`;
-  rmEl('Items').innerHTML = items.map((a) => `<div class="pick"><span class="pn" title="${esc(a.description)}">${esc(a.name)}</span>${metaIcons(a)}<span class="pt">${a.type === 'bash' ? 'Linux' : 'PowerShell'}</span></div>`).join('')
+  rmEl('Items').innerHTML = items.map((a) => `<div class="pick"><span class="pn" title="${esc(a.description)}">${esc(a.name)}</span>${metaIcons(a)}<span class="pt">${a.type === 'bash' ? 'Linux' : 'PowerShell'}</span><button type="button" class="unpick" data-unpick="${esc(a.id)}" title="Remove this action from the response" aria-label="Remove">×</button></div>`).join('')
     || '<p class="dim" style="margin:6px 10px">No actions selected yet. Choose them on the Actions tab.</p>';
 }
 const RM_ORDER = ['who', 'act', 'params', 'name'];
@@ -143,18 +171,18 @@ function rmQuickUi(host) {
   rmEl('Run').textContent = q ? 'Run Quick Response' : 'Run Response';
 }
 async function openRespModal(quickHost) {
-  rm.selA.clear(); rm.selH.clear(); rm.selL.clear(); rm.q = ''; rm.type = 'powershell'; rmParams.reset();
+  rm.selA.clear(); rm.selH.clear(); rm.selL.clear(); rmF.reset(); rm.matches = null; rm.type = 'powershell'; rmParams.reset();
   rmQuickUi(quickHost);
   if (quickHost) { rm.selH.add(quickHost.id); rm.type = quickHost.protocol === 'ssh' ? 'bash' : 'powershell'; } // open on the host's own kind of actions
   rm.shown = null; rmEl('Detail').innerHTML = '<p class="dim">Click an action to see what it does.</p>';
-  rmEl('Name').value = quickHost ? (quickHost.hostname || quickHost.name) : ''; rmEl('Search').value = ''; rmEl('Msg').textContent = '';
+  rmEl('Name').value = quickHost ? (quickHost.hostname || quickHost.name) : ''; rmEl('Msg').textContent = '';
   rmEl('Msg').className = ''; rmSetRecurring(false);
   rmTab(quickHost ? 'act' : 'who');
   $('respModal').hidden = false;
   try {
     [rm.actions, rm.hosts, rm.lists] = await Promise.all([api('GET', '/api/actions'), api('GET', '/api/hosts'), api('GET', '/api/lists')]);
   } catch (e) { rmEl('Msg').textContent = e.message; rmEl('Msg').className = 'bad'; }
-  rmRenderActions(); rmRenderTargets(); rmSummary();
+  rmF.loadMeta().catch(() => {}); rmRenderActions(); rmRenderTargets(); rmSummary();
 }
 const closeRespModal = () => { $('respModal').hidden = true; };
 $('brNew').onclick = () => openRespModal();
@@ -163,9 +191,10 @@ $('rmClose').onclick = closeRespModal;
 $('respModal').onclick = (e) => { if (e.target.id === 'respModal') closeRespModal(); };
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('respModal').hidden && $('rerunRespModal').hidden) closeRespModal(); });
 $('rmTabs').onclick = (e) => { const b = e.target.closest('button[data-pane]'); if (b) rmTab(b.dataset.pane); };
-$('rmToggle').onclick = (e) => { if (e.target.dataset.type) { rm.type = e.target.dataset.type; rmRenderActions(); } };
+$('rmToggle').onclick = (e) => { if (e.target.dataset.type) { rm.type = e.target.dataset.type; rmF.tags = []; rmQuery(); } }; // tags differ between PowerShell and Linux
 recInit('rm');
 rmEl('Recurring').onclick = () => rmSetRecurring(!rm.recurring);
+$('rmItems').onclick = (e) => { const u = e.target.closest('[data-unpick]'); if (u) rmUnpick(u.dataset.unpick); };
 $('rmActions').onclick = (e) => {
   const row = e.target.closest('[data-view]'); if (!row) return;
   const id = row.dataset.view, a = rm.actions.find((x) => x.id === id); if (!a) return;
@@ -173,13 +202,21 @@ $('rmActions').onclick = (e) => {
   if (rm.selA.has(id)) rm.selA.delete(id); else rm.selA.add(id); // a click adds it to the response, another takes it out
   rmSummary(); rmShow(id);
 };
-rmEl('Search').oninput = () => { rm.q = rmEl('Search').value.trim(); rmRenderActions(); };
-$('respModal').onchange = (e) => {
-  const d = e.target.dataset;
-  const set = d.h ? [rm.selH, d.h] : d.l ? [rm.selL, d.l] : null;
-  if (!set) return;
-  if (e.target.checked) set[0].add(set[1]); else set[0].delete(set[1]);
-  rmSummary();
+$('rmGroups').onclick = (e) => {
+  const row = e.target.closest('[data-l]'), l = row && rm.lists.find((x) => x.id === row.dataset.l); if (!l) return;
+  const ids = l.hostIds.filter((i) => rm.hosts.some((h) => h.id === i)); if (!ids.length) return;
+  if (rm.selL.has(l.id)) ids.forEach((i) => rm.selH.delete(i)); else ids.forEach((i) => rm.selH.add(i));
+  rmRenderTargets(); rmSummary();
+};
+$('rmHosts').onclick = (e) => {
+  const row = e.target.closest('[data-h]'); if (!row) return;
+  if (rm.selH.has(row.dataset.h)) rm.selH.delete(row.dataset.h); else rm.selH.add(row.dataset.h);
+  rmRenderTargets(); rmSummary();
+};
+// the X on a host in the Overview tab: it is no longer picked, which also makes any group it was in neutral on the Who tab
+$('rmTargets').onclick = (e) => {
+  const u = e.target.closest('[data-unpick-host]'); if (!u) return;
+  rm.selH.delete(u.dataset.unpickHost); rmRenderTargets(); rmSummary(); rmRenderTargetList();
 };
 
 // Rerun past response: pick an earlier response and its hosts and actions are ticked and the name becomes "<name>_rerun". Parameter

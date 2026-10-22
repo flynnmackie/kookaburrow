@@ -117,7 +117,7 @@ const NAV = [
     ['user-management', 'User Management', 'System'], ['shell-settings', 'Shell Settings', 'System'], ['health-settings', 'Health Settings', 'System'],
     ['view-collections', 'View Collections', 'Collections'], ['add-collections', 'Add Collections', 'Collections'],
     ['view-actions', 'View Actions', 'Actions'], ['add-actions', 'Add Actions', 'Actions'],
-    ['binaries', 'View Binaries'],
+    ['binaries', 'Upload Binaries'],
   ] },
   { id: 'hosts', label: 'Host Management', pages: [
     ['view-hosts', 'View Hosts', 'Hosts'], ['profiles', 'Profiles', 'Hosts'], ['groups', 'Groups', 'Hosts'],
@@ -125,7 +125,7 @@ const NAV = [
   ] },
   { id: 'burrow', label: 'Burrow!', accent: true, pages: [['hunt', 'Hunt'], ['respond', 'Respond'], ['recurring', 'Recurring']],
     // Hyperlink-style shortcuts under the pages: [label, slug of the page they open]
-    links: [['View Collections (Hunt)', 'settings/view-collections'], ['View Actions (Respond)', 'settings/view-actions'], ['View Binaries', 'settings/binaries']] },
+    links: [['View Collections (Hunt)', 'settings/view-collections'], ['View Actions (Respond)', 'settings/view-actions'], ['Upload Binaries', 'settings/binaries']] },
   { id: 'output', label: 'Results', pages: [['log', 'Log'], ['report', 'Report'], ['json', 'JSON']] },
   { id: 'browse', label: 'Browse', pages: [['files', 'Files']] },
   // The logo in the header opens this landing page. It has no tab of its own and no side menu.
@@ -240,6 +240,8 @@ NAV.forEach((t, i) => {
   $('topnav').append(b);
 });
 $('sidenav').onclick = (e) => {
+  const fold = e.target.closest('[data-shfold]');
+  if (fold) { const g = fold.dataset.shfold; if (shellFolded.has(g)) shellFolded.delete(g); else shellFolded.add(g); renderShellList(); return; }
   const sh = e.target.closest('button[data-shell-host]');
   if (sh) { shellHost = sh.dataset.shellHost; renderShellList(); renderShellMain(); return; }
   if (e.target.closest('#shellStart')) {
@@ -513,8 +515,7 @@ function renderHosts() {
   // the full list is in the tooltip), and one dropdown both adds it to a group and takes it out of one.
   const groupCell = (h) => {
     const mine = lists.filter((l) => l.hostIds.includes(h.id));
-    return `<div class="gcell"><button class="act sec" type="button" data-manage="${h.id}" data-perm="hosts.manage" data-perm-what="change host groups">Manage groups</button>
-      <div class="gchips" title="${mine.length ? esc(mine.map((l) => l.name).join(', ')) : 'Not in any group'}">${mine.map((l) => `<span class="tagchip on">${esc(l.name)}</span>`).join('')}</div></div>`;
+    return `<button class="act sec" type="button" data-manage="${h.id}" data-perm="hosts.manage" data-perm-what="change host groups" title="${mine.length ? `In: ${esc(mine.map((l) => l.name).join(', '))}` : 'Not in any group (shows under Unassigned)'}">Manage groups</button>`;
   };
   // Search matches name, address, OS and protocol. WinRM hosts show in blue and SSH hosts in orange.
   const q = hostQuery.toLowerCase();
@@ -721,66 +722,80 @@ const miToggle = (group, allowed) => allowed.map((v) => {
   return `<button type="button" data-v="${v}" title="${esc(`${x.label}. ${x.tip}`)}">${MI_SVG(x.svg)}${esc(x.label)}</button>`;
 }).join('');
 
+// ---- The search / filter controls (View Collections, View Actions and the New Hunt / New Response dialogs share them) ----
+// A search box (name, description and script text, matched server-side), a tag dropdown (a script must have ALL picked tags),
+// "Dependencies" (only scripts that need an external binary) and "★ Favourites" (only this user's starred ones). Picked tags show as
+// removable chips. `onChange(server)` is called after a change: true means ask the server again, false means redraw what is loaded.
+function makeFilter({ box, search, url, noun, favKind, getType, onChange }) {
+  const f = { query: '', tags: [], deps: false, favOnly: false, tagList: [], favs: new Set() };
+  let timer;
+  f.active = () => !!(f.query || f.tags.length || f.deps || f.favOnly);
+  f.qs = () => {
+    const params = new URLSearchParams();
+    if (f.query) params.set('q', f.query);
+    if (f.tags.length) params.set('tags', f.tags.join(','));
+    if (f.deps) params.set('deps', '1');
+    return params.toString();
+  };
+  f.render = () => {
+    const available = f.tagList.filter((t) => !f.tags.includes(t.tag));
+    box.innerHTML = `
+    <div class="tf-row">
+      <select data-role="tagSelect" ${available.length ? '' : 'disabled'}>
+        <option value="">${f.tagList.length ? (available.length ? 'Filter by tag…' : 'All tags selected') : 'No tags'}</option>
+        ${available.map((t) => `<option value="${esc(t.tag)}">${esc(t.tag)} (${t.count})</option>`).join('')}
+      </select>
+      <button type="button" class="tagchip ${f.deps ? 'on' : ''}" data-deps="1" aria-pressed="${f.deps}" title="Only ${noun}s that need at least one dependency (external binary)">Dependencies</button>
+      <button type="button" class="tagchip ${f.favOnly ? 'on' : ''}" data-favs="1" aria-pressed="${f.favOnly}" title="Only your favourite ${noun}s">★ Favourites</button>
+      ${f.tags.length || f.deps || f.favOnly ?'<a data-clear-tags="1">Clear</a>' : ''}
+    </div>
+    ${f.tags.length ? `<div class="tf-chips">${f.tags.map((t) => `<button type="button" class="tagchip on" data-remove-tag="${esc(t)}" title="Remove filter">${esc(t)} ×</button>`).join('')}</div>` : ''}`;
+  };
+  // the tags of the current type and this user's favourites (the list itself is fetched by the caller)
+  f.loadMeta = async () => {
+    const [tags, fv] = await Promise.all([api('GET', `${url}/tags?type=${getType()}`), api('GET', '/api/favourites').catch(() => ({}))]);
+    f.tagList = tags; f.favs = new Set(fv[favKind] || []);
+    f.render();
+  };
+  f.reset = () => { f.query = ''; f.tags = []; f.deps = false; f.favOnly = false; search.value = ''; };
+  const toggleTag = (tag) => { f.tags = f.tags.includes(tag) ? f.tags.filter((t) => t !== tag) : [...f.tags, tag]; onChange(true); };
+  box.onchange = (e) => { if (e.target.dataset.role === 'tagSelect' && e.target.value) toggleTag(e.target.value); };
+  box.onclick = (e) => {
+    const d = e.target.dataset;
+    if (d.clearTags) { f.tags = []; f.deps = false; f.favOnly = false; onChange(true); return; }
+    if (d.favs) { f.favOnly = !f.favOnly; f.render(); onChange(false); return; }
+    if (d.deps) { f.deps = !f.deps; onChange(true); return; }
+    if (d.removeTag) toggleTag(d.removeTag);
+  };
+  search.oninput = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => { f.query = search.value.trim(); onChange(true); }, 200);
+  };
+  return f;
+}
+
 // ---- Settings: View Collections / View Actions ----
 // One library view serves both: a searchable, filterable list of scripts on the left and the open
 // script on the right. `id` prefixes the element ids (collectionList, actionList, ...); `url` is the API root.
 function makeLibrary({ id, url, noun, folder, showParams }) {
   const el = (s) => $(id + s);
   const Noun = noun[0].toUpperCase() + noun.slice(1);
-  let type = 'powershell', all = [], tagList = [], selectedTags = [], depsOnly = false;
-  let query = '', req = 0, open = null, searchTimer;
+  let type = 'powershell', all = [], req = 0, open = null;
+  const favKind = id === 'action' ? 'actions' : 'collections';
+  const f = makeFilter({ box: el('TagFilter'), search: el('Search'), url, noun, favKind, getType: () => type, onChange: (server) => (server ? load() : renderList()) });
+  const starHtml = (sid) => f.favs.has(sid) ? '<span class="fav on" title="One of your favourites">★</span>' : '';
 
   async function load() {
     const r = ++req;
-    const params = new URLSearchParams();
-    if (query) params.set('q', query);
-    if (selectedTags.length) params.set('tags', selectedTags.join(','));
-    if (depsOnly) params.set('deps', '1');
-    const qs = params.toString();
-    const [list, tags] = await Promise.all([
-      api('GET', `${url}${qs ? `?${qs}` : ''}`),
-      api('GET', `${url}/tags?type=${type}`),
-    ]);
+    const qs = f.qs();
+    const [list] = await Promise.all([api('GET', `${url}${qs ? `?${qs}` : ''}`), f.loadMeta()]);
     if (r !== req) return; // a newer search is in flight
-    all = list; tagList = tags;
-    renderTagFilter();
+    all = list;
     // the box on the right is never empty: with nothing open yet, the first script in the list is opened
     if (!open) open = all.find((h) => h.type === type)?.id ?? null;
     renderList();
     if (open) show(open); // refresh the open script, e.g. after uploading a binary
   }
-
-  // Filters: pick tags from the dropdown (scripts must have ALL selected tags) and/or switch on
-  // "Dependencies" to keep only scripts that need at least one external binary. Selected tags show
-  // as removable chips under the dropdown.
-  function renderTagFilter() {
-    const available = tagList.filter((t) => !selectedTags.includes(t.tag));
-    el('TagFilter').innerHTML = `
-    <div class="tf-row">
-      <select data-role="tagSelect" ${available.length ? '' : 'disabled'}>
-        <option value="">${tagList.length ? (available.length ? 'Filter by tag…' : 'All tags selected') : 'No tags'}</option>
-        ${available.map((t) => `<option value="${esc(t.tag)}">${esc(t.tag)} (${t.count})</option>`).join('')}
-      </select>
-      <button class="tagchip ${depsOnly ? 'on' : ''}" data-deps="1" aria-pressed="${depsOnly}" title="Only ${noun}s that need at least one dependency (external binary)">Dependencies</button>
-      ${selectedTags.length || depsOnly ? '<a data-clear-tags="1">Clear</a>' : ''}
-    </div>
-    ${selectedTags.length ? `<div class="tf-chips">${selectedTags.map((t) => `<button class="tagchip on" data-remove-tag="${esc(t)}" title="Remove filter">${esc(t)} ×</button>`).join('')}</div>` : ''}`;
-  }
-  function toggleTag(tag) {
-    selectedTags = selectedTags.includes(tag) ? selectedTags.filter((t) => t !== tag) : [...selectedTags, tag];
-    load();
-  }
-  el('TagFilter').onchange = (e) => { if (e.target.dataset.role === 'tagSelect' && e.target.value) toggleTag(e.target.value); };
-  el('TagFilter').onclick = (e) => {
-    if (e.target.dataset.clearTags) { selectedTags = []; depsOnly = false; load(); return; }
-    if (e.target.dataset.deps) { depsOnly = !depsOnly; load(); return; }
-    if (e.target.dataset.removeTag) toggleTag(e.target.dataset.removeTag);
-  };
-  // Searches the name/description and the script text itself (matching is done server-side).
-  el('Search').oninput = () => {
-    clearTimeout(searchTimer);
-    searchTimer = setTimeout(() => { query = el('Search').value.trim(); load(); }, 200);
-  };
 
   // A script with binary dependencies is red until every one is uploaded, then light green.
   // Scripts with no dependencies keep the normal look.
@@ -789,28 +804,29 @@ function makeLibrary({ id, url, noun, folder, showParams }) {
     return h.dependencies.length ? 'met' : '';
   }
   function renderList() {
-    const count = (t) => all.filter((h) => h.type === t).length;
+    const keep = (h) => !f.favOnly || f.favs.has(h.id);
+    const count = (t) => all.filter((h) => h.type === t && keep(h)).length;
     document.querySelectorAll(`#${id}Toggle button`).forEach((b) => {
       b.classList.toggle('on', b.dataset.type === type);
       // While searching, show how many hits each side has so matches in the other tab aren't missed.
-      b.textContent = (b.dataset.type === 'bash' ? 'Linux' : 'PowerShell') + (query || selectedTags.length || depsOnly ? ` (${count(b.dataset.type)})` : '');
+      b.textContent = (b.dataset.type === 'bash' ? 'Linux' : 'PowerShell') + (f.active() ? ` (${count(b.dataset.type)})` : '');
     });
     const dir = `${folder}/${type === 'bash' ? 'bash' : 'powershell'}`;
     const tag = (m) => !m ? '' : [m.name && 'name', m.script && 'script'].filter(Boolean).join(' + ');
-    el('List').innerHTML = all.filter((h) => h.type === type).map((h) => `<div class="collection-item ${h.id === open ? 'on' : ''} ${depState(h)}" data-id="${esc(h.id)}">
-    ${h.verified ? VERIFIED : ''}${metaIcons(h)}<div class="hn">${esc(h.name)} ${h.match ? `<span class="mtag">${tag(h.match)}</span>` : ''}${h.warnings.length ? `<span class="mwarn" title="${esc(h.warnings.join('; '))}">⚠</span>` : ''}</div>
+    el('List').innerHTML = all.filter((h) => h.type === type && keep(h)).map((h) => `<div class="collection-item ${h.id === open ? 'on' : ''} ${depState(h)}" data-id="${esc(h.id)}">
+    ${h.verified ? VERIFIED : ''}${starHtml(h.id)}<div class="hn">${esc(h.name)} ${h.match ? `<span class="mtag">${tag(h.match)}</span>` : ''}${h.warnings.length ? `<span class="mwarn" title="${esc(h.warnings.join('; '))}">⚠</span>` : ''}</div>
     <div class="hd" title="${esc(h.description)}">${esc(h.description)}</div>
-    ${h.tags.length ? `<div class="htags">${h.tags.map((t) => `<span class="htag ${selectedTags.includes(t) ? 'on' : ''}" data-tag="${esc(t)}">${esc(t)}</span>`).join('')}</div>` : ''}
+    <div class="hmeta">${metaIcons(h)}</div>
     ${h.missingDependencies.length ? `<div class="hmiss" title="Missing: ${esc(h.missingDependencies.join(', '))}">Some dependencies missing</div>`
       : h.dependencies.length ? '<div class="hready" title="Every required binary has been uploaded">Dependencies ready</div>' : ''}
     ${h.match && !h.match.name && h.match.line ? `<div class="hl">${esc(h.match.line)}</div>` : ''}</div>`).join('')
-    || (query || selectedTags.length || depsOnly ? `<p class="dim" style="margin:0">No ${type === 'bash' ? 'Linux' : 'PowerShell'} ${noun}s match${query ? ` "${esc(query)}"` : ''}${selectedTags.length ? ` with tag${selectedTags.length > 1 ? 's' : ''} ${selectedTags.map(esc).join(' + ')}` : ''}${depsOnly ? ' that need a dependency' : ''}.</p>`
+    || (f.active() ? `<p class="dim" style="margin:0">No ${type === 'bash' ? 'Linux' : 'PowerShell'} ${f.favOnly ? 'favourite ' : ''}${noun}s match${f.query ? ` "${esc(f.query)}"` : ''}${f.tags.length ? ` with tag${f.tags.length > 1 ? 's' : ''} ${f.tags.map(esc).join(' + ')}` : ''}${f.deps ? ' that need a dependency' : ''}.</p>`
       : `<p class="dim" style="margin:0">No ${noun}s found. Add scripts to <code>${dir}</code>.</p>`);
   }
   el('Toggle').onclick = (e) => {
     if (!e.target.dataset.type) return;
     type = e.target.dataset.type;
-    selectedTags = []; // tags differ between PowerShell and Linux scripts
+    f.tags = []; // tags differ between PowerShell and Linux scripts
     open = null; el('Detail').innerHTML = ''; el('Detail').classList.remove('unmet', 'met');
     load();
   };
@@ -820,6 +836,15 @@ function makeLibrary({ id, url, noun, folder, showParams }) {
     open = item.dataset.id;
     renderList();
     show(open);
+  };
+  el('Detail').onclick = async (e) => {
+    const b = e.target.closest('[data-fav]'); if (!b) return;
+    const sid = b.dataset.fav, on = !f.favs.has(sid);
+    try {
+      const fv = await api('PUT', `/api/favourites/${favKind}`, { id: sid, on });
+      f.favs = new Set(fv[favKind] || []);
+      f.render(); renderList(); show(sid);
+    } catch (err) { toast(err.message, 'bad'); }
   };
   async function show(sid) {
     try {
@@ -833,24 +858,30 @@ function makeLibrary({ id, url, noun, folder, showParams }) {
 
   // Name / description / dependencies are shown in their own colours, then the script as code.
   // A script with binaries that have not been uploaded is shown in red with a warning.
+  // Parameters as "Required: a, b" and "Optional: c"; a script that takes none says so in green.
+  const paramsHtml = (h) => {
+    const req = h.parameters.filter((p) => !h.optionalParameters.includes(p)), opt = h.parameters.filter((p) => h.optionalParameters.includes(p));
+    if (!h.parameters.length) return '<span class="ok">None</span>';
+    return [req.length && `<div><b>Required:</b> ${req.map(esc).join(', ')}</div>`, opt.length && `<div><b>Optional:</b> ${opt.map(esc).join(', ')}</div>`].filter(Boolean).join('');
+  };
   function renderDetail(h) {
     const deps = h.dependencies.length
       ? h.dependencies.map((d) => `<span class="dep ${h.missingDependencies.includes(d) ? 'miss' : 'have'}">${esc(d)}${h.missingDependencies.includes(d) ? ' (not uploaded)' : ' (uploaded)'}</span>`).join('')
       : '<span class="dim">None</span>';
     return `
-    ${h.verified ? VERIFIED : ''}<div class="hd-name">${esc(h.name)}</div>
+    ${h.verified ? VERIFIED : ''}<button class="fav-btn ${f.favs.has(h.id) ? 'on' : ''}" data-fav="${esc(h.id)}" title="${f.favs.has(h.id) ? 'Remove from your favourites' : 'Add to your favourites'}" aria-pressed="${f.favs.has(h.id)}">${f.favs.has(h.id) ? '★' : '☆'}</button><div class="hd-name">${esc(h.name)}</div>
     <div class="hd-file">${esc(h.id)}</div>
     ${metaIcons(h, true)}
     ${h.missingDependencies.length ? `<div class="hd-unmet">Some dependencies missing: ${h.missingDependencies.map(esc).join(', ')}. Upload them in Settings → Binaries.</div>` : ''}
     ${h.warnings.length ? `<div class="hd-warn">${h.warnings.map(esc).join('<br>')}</div>` : ''}
     <div class="hd-label hd-label-desc">Description</div>
     <div class="hd-desc">${h.description ? esc(h.description) : '<span class="dim">-</span>'}</div>
-    ${showParams ? `<div class="hd-label hd-label-dep">Parameters</div>
-    <div class="hd-deps">${h.parameters.length ? h.parameters.map((p) => `<span class="dep have">${esc(p)}${h.optionalParameters.includes(p) ? ' (optional)' : ''}</span>`).join('') : '<span class="dim">None</span>'}</div>` : ''}
     <div class="hd-label hd-label-dep">Dependencies</div>
     <div class="hd-deps">${deps}</div>
     <div class="hd-label hd-label-tags">Tags</div>
     <div class="hd-tags">${h.tags.length ? h.tags.map((t) => `<span class="hd-tag">${esc(t)}</span>`).join('') : '<span class="dim">None</span>'}</div>
+    <div class="hd-label hd-label-dep">Parameters</div>
+    <div class="hd-params">${paramsHtml(h)}</div>
     <div class="hd-label hd-label-code">${Noun}</div>
     <pre class="code">${highlight(h.body, h.type)}</pre>`;
   }
@@ -1196,7 +1227,7 @@ $('bhDetail').onclick = (e) => {
 //   orange  it takes only optional parameters and they are not set (it can still run as it is)
 //   green   its parameters are set: Set parameters was pressed with every required one filled in
 // Typing in a parameter un-sets it again. Run is refused while anything is red. Values live in st.params for this dialog only.
-function makeParamsPane({ root, p, st, noun, items }) {
+function makeParamsPane({ root, p, st, noun, items, onRemove }) {
   const el = (x) => $(p + x);
   const taking = () => items().filter((x) => x.parameters.length);
   const required = (x) => x.parameters.filter((q) => !x.optionalParameters.includes(q));
@@ -1209,7 +1240,7 @@ function makeParamsPane({ root, p, st, noun, items }) {
     const list = taking();
     if (!list.some((x) => x.id === st.pShown)) st.pShown = list[0]?.id || null;
     el('PList').innerHTML = list.length
-      ? list.map((x) => `<div class="collection-item pi ${stateOf(x)} ${x.id === st.pShown ? 'on' : ''}" data-pi="${esc(x.id)}"><div class="ci-main"><div class="hn">${esc(x.name)}</div><div class="pi-s">${LABEL[stateOf(x)]}</div></div></div>`).join('')
+      ? list.map((x) => `<div class="collection-item pi ${stateOf(x)} ${x.id === st.pShown ? 'on' : ''}" data-pi="${esc(x.id)}"><div class="ci-main"><div class="hn">${esc(x.name)}</div><div class="pi-s">${LABEL[stateOf(x)]}</div></div><button type="button" class="unpick" data-unpick="${esc(x.id)}" title="Remove this ${noun} from the ${noun === 'action' ? 'response' : 'hunt'}" aria-label="Remove">×</button></div>`).join('')
       : `<p class="dim" style="margin:6px 10px">None of the picked ${noun}s take parameters.</p>`;
     const btn = el('TabParams'), states = list.map(stateOf);
     btn.lastChild.textContent = list.length ? `Parameters (${list.length})` : 'Parameters';
@@ -1240,6 +1271,8 @@ function makeParamsPane({ root, p, st, noun, items }) {
     st.setP.add(x.id); paintList(); paintState(); say('Parameters set.', 'ok');
   }
   $(root).addEventListener('click', (e) => {
+    const un = e.target.closest(`#${p}PList [data-unpick]`);
+    if (un) { onRemove(un.dataset.unpick); return; }
     const row = e.target.closest(`#${p}PList [data-pi]`);
     if (row) { st.pShown = row.dataset.pi; render(); return; }
     if (e.target.closest(`#${p}PSet`)) setParams();
@@ -1260,9 +1293,14 @@ function makeParamsPane({ root, p, st, noun, items }) {
   };
 }
 
-const hm = { collections: [], hosts: [], lists: [], selC: new Set(), selH: new Set(), selL: new Set(), q: '', type: 'powershell', shown: null, recurring: false, quick: null, params: {}, setP: new Set(), pShown: null };
-const hmParams = makeParamsPane({ root: 'huntModal', p: 'hm', st: hm, noun: 'collection', items: () => hm.collections.filter((c) => hm.selC.has(c.id)) });
+const hm = { collections: [], hosts: [], lists: [], selC: new Set(), selH: new Set(), selL: new Set(), matches: null, type: 'powershell', shown: null, recurring: false, quick: null, params: {}, setP: new Set(), pShown: null };
+const hmParams = makeParamsPane({ root: 'huntModal', p: 'hm', st: hm, noun: 'collection', items: () => hm.collections.filter((c) => hm.selC.has(c.id)), onRemove: (id) => hmUnpick(id) });
 const hmEl = (s) => $('hm' + s);
+// A group counts as picked while every one of its hosts is picked: clicking a group picks all its hosts, and taking one host out of it
+// (here or on the Overview tab) makes the group neutral again while the others stay picked. The ids go to the server as listIds.
+function hmSyncGroups() {
+  hm.selL = new Set(hm.lists.filter((l) => l.hostIds.length && l.hostIds.every((i) => hm.selH.has(i))).map((l) => l.id));
+}
 function hmCount() {
   const ids = new Set(hm.selH);
   for (const l of hm.lists) if (hm.selL.has(l.id)) l.hostIds.forEach((i) => ids.add(i));
@@ -1275,14 +1313,36 @@ function hmSummary() {
   hmEl('TabColl').lastChild.textContent = c ? `Collections (${c})` : 'Collections';
   hmParams.render(); // the Parameters tab follows what is picked
 }
+// The search box and filters are the same as View Collections (makeFilter). A search or tag/dependency filter is answered by the server
+// (hm.matches holds the ids that matched); picked collections stay picked even when a filter hides them.
+const hmF = makeFilter({ box: $('hmTagFilter'), search: $('hmSearch'), url: '/api/collections', noun: 'collection', favKind: 'collections', getType: () => hm.type, onChange: (server) => (server ? hmQuery() : hmRenderCollections()) });
+async function hmQuery() {
+  const qs = hmF.qs(), mine = hm.qn = (hm.qn || 0) + 1;
+  try {
+    const [list] = await Promise.all([qs ? api('GET', `/api/collections?${qs}`) : null, hmF.loadMeta()]);
+    if (mine !== hm.qn) return; // a newer search is in flight
+    hm.matches = list ? new Map(list.map((c) => [c.id, c.match])) : null;
+  } catch (e) { hmEl('Msg').textContent = e.message; hmEl('Msg').className = 'bad'; }
+  hmRenderCollections();
+}
 function hmRenderCollections() {
-  const q = hm.q.toLowerCase(), inType = hm.collections.filter((c) => c.type === hm.type);
-  const shown = inType.filter((c) => !q || [c.name, c.file, c.description, ...c.tags].some((s) => String(s).toLowerCase().includes(q)));
-  document.querySelectorAll('#hmToggle button').forEach((b) => b.classList.toggle('on', b.dataset.type === hm.type));
-  hmEl('Collections').innerHTML = shown.map((c) => `<div class="collection-item ${c.id === hm.shown ? 'on' : ''} ${hm.selC.has(c.id) ? 'sel' : ''} ${c.missingDependencies.length ? 'blocked' : ''}" data-view="${esc(c.id)}" ${c.missingDependencies.length ? `aria-disabled="true" title="Required binary missing: ${esc(c.missingDependencies.join(', '))}"` : ''}>
-      <div class="ci-main">${c.verified ? VERIFIED : ''}${metaIcons(c)}<div class="hn">${esc(c.name)}</div><div class="hd" title="${esc(c.description)}">${esc(c.description)}</div>
-      ${c.tags.length ? `<div class="htags">${c.tags.map((t) => `<span class="htag">${esc(t)}</span>`).join('')}</div>` : ''}</div></div>`).join('')
-    || '<p class="dim" style="margin:6px 10px">No collections match.</p>';
+  const keep = (c) => (!hm.matches || hm.matches.has(c.id)) && (!hmF.favOnly || hmF.favs.has(c.id));
+  const shown = hm.collections.filter((c) => c.type === hm.type && keep(c));
+  const tag = (m) => !m ? '' : [m.name && 'name', m.script && 'script'].filter(Boolean).join(' + ');
+  document.querySelectorAll('#hmToggle button').forEach((b) => {
+    b.classList.toggle('on', b.dataset.type === hm.type);
+    b.textContent = (b.dataset.type === 'bash' ? 'Linux' : 'PowerShell') + (hmF.active() ? ` (${hm.collections.filter((c) => c.type === b.dataset.type && keep(c)).length})` : '');
+  });
+  hmEl('Collections').innerHTML = shown.map((c) => { const m = hm.matches?.get(c.id); return `<div class="collection-item ${c.id === hm.shown ? 'on' : ''} ${hm.selC.has(c.id) ? 'sel' : ''} ${c.missingDependencies.length ? 'blocked' : ''}" data-view="${esc(c.id)}" ${c.missingDependencies.length ? `aria-disabled="true" title="Required binary missing: ${esc(c.missingDependencies.join(', '))}"` : ''}>
+      <div class="ci-main">${c.verified ? VERIFIED : ''}${hmF.favs.has(c.id) ? '<span class="fav on" title="One of your favourites">★</span>' : ''}<div class="hn">${esc(c.name)} ${m ? `<span class="mtag">${tag(m)}</span>` : ''}</div><div class="hd" title="${esc(c.description)}">${esc(c.description)}</div>
+      <div class="hmeta">${metaIcons(c)}</div>${m && !m.name && m.line ? `<div class="hl">${esc(m.line)}</div>` : ''}</div></div>`; }).join('')
+    || `<p class="dim" style="margin:6px 10px">No ${hmF.active() ? 'collections match.' : 'collections.'}</p>`;
+}
+// the X on the Parameters and Overview tabs: take a collection out of the hunt
+function hmUnpick(id) {
+  hm.selC.delete(id); delete hm.params[id]; hm.setP.delete(id);
+  hmSummary(); hmRenderCollections();
+  if (document.querySelector('#hmTabs .on')?.dataset.pane === 'name') hmRenderTargetList();
 }
 async function hmShow(id) {
   hm.shown = id;
@@ -1298,11 +1358,12 @@ async function hmShow(id) {
   } catch (e) { hmEl('Detail').innerHTML = `<p class="bad">${esc(e.message)}</p>`; }
 }
 function hmRenderTargets() {
-  hmEl('Groups').innerHTML = hm.lists.map((l) => `<label class="pick"><input type="checkbox" data-l="${esc(l.id)}" ${hm.selL.has(l.id) ? 'checked' : ''}>
-      <span class="pn">${esc(l.name)}</span><span class="pt">${l.hostIds.length} host${l.hostIds.length === 1 ? '' : 's'}</span></label>`).join('')
+  hmSyncGroups();
+  hmEl('Groups').innerHTML = hm.lists.map((l) => `<div class="pick pk ${hm.selL.has(l.id) ? 'sel' : ''}" data-l="${esc(l.id)}">
+      <span class="pn">${esc(l.name)}</span><span class="pt">${l.hostIds.length} host${l.hostIds.length === 1 ? '' : 's'}</span></div>`).join('')
     || '<p class="dim" style="margin:6px 10px">No groups yet.</p>';
-  hmEl('Hosts').innerHTML = hm.hosts.map((h) => `<label class="pick"><input type="checkbox" data-h="${esc(h.id)}" ${hm.selH.has(h.id) ? 'checked' : ''}>
-      <span class="pn">${esc(h.name)}</span><span class="pt">${esc(h.address)}</span></label>`).join('')
+  hmEl('Hosts').innerHTML = hm.hosts.map((h) => `<div class="pick pk ${hm.selH.has(h.id) ? 'sel' : ''}" data-h="${esc(h.id)}">
+      <span class="pn">${esc(h.name)}</span><span class="pt">${esc(h.address)}</span></div>`).join('')
     || '<p class="dim" style="margin:6px 10px">No saved hosts yet.</p>';
 }
 function hmTab(name) {
@@ -1318,12 +1379,12 @@ function hmRenderTargetList() {
   for (const l of hm.lists) if (hm.selL.has(l.id)) l.hostIds.forEach((i) => ids.add(i));
   const list = hm.hosts.filter((h) => ids.has(h.id));
   hmEl('TargetsHead').textContent = `Will run against ${list.length} host${list.length === 1 ? '' : 's'}`;
-  hmEl('Targets').innerHTML = list.map((h) => `<div class="pick"><span class="pn">${esc(h.name)}</span><span class="pt">${esc(h.address)}</span><span class="proto-${h.protocol === 'ssh' ? 'ssh' : 'winrm'}">${h.protocol === 'ssh' ? 'SSH' : 'WinRM'}</span></div>`).join('')
+  hmEl('Targets').innerHTML = list.map((h) => `<div class="pick"><span class="pn">${esc(h.name)}</span><span class="pt">${esc(h.address)}</span><span class="proto-${h.protocol === 'ssh' ? 'ssh' : 'winrm'}">${h.protocol === 'ssh' ? 'SSH' : 'WinRM'}</span><button type="button" class="unpick" data-unpick-host="${esc(h.id)}" title="Remove this host from the hunt" aria-label="Remove">×</button></div>`).join('')
     || '<p class="dim" style="margin:6px 10px">No hosts selected yet. Choose them on the Who tab.</p>';
   // and what will run on them
   const items = hm.collections.filter((c) => hm.selC.has(c.id));
   hmEl('ItemsHead').textContent = `${items.length} collection${items.length === 1 ? '' : 's'} to run`;
-  hmEl('Items').innerHTML = items.map((c) => `<div class="pick"><span class="pn" title="${esc(c.description)}">${esc(c.name)}</span>${metaIcons(c)}<span class="pt">${c.type === 'bash' ? 'Linux' : 'PowerShell'}</span></div>`).join('')
+  hmEl('Items').innerHTML = items.map((c) => `<div class="pick"><span class="pn" title="${esc(c.description)}">${esc(c.name)}</span>${metaIcons(c)}<span class="pt">${c.type === 'bash' ? 'Linux' : 'PowerShell'}</span><button type="button" class="unpick" data-unpick="${esc(c.id)}" title="Remove this collection from the hunt" aria-label="Remove">×</button></div>`).join('')
     || '<p class="dim" style="margin:6px 10px">No collections selected yet. Choose them on the Collections tab.</p>';
   // a collection that pulls back large files: say what will be switched on, and for which hosts, before the hunt runs
   const big = items.filter((c) => c.transfer === 'large'), win = list.filter((h) => h.protocol !== 'ssh'), lin = list.filter((h) => h.protocol === 'ssh');
@@ -1355,18 +1416,18 @@ function hmQuickUi(host) {
   hmEl('Run').textContent = q ? 'Run Quick Hunt' : 'Run Hunt';
 }
 async function openHuntModal(quickHost) {
-  hm.selC.clear(); hm.selH.clear(); hm.selL.clear(); hm.q = ''; hm.type = 'powershell'; hmParams.reset();
+  hm.selC.clear(); hm.selH.clear(); hm.selL.clear(); hmF.reset(); hm.matches = null; hm.type = 'powershell'; hmParams.reset();
   hmQuickUi(quickHost);
   if (quickHost) { hm.selH.add(quickHost.id); hm.type = quickHost.protocol === 'ssh' ? 'bash' : 'powershell'; } // open on the host's own kind of collections
   hm.shown = null; hmEl('Detail').innerHTML = '<p class="dim">Click a collection to see what it does.</p>';
-  hmEl('Name').value = quickHost ? (quickHost.hostname || quickHost.name) : ''; hmEl('Search').value = ''; hmEl('Msg').textContent = '';
+  hmEl('Name').value = quickHost ? (quickHost.hostname || quickHost.name) : ''; hmEl('Msg').textContent = '';
   hmEl('Msg').className = ''; hmSetRecurring(false);
   hmTab(quickHost ? 'coll' : 'who');
   $('huntModal').hidden = false;
   try {
     [hm.collections, hm.hosts, hm.lists] = await Promise.all([api('GET', '/api/collections'), api('GET', '/api/hosts'), api('GET', '/api/lists')]);
   } catch (e) { hmEl('Msg').textContent = e.message; hmEl('Msg').className = 'bad'; }
-  hmRenderCollections(); hmRenderTargets(); hmSummary();
+  hmF.loadMeta().catch(() => {}); hmRenderCollections(); hmRenderTargets(); hmSummary();
 }
 const closeHuntModal = () => { $('huntModal').hidden = true; };
 $('bhNew').onclick = () => openHuntModal();
@@ -1375,9 +1436,10 @@ $('hmClose').onclick = closeHuntModal;
 $('huntModal').onclick = (e) => { if (e.target.id === 'huntModal') closeHuntModal(); };
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('huntModal').hidden) closeHuntModal(); });
 $('hmTabs').onclick = (e) => { const b = e.target.closest('button[data-pane]'); if (b) hmTab(b.dataset.pane); };
-$('hmToggle').onclick = (e) => { if (e.target.dataset.type) { hm.type = e.target.dataset.type; hmRenderCollections(); } };
+$('hmToggle').onclick = (e) => { if (e.target.dataset.type) { hm.type = e.target.dataset.type; hmF.tags = []; hmQuery(); } }; // tags differ between PowerShell and Linux
 recInit('hm');
 hmEl('Recurring').onclick = () => hmSetRecurring(!hm.recurring);
+$('hmItems').onclick = (e) => { const u = e.target.closest('[data-unpick]'); if (u) hmUnpick(u.dataset.unpick); };
 $('hmCollections').onclick = (e) => {
   const row = e.target.closest('[data-view]'); if (!row) return;
   const id = row.dataset.view, c = hm.collections.find((x) => x.id === id); if (!c) return;
@@ -1385,12 +1447,21 @@ $('hmCollections').onclick = (e) => {
   if (hm.selC.has(id)) hm.selC.delete(id); else hm.selC.add(id); // a click adds it to the hunt, another takes it out
   hmSummary(); hmShow(id);
 };
-hmEl('Search').oninput = () => { hm.q = hmEl('Search').value.trim(); hmRenderCollections(); };
-$('huntModal').onchange = (e) => {
-  const d = e.target.dataset, set = d.h ? [hm.selH, d.h] : d.l ? [hm.selL, d.l] : null;
-  if (!set) return;
-  if (e.target.checked) set[0].add(set[1]); else set[0].delete(set[1]);
-  hmSummary();
+$('hmGroups').onclick = (e) => {
+  const row = e.target.closest('[data-l]'), l = row && hm.lists.find((x) => x.id === row.dataset.l); if (!l) return;
+  const ids = l.hostIds.filter((i) => hm.hosts.some((h) => h.id === i)); if (!ids.length) return;
+  if (hm.selL.has(l.id)) ids.forEach((i) => hm.selH.delete(i)); else ids.forEach((i) => hm.selH.add(i));
+  hmRenderTargets(); hmSummary();
+};
+$('hmHosts').onclick = (e) => {
+  const row = e.target.closest('[data-h]'); if (!row) return;
+  if (hm.selH.has(row.dataset.h)) hm.selH.delete(row.dataset.h); else hm.selH.add(row.dataset.h);
+  hmRenderTargets(); hmSummary();
+};
+// the X on a host in the Overview tab: it is no longer picked, which also makes any group it was in neutral on the Who tab
+$('hmTargets').onclick = (e) => {
+  const u = e.target.closest('[data-unpick-host]'); if (!u) return;
+  hm.selH.delete(u.dataset.unpickHost); hmRenderTargets(); hmSummary(); hmRenderTargetList();
 };
 // Rerun past hunt: pick an earlier hunt and its hosts and collections are ticked, the name becomes "<name>_rerun", and the dialog moves
 // to the Name tab. Nothing runs until Run Hunt is pressed.
@@ -1914,7 +1985,7 @@ function renderMonitor() {
         <span class="mon-pill ${hp.state}" title="${esc(hostTip)}"><i></i><b>Host</b>${esc(hostTxt)}</span>
         <span class="mon-pill ${rm.state}" title="${esc(remTip)}"><i></i><b>Remote</b>${rm.state === 'off' ? '' : `${esc(rm.label)} `}${esc(remTxt)}</span>
       </div>
-      <div class="mon-foot">${hp.state === 'off' ? 'ping off' : `pinged ${ago(hp.checkedAt)}`} · ${rm.state === 'off' ? `${rm.label} check off` : `${rm.label} checked ${ago(rm.checkedAt)}`}</div></div>`;
+      <div class="mon-foot"><button class="act sec mon-check" type="button" data-check="${esc(h.id)}" title="Ping this host and check its ${rm.label} port now">Check</button>${hp.state === 'off' ? 'ping off' : `pinged ${ago(hp.checkedAt)}`} · ${rm.state === 'off' ? `${rm.label} check off` : `${rm.label} checked ${ago(rm.checkedAt)}`}</div></div>`;
   }).join('') || '<p class="dim" style="margin:0">No saved hosts yet. Add and authenticate hosts under Host Management to monitor them.</p>';
 }
 async function loadMonitor() {
@@ -1945,13 +2016,20 @@ function renderMonitorLog() {
 }
 $('mlSearch').oninput = renderMonitorLog;
 $('mlFilter').onclick = (e) => { if (e.target.dataset.f) { mlFilter = e.target.dataset.f; renderMonitorLog(); } };
+$('monGrid').onclick = async (e) => {
+  const b = e.target.closest('[data-check]'); if (!b) return;
+  b.disabled = true; b.textContent = 'Checking…';
+  try { monSnap = await api('POST', `/api/monitor/check/${encodeURIComponent(b.dataset.check)}`); } catch (err) { toast(err.message, 'bad'); }
+  renderMonitor();
+};
 $('monCheck').onclick = async () => { $('monCheck').disabled = true; await fetchMonitor(true); renderMonitor(); setTimeout(() => { $('monCheck').disabled = false; loadMonitor(); }, 2500); };
 
 // ---- Shell ----
 // Left: Start/End shell for the selected host, a search box and the authenticated hosts. Right: the terminal.
 // SSH hosts get a real terminal (keys go straight to the host); WinRM hosts get a line-by-line PowerShell shell, so
 // the page does the line editing (typing, backspace, history) and sends a command when you press Enter.
-let shellHosts = [], shellHost = null, shellQuery = '';
+let shellHosts = [], shellLists = [], shellHost = null, shellQuery = '';
+const shellFolded = new Set(); // groups folded in the host list
 const shells = new Map(); // hostId -> { id, kind, term, fit, el, es, status, line, hist, histPos, queue }
 const hostOf = (id) => shellHosts.find((h) => h.id === id);
 
@@ -1977,10 +2055,17 @@ function renderShellList() {
   const shown = shellHosts.filter((h) => !q || [h.address, h.hostname, h.name].some((v) => String(v || '').toLowerCase().includes(q)))
     .sort((a, b) => n(a.address) - n(b.address) || a.address.localeCompare(b.address));
   const el = $('shellList'); if (!el) return;
-  el.innerHTML = shown.map((h) => {
+  // each host sits under every group it is in; hosts in no group come under Unassigned
+  const grouped = new Set(shellLists.flatMap((l) => l.hostIds));
+  const groups = [...shellLists.map((l) => ({ id: l.id, name: l.name, hosts: shown.filter((h) => l.hostIds.includes(h.id)) })), { id: UNASSIGNED, name: 'Unassigned', hosts: shown.filter((h) => !grouped.has(h.id)) }].filter((g) => g.hosts.length);
+  const hostBtn = (h) => {
     const live = shells.get(h.id) && shells.get(h.id).status !== 'ended';
     return `<button class="shellhost ${h.id === shellHost ? 'on' : ''} ${shellDenied(h.id) ? 'denied' : ''}" data-shell-host="${esc(h.id)}" title="${esc(shellDenied(h.id) ? (shellCfg && !shellCfg.enabled ? 'Shell access is turned off in Shell Settings' : 'Shells to this host are not allowed in Shell Settings') : h.os || '')}">
       <span class="sh-name">${live ? '<i class="dot"></i>' : ''}${esc(h.hostname || h.name)}</span><span class="sh-ip">${esc(h.address)}</span></button>`;
+  };
+  el.innerHTML = groups.map((g) => {
+    const folded = shellFolded.has(g.id) && !q;
+    return `<button type="button" class="shgrp" data-shfold="${esc(g.id)}" aria-expanded="${!folded}"><span class="chev">${folded ? '▸' : '▾'}</span><span class="shg-name">${esc(g.name)}</span><span class="shg-n">${g.hosts.length}</span></button>${folded ? '' : g.hosts.map(hostBtn).join('')}`;
   }).join('') || `<div class="empty">${shellHosts.length ? 'No hosts match' : 'No authenticated hosts yet'}</div>`;
 }
 function renderShellMain() {
@@ -2014,6 +2099,7 @@ const shellDenied = (hostId) => !!(shellCfg && (!shellCfg.enabled || (shellCfg.a
 async function loadShell() {
   try { shellCfg = await api('GET', '/api/shell/config'); } catch { shellCfg = null; }
   try { shellHosts = await api('GET', '/api/hosts'); } catch { shellHosts = []; }
+  try { shellLists = await api('GET', '/api/lists'); } catch { shellLists = []; }
   if (!shellHosts.some((h) => h.id === shellHost)) shellHost = null;
   // shells that kept running while the page was away are reattached (their recent output is replayed)
   try { for (const o of await api('GET', '/api/shell')) if (!shells.has(o.hostId) && hostOf(o.hostId)) attachShell(o.hostId, o.id, o.kind); } catch { /* none */ }
@@ -2321,13 +2407,17 @@ async function loadBinaries() {
     <td><div class="binfield" title="${b.present ? `SHA-256 ${esc(b.sha256)}` : ''}">${b.present
       ? `${esc(b.name)} <span class="dim" style="margin-left:8px">${fmtSize(b.size)} · ${esc(b.sha256.slice(0, 12))}…</span>`
       : 'No file uploaded'}</div></td>
-    <td>${b.present ? '<span class="badge green">Uploaded</span>' : '<span class="badge red">Not uploaded</span>'}</td>
     <td><div class="binactions">
       <button class="act ${b.present ? 'sec' : ''}" data-upload="${esc(b.name)}" ${b.usedBy.length ? '' : 'disabled'}>${b.present ? 'Replace…' : 'Upload…'}</button>
       <button class="del" data-remove="${esc(b.name)}" ${b.present ? '' : 'disabled'}>Remove</button>
-    </div></td></tr>`).join('') || '<tr><td colspan="5" class="dim">No collection declares a binary dependency</td></tr>';
+    </div></td></tr>`).join('') || '<tr><td colspan="4" class="dim">No collection declares a binary dependency</td></tr>';
 }
 let uploadSlot = null;
+$('binFromServer').onclick = () => { $('fsModal').hidden = false; $('fsOk').focus(); };
+const closeFs = () => { $('fsModal').hidden = true; };
+$('fsOk').onclick = $('fsX').onclick = closeFs;
+$('fsModal').onclick = (e) => { if (e.target.id === 'fsModal') closeFs(); };
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('fsModal').hidden) closeFs(); });
 $('binTable').onclick = async (e) => {
   const { upload, remove } = e.target.dataset;
   $('binMsg').textContent = '';
