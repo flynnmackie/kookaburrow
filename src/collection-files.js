@@ -130,6 +130,17 @@ function makeFiles({ root, noun, listAll, resolve }) {
       if (!fs.existsSync(full)) throw new Error(`${Noun} not found`);
       fs.unlinkSync(full);
     },
+    // Reads an uploaded script the way the library does (header fields and body) so the form can be filled in from it. Nothing is saved.
+    parse(type, text) {
+      if (!TYPES[type]) throw new Error('Type must be PowerShell or Linux');
+      const t = String(text ?? '');
+      if (!t.trim()) throw new Error('The file is empty');
+      if (t.length > MAX_SCRIPT) throw new Error('The file is too large (the limit is 200 KB)');
+      if (t.includes('\u0000')) throw new Error('That does not look like a text script');
+      const p = collections.parseCollection(t, type, isAction);
+      const { warnings, ...rest } = p;
+      return { ...rest, hasHeader: !!(p.name || p.description) };
+    },
     listUser() {
       const verified = collections.loadVerified(root);
       return listAll().filter((h) => !(h.id in verified)).map((h) => view(h.type, h.file));

@@ -8,7 +8,7 @@ const responseRunner = require('./response-runner');
 // then again every `everyMinutes` minutes, until the end time passes or the schedule is deleted (until.type 'time' or 'forever').
 // A schedule is { id, kind: 'hunt'|'response', name, hostIds, listIds, itemIds (collection or action ids), params (response only,
 // encrypted: the values are needed to run unattended), everyMinutes, until, createdBy, createdAt, nextRun, lastRun, runCount, runIds,
-// status: 'active'|'finished', lastError }. Every run it starts is an ordinary hunt/response record carrying scheduleId, so it appears
+// status: 'active'|'paused'|'finished', lastError }. Every run it starts is an ordinary hunt/response record carrying scheduleId, so it appears
 // in the lists and the log with a green R. Missed runs (the server was off) are not made up: at most one run happens when it is back.
 const TICK_MS = 5000;
 const MAX_EVERY = 60 * 24 * 365; // a year, in minutes
@@ -53,6 +53,19 @@ function activate(s, run) {
   save();
 }
 
+// Pausing keeps the schedule and what it already ran; nothing runs until it is resumed. Resuming starts a fresh cycle: the next run is
+// one interval from now (or it finishes, when its end time has already passed).
+function pause(s) {
+  if (s.status !== 'active') throw new Error(s.status === 'paused' ? 'It is already paused' : 'It has finished, so it cannot be paused');
+  s.status = 'paused'; s.nextRun = null; s.lastError = ''; save();
+}
+function resume(s) {
+  if (s.status !== 'paused') throw new Error('It is not paused');
+  const now = Date.now();
+  s.nextRun = nextAfter(s, now, now);
+  s.status = s.nextRun ? 'active' : 'finished';
+  s.lastError = ''; save();
+}
 function hostsOf(s) {
   const ids = new Set(s.hostIds);
   for (const lid of s.listIds) db.lists.find((l) => l.id === lid)?.hostIds.forEach((h) => ids.add(h));
@@ -97,4 +110,4 @@ function view(s) {
   };
 }
 
-module.exports = { parseSchedule, totalRuns, prepare, activate, start, tick, view };
+module.exports = { parseSchedule, totalRuns, prepare, activate, pause, resume, start, tick, view };

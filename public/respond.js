@@ -112,7 +112,7 @@ async function rmShow(id) {
   try {
     const h = await api('GET', `/api/actions/${id}`);
     if (id !== rm.shown) return;
-    rmEl('Detail').innerHTML = `<div class="hd-name">${esc(h.name)}</div><div class="hd-file">${esc(h.id)}</div>${metaIcons(h, true)}
+    rmEl('Detail').innerHTML = `<button type="button" class="fav-btn ${rmF.favs.has(h.id) ? 'on' : ''}" data-fav="${esc(h.id)}" title="${rmF.favs.has(h.id) ? 'Remove from your favourites' : 'Add to your favourites'}" aria-pressed="${rmF.favs.has(h.id)}">${rmF.favs.has(h.id) ? '★' : '☆'}</button><div class="hd-name">${esc(h.name)}</div><div class="hd-file">${esc(h.id)}</div>${metaIcons(h, true)}
       <div class="hd-label hd-label-desc">Description</div><div class="hd-desc">${h.description ? esc(h.description) : '<span class="dim">-</span>'}</div>
       <div class="hd-label hd-label-dep">Parameters</div><div class="hd-deps">${h.parameters.length ? h.parameters.map((p) => `<span class="dep have">${esc(p)}${h.optionalParameters.includes(p) ? ' (optional)' : ''}</span>`).join('') : '<span class="dim">None</span>'}</div>
       <div class="hd-label hd-label-dep">Dependencies</div><div class="hd-deps">${h.dependencies.length ? h.dependencies.map((d) => `<span class="dep ${h.missingDependencies.includes(d) ? 'miss' : 'have'}">${esc(d)}${h.missingDependencies.includes(d) ? ' (not uploaded)' : ''}</span>`).join('') : '<span class="dim">None</span>'}</div>
@@ -194,6 +194,15 @@ $('rmTabs').onclick = (e) => { const b = e.target.closest('button[data-pane]'); 
 $('rmToggle').onclick = (e) => { if (e.target.dataset.type) { rm.type = e.target.dataset.type; rmF.tags = []; rmQuery(); } }; // tags differ between PowerShell and Linux
 recInit('rm');
 rmEl('Recurring').onclick = () => rmSetRecurring(!rm.recurring);
+// the star on an action's detail: your favourites are the same ones as in View Actions, and show in every list
+rmEl('Detail').onclick = async (e) => {
+  const b = e.target.closest('[data-fav]'); if (!b) return;
+  try {
+    const fv = await api('PUT', '/api/favourites/actions', { id: b.dataset.fav, on: !rmF.favs.has(b.dataset.fav) });
+    rmF.favs = new Set(fv.actions || []);
+    rmF.render(); rmRenderActions(); rmShow(b.dataset.fav);
+  } catch (err) { toast(err.message, 'bad'); }
+};
 $('rmItems').onclick = (e) => { const u = e.target.closest('[data-unpick]'); if (u) rmUnpick(u.dataset.unpick); };
 $('rmActions').onclick = (e) => {
   const row = e.target.closest('[data-view]'); if (!row) return;

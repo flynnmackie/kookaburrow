@@ -1,12 +1,16 @@
+const fs = require('fs');
+const path = require('path');
 const net = require('net');
 const { execFile } = require('child_process');
 const { db, save } = require('./store');
+const { dataDir } = require('./config');
 
 // Health monitor for every saved (authenticated) host. It runs in the server, so it keeps checking while no page is open.
 //   Host    ping, every minute by default
 //   Remote  the host's remote-management port, every 5 minutes by default: WinRM (5985 or 5986) for Windows hosts, SSH (22) for Linux
 // Both intervals and the hosts that are checked (all of them by default) are set in Settings > System > Health Settings.
-// Results are kept in memory only; after a restart every host shows "unknown" until its first check (a few seconds).
+// Live results are kept in memory, so after a restart every host shows "unknown" until its first check (a few seconds); the log of
+// checks is a file (see below).
 const TICK_MS = 1000;
 const LIMIT = 16;          // checks in flight at once
 const PORT_TIMEOUT = 2000;
@@ -55,11 +59,45 @@ const SAFE_ADDR = /^[A-Za-z0-9.:_-]+$/; // an address becomes a ping argument, s
 const portsFor = (h) => (h.protocol === 'ssh' ? [h.port || 22] : h.port ? [h.port] : [5985, 5986]);
 const remoteLabel = (h) => (h.protocol === 'ssh' ? 'SSH' : 'WinRM');
 
-// Every check is also written to a log kept in memory (the newest 5000), for Health > Monitor log: when it ran, which host, the
-// command, and whether it worked or why not.
-const checkLog = [];
-function note(e) { checkLog.push({ t: new Date().toISOString(), ...e }); if (checkLog.length > 5000) checkLog.splice(0, checkLog.length - 5000); }
-const getLog = (limit = 500) => checkLog.slice(-limit).reverse();
+// Every check is also written to a log file, data/monitor-log.jsonl (one JSON object per line), for Health > Monitor log: when it ran,
+// which host, the command, and whether it worked or why not. Nothing is kept in memory but the few lines waiting to be written; the page
+// reads the end of the file. At 20 MB the file is renamed to monitor-log.1.jsonl (replacing the older one), so the log never grows
+// beyond about 40 MB and the latest checks always survive a restart.
+const LOG_FILE = path.join(dataDir, 'monitor-log.jsonl'), LOG_OLD = path.join(dataDir, 'monitor-log.1.jsonl'), LOG_MAX = 20 * 1024 * 1024;
+let pendingLog = [];
+function flushLog() {
+  if (!pendingLog.length) return;
+  const text = pendingLog.map((e) => JSON.stringify(e)).join('\n') + '\n';
+  pendingLog = [];
+  try {
+    fs.mkdirSync(dataDir, { recursive: true });
+    try { if (fs.statSync(LOG_FILE).size > LOG_MAX) fs.renameSync(LOG_FILE, LOG_OLD); } catch { /* no file yet */ }
+    fs.appendFileSync(LOG_FILE, text);
+  } catch { /* a full or locked disk must not stop the monitor */ }
+}
+setInterval(flushLog, 1000).unref();
+process.on('exit', flushLog);
+function note(e) { pendingLog.push({ t: new Date().toISOString(), ...e }); if (pendingLog.length >= 500) flushLog(); }
+// The last `n` entries of one log file (oldest first), read from the end so a big file costs only what is shown.
+function tailEntries(file, n) {
+  let fd;
+  try {
+    fd = fs.openSync(file, 'r');
+    const size = fs.fstatSync(fd).size, len = Math.min(size, n * 900 + 4096), buf = Buffer.alloc(len);
+    fs.readSync(fd, buf, 0, len, size - len);
+    const lines = buf.toString('utf8').split('\n');
+    if (size > len) lines.shift(); // the first line is cut off
+    const out = [];
+    for (const l of lines) { if (!l) continue; try { out.push(JSON.parse(l)); } catch { /* a damaged line */ } }
+    return out.slice(-n);
+  } catch { return []; } finally { if (fd !== undefined) fs.closeSync(fd); }
+}
+function getLog(limit = 500) {
+  flushLog();
+  let list = tailEntries(LOG_FILE, limit);
+  if (list.length < limit) list = [...tailEntries(LOG_OLD, limit - list.length), ...list];
+  return list.reverse();
+}
 const namesAt = (address) => db.hosts.filter((h) => h.address === address).map((h) => h.name || h.hostname || h.address).join(', ') || address;
 
 function ping(address) {

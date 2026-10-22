@@ -330,9 +330,11 @@ function setDiscovered(found) {
 // Clear all: empties the discovered hosts list (and stops a scan that is still running).
 $('scanClear').onclick = () => {
   if (!$('scanStop').hidden) $('scanStop').click();
+  clearInterval(scanTimer); $('scanBtn').disabled = false; $('scanStop').hidden = true; // stop polling, or the cancelled scan would put its hosts back
   setDiscovered([]); scanSeen = new Set(); authState = {}; saveAuthState(); renderAuthHosts();
   $('scanStatus').textContent = ''; $('scanBar').hidden = true;
 };
+$('scanReset').onclick = () => { $('scanClear').click(); $('cidr').value = ''; }; // the same as Clear all under the results, and the address box is emptied too
 $('cidr').onkeydown = (e) => { if (e.key === 'Enter') $('scanBtn').click(); };
 
 // ---- Authenticate ----
@@ -666,10 +668,41 @@ $('mnForm').onkeydown = (e) => { if (e.key === 'Enter' && e.target.tagName === '
 mnSetProto('winrm'); mnRenderLog();
 
 // ---- Groups (the API still calls these "lists") ----
+// New group: hosts are added from a typeable drop-down (the matches narrow as you type) and show as removable chips, like the tag filter.
+let ngHosts = [], ngPicked = [], ngText = '', ngOpen = false; // saved hosts, the ids picked so far, what is typed, and whether the suggestions show
+function ngRender() {
+  const left = ngHosts.filter((h) => !ngPicked.includes(h.id));
+  $('listHosts').innerHTML = `<div class="tf-dd">
+      <input type="text" class="tf-taginput" data-role="ngInput" placeholder="${ngHosts.length ? (left.length ? 'Add a host…' : 'Every host is added') : 'No hosts saved yet'}" value="${esc(ngText)}" ${left.length ? '' : 'disabled'} autocomplete="off" spellcheck="false">
+      <div class="tf-menu" data-role="ngMenu" hidden></div></div>
+    ${ngPicked.length ? `<div class="tf-chips">${ngPicked.map((id) => { const h = ngHosts.find((x) => x.id === id); return h ? `<button type="button" class="tagchip on" data-ng-remove="${esc(id)}" title="Remove this host from the group">${esc(h.name)} <span class="dim">${esc(h.address)}</span><b class="x">×</b></button>` : ''; }).join('')}</div>` : ''}`;
+  ngFill();
+}
+function ngFill() {
+  const menu = $('listHosts').querySelector('[data-role=ngMenu]'); if (!menu) return;
+  const q = ngText.trim().toLowerCase();
+  const hits = ngHosts.filter((h) => !ngPicked.includes(h.id) && (!q || [h.name, h.hostname, h.address].some((v) => String(v || '').toLowerCase().includes(q))));
+  menu.innerHTML = hits.map((h) => `<button type="button" data-ng-add="${esc(h.id)}">${esc(h.name)} <span class="dim">${esc(h.address)}</span></button>`).join('') || '<div class="tf-none">No hosts match</div>';
+  menu.hidden = !ngOpen;
+  $('listHosts').closest('.card').classList.toggle('ng-open', ngOpen); // the card grows while the suggestions show, so they are not cut off
+}
+const ngAdd = (id) => { if (!ngPicked.includes(id)) ngPicked.push(id); ngText = ''; ngOpen = false; ngRender(); };
+$('listHosts').addEventListener('input', (e) => { if (e.target.dataset.role === 'ngInput') { ngText = e.target.value; ngOpen = true; ngFill(); } });
+$('listHosts').addEventListener('focusin', (e) => { if (e.target.dataset.role === 'ngInput' && !ngOpen) { ngOpen = true; ngFill(); } });
+$('listHosts').addEventListener('keydown', (e) => {
+  if (e.target.dataset.role !== 'ngInput') return;
+  if (e.key === 'Escape') { ngOpen = false; ngFill(); }
+  if (e.key === 'Enter') { const first = $('listHosts').querySelector('[data-ng-add]'); if (first) { e.preventDefault(); ngAdd(first.dataset.ngAdd); } }
+});
+$('listHosts').addEventListener('click', (e) => {
+  const add = e.target.closest('[data-ng-add]'), rm = e.target.closest('[data-ng-remove]');
+  if (add) ngAdd(add.dataset.ngAdd);
+  else if (rm) { ngPicked = ngPicked.filter((i) => i !== rm.dataset.ngRemove); ngRender(); }
+});
+document.addEventListener('click', (e) => { if (ngOpen && e.target.isConnected && !$('listHosts').contains(e.target)) { ngOpen = false; ngFill(); } });
 async function loadGroups() {
   const [h, lists] = await Promise.all([api('GET', '/api/hosts'), api('GET', '/api/lists')]);
-  $('listHosts').innerHTML = h.map((x) => `<label><input type="checkbox" class="hsel" value="${x.id}"> ${esc(x.name)} <span class="dim">${esc(x.address)}</span></label>`).join('')
-    || '<span class="dim">No hosts saved yet</span>';
+  ngHosts = h; ngPicked = ngPicked.filter((id) => h.some((x) => x.id === id)); ngRender();
   $('groupList').innerHTML = groupsHtml(h, lists, { deletable: true });
 }
 $('hosts/groups').onclick = async (e) => {
@@ -677,8 +710,7 @@ $('hosts/groups').onclick = async (e) => {
   if (e.target.dataset.delList) { await api('DELETE', `/api/lists/${e.target.dataset.delList}`); loadGroups(); }
 };
 $('mkList').onclick = async () => {
-  const hostIds = [...document.querySelectorAll('.hsel:checked')].map((c) => c.value);
-  try { await api('POST', '/api/lists', { name: $('listName').value, hostIds }); $('listName').value = ''; $('listMsg').textContent = ''; loadGroups(); }
+  try { await api('POST', '/api/lists', { name: $('listName').value, hostIds: ngPicked }); $('listName').value = ''; $('listMsg').textContent = ''; ngPicked = []; ngText = ''; loadGroups(); }
   catch (e) { $('listMsg').textContent = e.message; }
 };
 
@@ -984,6 +1016,7 @@ function makeEditor({ P, url, noun, folder, items, hints }) {
     el('File').readOnly = false;
     el('Type').classList.remove('locked');
     el('Title').textContent = `New ${noun}`;
+    el('Upload').hidden = false;
     el('Submit').textContent = `Add ${noun[0].toUpperCase() + noun.slice(1)}`;
     el('Cancel').hidden = true;
     el('Msg').textContent = '';
@@ -991,8 +1024,31 @@ function makeEditor({ P, url, noun, folder, items, hints }) {
     setItemsOn(false);
     if (hasMeta) for (const g of Object.keys(META)) setMeta(g, g === 'returns' ? 'records' : g === 'kind' ? 'command' : 'none');
   }
+  // Upload: pick a .ps1 or .sh file; the server reads its header (name, description, tags and so on) and the form is filled in from it.
+  // The user checks it and presses Add, so the usual rules (a description, a file name that is free, ...) still apply.
+  async function fromFile(file) {
+    const ext = (/\.(ps1|sh)$/i.exec(file.name) || [])[1];
+    if (!ext) { el('Msg').textContent = 'Choose a .ps1 or .sh file.'; el('Msg').className = 'bad'; return; }
+    if (file.size > 200 * 1024) { el('Msg').textContent = 'That file is over the 200 KB limit.'; el('Msg').className = 'bad'; return; }
+    try {
+      const t = ext.toLowerCase() === 'ps1' ? 'powershell' : 'bash';
+      const p = await api('POST', `${url}/parse`, { type: t, text: await file.text() });
+      reset(); setType(t);
+      const base = file.name.replace(/\.(ps1|sh)$/i, '').replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^[^A-Za-z0-9]+/, '').slice(0, 64);
+      el('File').value = base; el('Name').value = p.name || base; el('Desc').value = p.description; el('Tags').value = p.tags.join(', ');
+      el('Script').value = p.body;
+      list = itemKey === 'parameters' ? p.parameters.map((x) => (p.optionalParameters.includes(x) ? `${x}?` : x)) : [...p[itemKey]];
+      setItemsOn(list.length > 0);
+      if (hasMeta) for (const g of Object.keys(META)) setMeta(g, g === 'footprint' && p.footprint === 'persistent' ? 'transient' : p[g]);
+      el('Msg').className = p.hasHeader && p.description ? 'ok' : 'bad';
+      el('Msg').textContent = p.hasHeader ? `Loaded ${file.name}. Check the details, then press Add.` : `Loaded ${file.name}, which has no header, so add a name and a description before pressing Add.`;
+    } catch (e) { el('Msg').textContent = e.message; el('Msg').className = 'bad'; }
+  }
+  el('Upload').onclick = () => el('UploadFile').click();
+  el('UploadFile').onchange = () => { const f = el('UploadFile').files[0]; el('UploadFile').value = ''; if (f) fromFile(f); };
   function edit(h) {
     reset();
+    el('Upload').hidden = true; // an existing script is being edited
     editing = h.file;
     setType(h.type);
     el('Type').classList.add('locked');
@@ -1389,7 +1445,7 @@ async function hmShow(id) {
   try {
     const h = await api('GET', `/api/collections/${id}`);
     if (id !== hm.shown) return;
-    hmEl('Detail').innerHTML = `<div class="hd-name">${esc(h.name)}</div><div class="hd-file">${esc(h.id)}</div>${metaIcons(h, true)}
+    hmEl('Detail').innerHTML = `<button type="button" class="fav-btn ${hmF.favs.has(h.id) ? 'on' : ''}" data-fav="${esc(h.id)}" title="${hmF.favs.has(h.id) ? 'Remove from your favourites' : 'Add to your favourites'}" aria-pressed="${hmF.favs.has(h.id)}">${hmF.favs.has(h.id) ? '★' : '☆'}</button><div class="hd-name">${esc(h.name)}</div><div class="hd-file">${esc(h.id)}</div>${metaIcons(h, true)}
       <div class="hd-label hd-label-desc">Description</div><div class="hd-desc">${h.description ? esc(h.description) : '<span class="dim">-</span>'}${h.transfer === 'large' ? '<div class="smb-note"><b>Large transfer.</b> The files this collection leaves on the host are pulled back to the server: over SMB for Windows hosts (switched on for the hunt only, then off again) and over SFTP for Linux hosts.</div>' : ''}</div>
       <div class="hd-label hd-label-dep">Dependencies</div><div class="hd-deps">${h.dependencies.length ? h.dependencies.map((d) => `<span class="dep ${h.missingDependencies.includes(d) ? 'miss' : 'have'}">${esc(d)}${h.missingDependencies.includes(d) ? ' (not uploaded)' : ''}</span>`).join('') : '<span class="dim">None</span>'}</div>
       <div class="hd-label hd-label-tags">Tags</div><div class="hd-tags">${h.tags.length ? h.tags.map((t) => `<span class="hd-tag">${esc(t)}</span>`).join('') : '<span class="dim">None</span>'}</div>
@@ -1478,6 +1534,15 @@ $('hmTabs').onclick = (e) => { const b = e.target.closest('button[data-pane]'); 
 $('hmToggle').onclick = (e) => { if (e.target.dataset.type) { hm.type = e.target.dataset.type; hmF.tags = []; hmQuery(); } }; // tags differ between PowerShell and Linux
 recInit('hm');
 hmEl('Recurring').onclick = () => hmSetRecurring(!hm.recurring);
+// the star on a collection's detail: your favourites are the same ones as in View Collections, and show in every list
+hmEl('Detail').onclick = async (e) => {
+  const b = e.target.closest('[data-fav]'); if (!b) return;
+  try {
+    const fv = await api('PUT', '/api/favourites/collections', { id: b.dataset.fav, on: !hmF.favs.has(b.dataset.fav) });
+    hmF.favs = new Set(fv.collections || []);
+    hmF.render(); hmRenderCollections(); hmShow(b.dataset.fav);
+  } catch (err) { toast(err.message, 'bad'); }
+};
 $('hmItems').onclick = (e) => { const u = e.target.closest('[data-unpick]'); if (u) hmUnpick(u.dataset.unpick); };
 $('hmCollections').onclick = (e) => {
   const row = e.target.closest('[data-view]'); if (!row) return;

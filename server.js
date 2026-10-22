@@ -270,6 +270,7 @@ app.get('/api/collections', (req, res) => {
   res.json(collections.listCollections(String(req.query.q || ''), tags, req.query.deps === '1'));
 });
 // User-written collections (Add Collections page). Shipped collections are never touched by these routes.
+app.post('/api/collections/parse', wrap((req, res) => res.json(collectionFiles.collections.parse(req.body?.type, req.body?.text))));
 app.get('/api/collections/user', wrap((req, res) => res.json(collectionFiles.collections.listUser())));
 app.post('/api/collections', wrap((req, res) => res.json(collectionFiles.collections.create(req.body))));
 app.put('/api/collections/:type/:file', wrap((req, res) => res.json(collectionFiles.collections.update(req.params.type, req.params.file, req.body))));
@@ -290,6 +291,7 @@ app.get('/api/actions', (req, res) => {
   res.json(collections.listActions(String(req.query.q || ''), tags, req.query.deps === '1'));
 });
 // User-written actions (Add Actions page); same rules as collections.
+app.post('/api/actions/parse', wrap((req, res) => res.json(collectionFiles.actions.parse(req.body?.type, req.body?.text))));
 app.get('/api/actions/user', wrap((req, res) => res.json(collectionFiles.actions.listUser())));
 app.post('/api/actions', wrap((req, res) => res.json(collectionFiles.actions.create(req.body))));
 app.put('/api/actions/:type/:file', wrap((req, res) => res.json(collectionFiles.actions.update(req.params.type, req.params.file, req.body))));
@@ -630,6 +632,14 @@ app.delete('/api/responses/:id', wrap((req, res) => {
 // Recurring hunts and responses: the list shows each kind only to people who may see that kind; deleting stops the schedule.
 const mayFor = (req, kind, perm) => { const a = access(caller(req)); return a.all || a.permissions.includes(kind === 'hunt' ? `hunts.${perm}` : `actions.${perm}`); };
 app.get('/api/schedules', (req, res) => res.json({ now: new Date().toISOString(), schedules: db.schedules.filter((s) => mayFor(req, s.kind, 'view')).map(scheduler.view) }));
+// Pause or resume a recurring hunt / response: body { paused: true|false }. Needs the same permission as deleting it.
+app.put('/api/schedules/:id', wrap((req, res) => {
+  const s = db.schedules.find((x) => x.id === req.params.id);
+  if (!s) throw new Error('Not found');
+  if (!mayFor(req, s.kind, 'run')) return res.status(403).json({ error: 'Permission denied', needed: [s.kind === 'hunt' ? 'Run hunts' : 'Run actions'] });
+  if (req.body?.paused) scheduler.pause(s); else scheduler.resume(s);
+  res.json(scheduler.view(s));
+}));
 app.delete('/api/schedules/:id', wrap((req, res) => {
   const s = db.schedules.find((x) => x.id === req.params.id);
   if (!s) throw new Error('Not found');

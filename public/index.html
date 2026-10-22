@@ -393,6 +393,8 @@
   pre { margin:0; padding:8px 10px; background:#080a0e; border:1px solid var(--line); border-radius:var(--r-m); overflow:auto; max-height:420px; font:11.5px/1.45 var(--f-mono); white-space:pre; }
   pre.code { white-space:pre-wrap; overflow-wrap:anywhere; overflow-x:hidden; } /* scripts wrap instead of scrolling sideways */
   .bar { height:4px; background:var(--line); border-radius:4px; overflow:hidden; } .bar > div { height:100%; background:var(--blue); width:0; border-radius:4px; }
+  [id="hosts/groups"] .card.auto { overflow:visible; } [id="hosts/groups"] .card.auto.ng-open { min-height:380px; }
+  .ng-pick { max-width:520px; } .ng-pick .tf-chips { margin-top:6px; }
   .checks { display:grid; grid-template-columns:repeat(auto-fill, minmax(210px, 1fr)); gap:4px 12px; margin-bottom:10px; }
 
   /* groups */
@@ -419,6 +421,7 @@
   .os.unix { color:var(--orange); border-color:var(--orange-d); }
   .os.unknown { color:var(--dim); border-color:var(--line-hi); }
   .badge.red { color:var(--bad); border-color:rgba(239,91,97,.45); }
+  .badge.orange { color:var(--orange); border-color:rgba(255,170,60,.45); }
   .badge.green { color:var(--ok); border-color:rgba(76,214,138,.4); }
   .tagchip { background:none; border:1px solid var(--line-hi); border-radius:var(--r-s); color:var(--dim); padding:0 8px; font:500 11.5px var(--f-ui); cursor:pointer; transition:all var(--ease); }
   .tagchip:hover { color:var(--text); border-color:var(--blue-d); }
@@ -732,7 +735,7 @@
     <section class="page" id="settings/add-collections">
       <div class="add-layout">
         <div class="card" id="ahForm">
-          <h2 id="ahTitle">New collection</h2>
+          <div class="bh-bar"><h2 id="ahTitle">New collection</h2><button type="button" class="act sec" id="ahUpload" title="Fill this form from a .ps1 or .sh file on your computer" data-perm="collections.manage" data-perm-what="add collections">Upload</button><input type="file" id="ahUploadFile" accept=".ps1,.sh" hidden></div>
           <span class="fl">Type</span>
           <div class="toggle" id="ahType"><button type="button" data-type="powershell" class="on">PowerShell</button><button type="button" data-type="bash">Linux</button></div>
           <span class="fl">File name</span>
@@ -803,7 +806,7 @@
     <section class="page" id="settings/add-actions">
       <div class="add-layout">
         <div class="card" id="aaForm">
-          <h2 id="aaTitle">New action</h2>
+          <div class="bh-bar"><h2 id="aaTitle">New action</h2><button type="button" class="act sec" id="aaUpload" title="Fill this form from a .ps1 or .sh file on your computer" data-perm="actions.manage" data-perm-what="add actions">Upload</button><input type="file" id="aaUploadFile" accept=".ps1,.sh" hidden></div>
           <span class="fl">Type</span>
           <div class="toggle" id="aaType"><button type="button" data-type="powershell" class="on">PowerShell</button><button type="button" data-type="bash">Linux</button></div>
           <span class="fl">File name</span>
@@ -934,6 +937,7 @@
           <input id="cidr" placeholder="192.168.50.0/24, 10.0.0.5-20, 172.16.1.7,8,9" size="46" title="Subnets (192.168.50.0/24), ranges (192.168.50.10-20), lists (192.168.50.5,6,7) or single addresses. Chain several with commas." spellcheck="false" autocomplete="off">
           <button class="act" id="scanBtn" data-perm="hosts.manage" data-perm-what="run discovery scans">Scan</button>
           <button class="act sec" id="scanStop" hidden>Cancel</button>
+          <button class="act sec" id="scanReset" type="button" title="Stop the scan if it is running and clear its progress and the hosts it found">Clear scan</button>
           <span class="dim" id="scanStatus"></span>
         </div>
         <div class="bar" id="scanBar" hidden><div></div></div>
@@ -984,7 +988,7 @@
           <button class="act" id="mkList" data-perm="hosts.manage" data-perm-what="create groups">Create group</button>
           <span id="listMsg" class="bad"></span>
         </div>
-        <div class="checks" id="listHosts"></div>
+        <div id="listHosts" class="ng-pick"></div>
       </div>
       <div class="card">
         <h2>Groups</h2>
@@ -1006,7 +1010,7 @@
     <section class="page" id="health/monitor-log">
       <div class="card">
         <div class="mon-top"><h2>Monitor log</h2><span class="dim" id="mlCount"></span></div>
-        <p class="dim lg-sub">Every ping and remote port check, newest first: the command that ran, the host, when, and whether it worked or why not. The log is kept in memory (the latest 5000 checks) and starts empty when the server restarts.</p>
+        <p class="dim lg-sub">Every ping and remote port check, newest first: the command that ran, the host, when, and whether it worked or why not. The log is written to a file on the server (data/monitor-log.jsonl, trimmed at 20 MB), so it survives restarts; this page shows the latest 1000 checks.</p>
         <div class="row" style="margin-bottom:8px"><input id="mlSearch" type="search" placeholder="Search host, address, command or message" autocomplete="off" style="flex:1; max-width:460px"><div class="toggle" id="mlFilter" style="margin:0"><button type="button" data-f="all" class="on">All</button><button type="button" data-f="ok">Success</button><button type="button" data-f="fail">Failed</button></div></div>
         <div id="mlBox"></div>
       </div>

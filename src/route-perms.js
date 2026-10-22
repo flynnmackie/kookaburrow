@@ -25,7 +25,8 @@ const RULES = [
   ['POST', /^\/api\/responses$/, ['actions.run']],
   ['DELETE', /^\/api\/responses\/[^/]+$/, ['actions.run']],
   ['GET', /^\/api\/schedules$/, ['hunts.view', 'actions.view']],
-  ['DELETE', /^\/api\/schedules\/[^/]+$/, ['hunts.run', 'actions.run']], // the kind of schedule is checked in the handler
+  ['DELETE', /^\/api\/schedules\/[^/]+$/, ['hunts.run', 'actions.run']],
+  ['PUT', /^\/api\/schedules\/[^/]+$/, ['hunts.run', 'actions.run']], // pause / resume; the kind of schedule is checked in the handler // the kind of schedule is checked in the handler
   ['GET', /^\/api\/responses(\/|$)/, ['actions.view']],
   ['GET', /^\/api\/reports$/, ['hunts.view']],
   ['POST', /^\/api\/runs\/[^/]+\/report$/, ['hunts.export']],
