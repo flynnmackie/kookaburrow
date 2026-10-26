@@ -231,6 +231,99 @@
   .bb-name .ico { color:var(--dim); flex-shrink:0; }
   .bb-row[data-dir="1"] .ico { color:var(--blue); }
   .bb-desc { color:var(--faint); font-size:11.5px; margin-left:6px; }
+  .badge.blue { color:var(--blue); border-color:var(--blue-d); }
+  /* Browse: pinned section, search, actions on a row, preview toolbar */
+  .bb-pinned { overflow:auto; }
+  .bp-head { display:flex; align-items:center; gap:8px; } .bp-head h2 { margin:0; border:0; padding:0; } .bp-hint { font-size:12.5px; margin:6px 0 0; }
+  .bp-list { margin-top:6px; display:flex; flex-direction:column; gap:3px; }
+  .bp-item { border:1px solid var(--line); border-radius:var(--r-m); padding:7px 12px; background:var(--panel2); } .bp-item.gone { opacity:.6; }
+  .bp-main { display:flex; align-items:center; gap:6px; min-width:0; } .bp-link { display:inline-flex; align-items:center; gap:6px; font-weight:600; font-size:12.5px; } .bp-link .ico { color:var(--blue); }
+  .bp-acts { margin-left:auto; display:flex; gap:12px; font-size:11.5px; flex-shrink:0; }
+  .bp-note { font-size:12px; color:var(--text); margin:2px 0 1px 20px; white-space:pre-wrap; border-left:2px solid var(--blue-d); padding-left:8px; }
+  .bp-edit { margin:4px 0 2px 20px; } .bp-edit textarea { width:100%; } .bp-edit div { display:flex; gap:6px; margin-top:4px; } .bp-edit .act { width:auto; margin:0; }
+  .bb-searchrow { display:flex; gap:6px; } .bb-searchrow input { flex:1; min-width:0; } .bb-searchrow .act { width:auto; margin:0; flex-shrink:0; } .bb-searchrow [hidden] { display:none; }
+  .bb-scope { font-size:11px; margin:3px 0 6px; }
+  .bb-topbtns { display:flex; gap:6px; align-items:center; flex-wrap:wrap; justify-content:flex-end; } .bb-topbtns [hidden] { display:none; } .bb-topbtns .act, .bb-topbtns .del { margin:0; width:auto; padding:3px 10px; }
+  .bb-acts { white-space:nowrap; text-align:right; width:1%; } .bb-ic { background:none; border:0; color:var(--faint); cursor:pointer; font-size:13px; padding:0 4px; line-height:1; } .bb-ic:hover { color:var(--blue); } .bb-ic.on { color:var(--orange); } .bb-ic.del:hover { color:var(--bad); }
+  .bb-row .bb-ic:not(.on) { visibility:hidden; } .bb-row:hover .bb-ic { visibility:visible; }
+  .bb-sum { font-size:12px; margin:2px 0 6px; color:var(--dim); }
+  .bb-res { display:flex; flex-direction:column; }
+  .bb-hit { padding:6px 8px; border-bottom:1px solid var(--line); cursor:pointer; } .bb-hit:hover { background:var(--hover); } .bb-hit.on { background:var(--panel2); box-shadow:inset 2px 0 0 var(--blue); }
+  .bb-hit-top { display:flex; align-items:center; gap:7px; font-size:12.5px; } .bb-hit-top .ico { color:var(--dim); flex-shrink:0; } .bb-hit-path { font-size:11px; color:var(--faint); margin-left:21px; word-break:break-all; }
+  .bb-n { margin-left:auto; font-size:10.5px; color:var(--blue); border:1px solid var(--blue-d); border-radius:var(--r-s); padding:0 6px; white-space:nowrap; } .bb-n.alt { color:var(--dim); border-color:var(--line-hi); }
+  .bb-snip { font:11.5px/1.45 var(--f-mono, ui-monospace, Consolas, monospace); color:var(--dim); margin:2px 0 0 21px; overflow-wrap:anywhere; }
+  mark, .bb-find-hit { background:rgba(255,196,0,.28); color:inherit; border-radius:2px; padding:0 1px; } .bb-find-hit.cur { background:#ff9d00; color:#000; outline:1px solid #ffd27a; }
+  .bb-btns { display:flex; gap:6px; align-items:center; flex-shrink:0; } .bb-btns .act, .bb-btns .del { margin:0; width:auto; padding:3px 10px; }
+  .bb-bar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:2px 0 8px; }
+  .bb-modes { width:auto; } .bb-modes button { padding:3px 12px; }
+  .bb-find { display:flex; align-items:center; gap:6px; margin-left:auto; } .bb-find input { width:190px; } .bb-find .act { width:auto; margin:0; padding:3px 9px; } .bb-count { font-size:11.5px; color:var(--dim); min-width:62px; text-align:right; }
+  .bb-tablewrap { overflow:auto; max-height:62vh; border:1px solid var(--line); border-radius:var(--r-m); }
+  .bb-tbl { border-collapse:collapse; font-size:11.5px; width:100%; } .bb-tbl th { position:sticky; top:0; background:var(--panel2); cursor:pointer; white-space:nowrap; text-align:left; padding:3px 8px; border-bottom:1px solid var(--line-hi); z-index:1; }
+  .bb-tbl th[data-dir=asc]::after { content:' ▲'; font-size:8px; } .bb-tbl th[data-dir=desc]::after { content:' ▼'; font-size:8px; }
+  .bb-tbl td { padding:2px 8px; border-bottom:1px solid var(--line); max-width:340px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; vertical-align:top; } .bb-tbl td.wrap { white-space:normal; max-width:520px; overflow-wrap:anywhere; } .bb-tbl td.nw { white-space:nowrap; }
+  .bb-tbl tr:hover td { background:var(--hover); }
+  .bb-tree { font:12px/1.55 var(--f-mono, ui-monospace, Consolas, monospace); } .bb-tree details > summary { cursor:pointer; list-style-position:inside; } .bb-tree .jc { margin-left:16px; border-left:1px solid var(--line); padding-left:8px; } .bb-tree .jl { padding-left:14px; overflow-wrap:anywhere; }
+  .bb-tree .jk { color:#7be3ff; } .bb-tree .js { color:#9ae6a8; } .bb-tree .jnum { color:#f2c46d; } .bb-tree .jn { color:var(--faint); } .bb-tree .jb2 { color:#d68cff; } .bb-tree .xt { color:#8fa8ff; } .bb-tree .jx { color:var(--text); }
+  .bb-treebtns { display:flex; gap:12px; font-size:11.5px; margin-bottom:4px; font-family:var(--f-ui); }
+  .t-e { color:var(--bad); font-weight:700; } .t-h { color:#d68cff; }
+  /* CSV tables: banded rows, ruled columns, values coloured by kind */
+  .bb-tbl.pretty { border-collapse:separate; border-spacing:0; }
+  .bb-tbl.pretty th { background:#101a2a; color:#7be3ff; font:600 10.5px var(--f-ui); text-transform:uppercase; letter-spacing:.05em; padding:5px 10px; border-bottom:2px solid var(--blue-d); border-right:1px solid var(--line); }
+  .bb-tbl.pretty td { padding:3px 10px; border-right:1px solid var(--line); border-bottom:1px solid var(--line); }
+  .bb-tbl.pretty tbody tr:nth-child(even) td { background:rgba(255,255,255,.028); }
+  .bb-tbl.pretty tbody tr:hover td { background:rgba(0,200,255,.07); } .bb-tbl.pretty tbody tr { cursor:pointer; }
+  .bb-tbl.pretty tr.sel td { background:rgba(0,200,255,.14) !important; box-shadow:inset 0 1px 0 var(--blue-d), inset 0 -1px 0 var(--blue-d); }
+  .bb-tbl .rn { width:1%; text-align:right; color:var(--faint); font-variant-numeric:tabular-nums; background:var(--panel2); position:sticky; left:0; cursor:default; }
+  .bb-tbl.pretty th.rn { z-index:2; }
+  .cv-n { color:#f2c46d; text-align:right; font-variant-numeric:tabular-nums; } .cv-b { color:#d68cff; } .cv-ip { color:#6cc7e0; } .cv-h { color:#d68cff; font-family:var(--f-mono, ui-monospace, Consolas, monospace); font-size:11px; } .cv-d { color:#9ae6a8; } .cv-p { color:#e8ab62; } .cv-e::before { content:'–'; color:var(--faint); }
+  .bb-rec { margin-top:8px; border:1px solid var(--blue-d); border-radius:var(--r-m); background:var(--panel2); } .bb-rec[hidden] { display:none; }
+  .bb-rec-head { display:flex; justify-content:space-between; padding:5px 10px; border-bottom:1px solid var(--line); font-size:12.5px; }
+  .bb-rec-grid { display:grid; grid-template-columns:minmax(110px, max-content) 1fr; max-height:260px; overflow:auto; }
+  .bb-rec-grid .k { padding:3px 10px; font:600 10.5px var(--f-ui); text-transform:uppercase; letter-spacing:.04em; color:#7be3ff; border-bottom:1px solid var(--line); border-right:1px solid var(--line); background:#101a2a; }
+  .bb-rec-grid .v { padding:3px 10px; font-size:12px; overflow-wrap:anywhere; border-bottom:1px solid var(--line); text-align:left; } .bb-rec-grid .v.cv-e::before { content:none; }
+  /* Cross-host comparison and Baseline */
+  .cp-pick { display:grid; grid-template-columns:1fr 1fr auto; gap:10px; align-items:end; } .cp-pick .act { width:auto; margin:0; } .cp-pick select { width:100%; min-width:0; }
+  .cp-match { display:flex; flex-wrap:wrap; gap:5px; align-items:center; margin-bottom:8px; font-size:12px; } .cp-match .act { width:auto; margin:0 0 0 6px; padding:2px 10px; } .cp-match .tagchip { cursor:pointer; }
+  .cp-q { margin-left:auto; width:210px; }
+  .cp-wrap { max-height:none; }
+  .cp-tbl .cp-hc { white-space:nowrap; width:1%; position:sticky; left:0; background:var(--panel2); z-index:1; }
+  .cp-bar { display:inline-block; width:54px; height:6px; background:var(--line); border-radius:3px; vertical-align:middle; margin-right:7px; overflow:hidden; } .cp-bar i { display:block; height:100%; background:var(--blue); }
+  .cp-row { cursor:pointer; } .cp-row.one td { background:rgba(239,91,97,.1); } .cp-row.one .cp-bar i { background:var(--bad); } .cp-row.rare td { background:rgba(255,170,60,.08); } .cp-row.rare .cp-bar i { background:var(--orange); } .cp-row.all .cp-bar i { background:var(--ok); }
+  .cp-row:hover td { background:var(--hover); } .cp-hosts td { background:var(--panel); padding:5px 10px; white-space:normal; } th.cp-off { opacity:.45; }
+  .bl-note { margin:6px 0 4px; padding:6px 10px; border:1px solid var(--orange-d); background:var(--orange-soft); color:var(--orange); border-radius:var(--r-m); font-size:12.5px; }
+  /* Diff */
+  .df-pick { display:grid; grid-template-columns:1fr auto 1fr auto; gap:10px; align-items:end; } .df-pick .act { width:auto; margin:0; } .df-pick select { width:100%; min-width:0; }
+  .df-file-sel { width:100%; margin-top:5px; font-size:12px; } .df-sel { display:flex; gap:6px; } .df-sel select { flex:1; } .df-sel .act { padding:3px 10px; }
+  .df-sum { display:flex; flex-wrap:wrap; gap:6px 14px; align-items:center; font-size:13px; margin-bottom:8px; } .df-sum b { color:var(--blue); margin-right:3px; }
+  .df-chips { display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-bottom:8px; }
+  .df-chip { background:none; border:1px solid var(--line-hi); border-radius:var(--r-m); color:var(--dim); padding:2px 10px; font:500 12px var(--f-ui); cursor:pointer; } .df-chip b { margin-left:4px; color:var(--text); }
+  .df-chip.on.changed { border-color:var(--orange); color:var(--orange); } .df-chip.on.added { border-color:var(--ok); color:var(--ok); } .df-chip.on.removed { border-color:var(--bad); color:var(--bad); } .df-chip.on.same { border-color:var(--blue); color:var(--blue); }
+  .df-all { font-size:12px; color:var(--dim); margin-left:auto; display:flex; align-items:center; gap:5px; }
+  .df-file { border:1px solid var(--line); border-radius:var(--r-m); margin-bottom:4px; overflow:hidden; background:var(--panel2); }
+  .df-fhead { display:flex; align-items:center; gap:10px; padding:5px 10px; cursor:pointer; } .df-fhead:hover { background:var(--hover); }
+  .df-tag { font:600 10px var(--f-ui); text-transform:uppercase; letter-spacing:.04em; border:1px solid; border-radius:var(--r-s); padding:0 6px; min-width:68px; text-align:center; flex-shrink:0; }
+  .df-tag.changed { color:var(--orange); border-color:var(--orange-d); } .df-tag.added { color:var(--ok); border-color:rgba(76,214,138,.4); } .df-tag.removed { color:var(--bad); border-color:rgba(239,91,97,.45); } .df-tag.same { color:var(--dim); border-color:var(--line-hi); }
+  .df-name { font-size:12.5px; overflow-wrap:anywhere; min-width:0; } .df-nums { margin-left:auto; font-size:12px; white-space:nowrap; } .df-nums .rem, .df-sec.rem { color:var(--bad); } .df-nums .add, .df-sec.add { color:var(--ok); }
+  .df-body { padding:6px 10px 8px; border-top:1px solid var(--line); background:var(--panel); } .df-sec { font:600 11.5px var(--f-ui); margin:6px 0 3px; }
+  .bb-tbl.rem td { background:rgba(239,91,97,.08); } .bb-tbl.add td { background:rgba(76,214,138,.08); } .df-lines.rem { background:rgba(239,91,97,.08); } .df-lines.add { background:rgba(76,214,138,.08); } .df-body .bb-tablewrap { max-height:320px; }
+  /* IOC */
+  .ioc-top { display:flex; align-items:center; justify-content:space-between; } .ioc-top h2 { margin:0; } .ioc-top .act { width:auto; margin:0; }
+  .ioc-list { border:1px solid var(--line); border-radius:var(--r-m); margin-top:8px; background:var(--panel2); overflow:hidden; }
+  .ioc-head { display:flex; align-items:center; gap:12px; padding:6px 10px; flex-wrap:wrap; }
+  .ioc-tog { background:none; border:0; color:var(--text); display:flex; align-items:center; gap:8px; cursor:pointer; font:600 14px var(--f-ui); padding:0; } .ioc-tog .chev { color:var(--dim); width:10px; }
+  .ioc-meta, .ioc-by { font-size:11.5px; } .ioc-acts { margin-left:auto; display:flex; gap:14px; font-size:12px; }
+  .ioc-b { font:600 10.5px/16px var(--f-ui); border:1px solid var(--line-hi); border-radius:var(--r-s); padding:0 7px; white-space:nowrap; } .ioc-b.hit { color:var(--bad); border-color:rgba(239,91,97,.55); background:rgba(239,91,97,.1); } .ioc-b.ok { color:var(--ok); border-color:rgba(76,214,138,.4); }
+  .ioc-body { padding:2px 12px 10px; border-top:1px solid var(--line); } .ioc-sub { margin:8px 0 4px; font-size:12.5px; } .ioc-hh { font:600 11px var(--f-ui); text-transform:uppercase; letter-spacing:.05em; color:var(--dim); }
+  .ioc-chips { display:flex; flex-wrap:wrap; gap:4px; max-height:140px; overflow:auto; } .ioc-chip { font:11.5px var(--f-mono, ui-monospace, Consolas, monospace); border:1px solid var(--line-hi); border-radius:var(--r-s); padding:0 6px; overflow-wrap:anywhere; } .ioc-chip i { font-style:normal; color:var(--faint); font-size:9.5px; margin-right:5px; text-transform:uppercase; }
+  .ioc-run { border:1px solid var(--line); border-radius:var(--r-m); margin-top:6px; background:var(--panel); } .ioc-runhead { display:flex; align-items:center; gap:10px; padding:5px 10px; flex-wrap:wrap; } .ioc-runname { font-weight:600; font-size:13px; } .ioc-pin { margin-left:auto; font-size:12px; }
+  .ioc-files { border-top:1px solid var(--line); } .ioc-file-row { display:flex; align-items:center; gap:10px; padding:3px 10px 3px 22px; font-size:12px; border-bottom:1px solid var(--line); flex-wrap:wrap; } .ioc-file-row:last-child { border-bottom:0; }
+  .ioc-vals { margin-left:auto; display:flex; gap:4px; flex-wrap:wrap; } .ioc-val { font:11px var(--f-mono, ui-monospace, Consolas, monospace); border:1px solid rgba(239,91,97,.5); color:var(--bad); border-radius:var(--r-s); padding:0 6px; } .ioc-val b { margin-left:5px; color:var(--text); font-weight:600; } .ioc-val:hover { background:rgba(239,91,97,.12); text-decoration:none; }
+  .modal .dlg.iocdlg { width:min(640px, 100%); height:auto; max-height:100%; } .iocdlg .dlg-body { padding:6px 20px 16px; } .iocdlg textarea { width:100%; resize:vertical; font:12px var(--f-mono, ui-monospace, Consolas, monospace); } .iocdlg input[type=text] { width:100%; }
+  .ioc-file { display:flex; align-items:center; gap:10px; margin-bottom:6px; } .ioc-file label.act { margin:0; cursor:pointer; padding:3px 12px; width:auto; }
+  /* Host details */
+  .modal .dlg.hddlg { width:min(1000px, 100%); height:min(760px, 100%); } .hd-badges { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:2px 0 8px; }
+  .hd-facts { margin:6px 0 4px; } .hd-sec { font:600 12px var(--f-ui); text-transform:uppercase; letter-spacing:.05em; color:var(--blue); border-bottom:1px solid var(--line); padding-bottom:3px; margin:16px 0 6px; }
+  .hd-tablewrap { max-height:240px; overflow:auto; border:1px solid var(--line); border-radius:var(--r-m); } .hd-tablewrap td.nw { white-space:nowrap; } .hd-tablewrap th { position:sticky; top:0; background:var(--panel2); }
   .bb-head { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:6px; }
   .bb-title { font:600 14px var(--f-ui); word-break:break-all; }
   a.act { display:inline-block; text-decoration:none; font:500 12.5px var(--f-ui); padding:4px 12px; border-radius:var(--r-m); white-space:nowrap; }
@@ -248,6 +341,9 @@
   tr.bh-row { cursor:pointer; transition:background var(--ease); } tr.bh-row:hover { background:var(--hover); } tr.bh-row.on { background:var(--blue-soft); box-shadow:inset 2px 0 0 var(--blue); }
   .bh-name { font-weight:600; color:var(--text); } .st-run { color:var(--blue); } .st-warn, tr.st-warn td { color:var(--orange); } tr.bad td { color:var(--bad); } tr.bad td.dim { color:var(--dim); }
   .bd-head { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; flex-wrap:wrap; } .bd-btns { display:flex; gap:6px; flex-wrap:wrap; }
+  .rs-server { margin:0 0 10px; font-size:12.5px; color:var(--dim); max-width:760px; } .rs-adv { max-width:760px; margin:4px 0 6px; padding:6px 10px; border-radius:6px; font-size:12.5px; border:1px solid; } .rs-adv.ok { color:var(--ok); border-color:#1f4d3a; } .rs-adv.warn { color:var(--orange); border-color:#5a4520; } .rs-adv.bad { color:var(--bad); border-color:#5c2a2a; }
+  .pbar { display:flex; height:9px; width:100%; min-width:70px; background:var(--line, #2a3342); border-radius:5px; overflow:hidden; } .pbar i { display:block; height:100%; } .pbar i.ok { background:var(--ok); } .pbar i.bad { background:var(--bad); } .pbar i.can { background:var(--dim); } .pbar i.run { background:var(--blue); animation:pbpulse 1.4s ease-in-out infinite; } @keyframes pbpulse { 50% { opacity:.45; } }
+  .pall { display:flex; align-items:center; gap:12px; margin:4px 0 8px; font-size:12.5px; } .pall .pbar { max-width:320px; flex:0 1 320px; } .pall .act { margin-left:auto; }
   .bd-facts { display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:6px 14px; margin:6px 0 2px; font-size:12.5px; }
   .bd-facts span { display:block; font:600 10.5px var(--f-ui); text-transform:uppercase; letter-spacing:.04em; color:var(--dim); }
   a.dl { cursor:pointer; font-size:12px; }
@@ -511,6 +607,42 @@
   .um-inc { display:block; font-size:11px; color:var(--faint); }
   .um-perm.um-master { margin-bottom:4px; }
   .um input:disabled, .um-detail input:disabled { opacity:.85; cursor:not-allowed; }
+  /* Cleaner layout: centred titles, a toolbar, panels, and a tick or cross at the right of every permission and role */
+  .um-top { display:block; text-align:center; margin-bottom:10px; } .um-top h2 { margin:0 0 2px; } .um-top p { margin:0; font-size:12.5px; }
+  .um-bar { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:10px; margin-bottom:12px; padding-bottom:12px; border-bottom:1px solid var(--line); }
+  .um-bar #umTabs { width:200px; margin:0; } .um-bar #umNew { margin:0; justify-self:end; padding:3px 14px; }
+  .um-layout { gap:16px; margin-top:0; grid-template-columns:minmax(210px, 270px) 1fr; }
+  .um-listtitle { justify-self:start; font:600 20px var(--f-ui); color:#fff; }
+  .um-list { background:var(--panel2); } .um-item { padding:8px 12px; }
+  .um-detail { padding:16px 20px; background:var(--panel2); }
+  .um-title { text-align:center; font-size:17px; margin-bottom:4px; }
+  .um-detail > .dim { text-align:center; }
+  .um-detail .hd-label { display:flex; align-items:center; gap:10px; justify-content:center; text-align:center; margin:18px 0 8px; }
+  .um-detail .hd-label::before, .um-detail .hd-label::after { content:''; flex:1; height:1px; background:var(--line); }
+  .um-detail .um-lock { text-align:center; }
+  .um-chips { justify-content:center; } .um-actions { justify-content:center; margin-top:14px; } .um-detail .um-pw { justify-content:center; }
+  .um-detail .fl { text-align:center; } .um-detail input[type=text], .um-detail input[type=password] { margin-left:auto; margin-right:auto; }
+  .um-roles, .um-perms { gap:0; border:1px solid var(--line); border-radius:var(--r-m); overflow:hidden; background:var(--bg, transparent); }
+  .um-perm { align-items:center; padding:6px 12px; border-bottom:1px solid var(--line); } .um-perm:last-child { border-bottom:0; }
+  .um-perm.um-on:hover { background:var(--hover); }
+  .um-group { margin-top:12px; }
+  .um-ghead { justify-content:center; gap:10px; border:0; padding:0; margin:0 0 5px; } .um-ghead .dim { margin-left:0; }
+  .um-ghead input { display:none; }
+  .um-perm input[type=checkbox] { appearance:none; -webkit-appearance:none; order:2; margin:0 0 0 auto; width:20px; height:20px; border-radius:50%; display:grid; place-items:center; flex-shrink:0; font:700 12px/1 var(--f-ui); opacity:1 !important; }
+  .um-perm input[type=checkbox]::before { content:'\2715'; color:var(--bad); }
+  .um-perm input[type=checkbox]:not(:checked) { background:color-mix(in srgb, var(--bad) 14%, transparent); border:1px solid color-mix(in srgb, var(--bad) 45%, transparent); }
+  .um-perm input[type=checkbox]:checked { background:color-mix(in srgb, var(--ok) 16%, transparent); border:1px solid color-mix(in srgb, var(--ok) 55%, transparent); }
+  .um-perm input[type=checkbox]:checked::before { content:'\2713'; color:var(--ok); }
+  .um-perm > span { min-width:0; }
+  .modal .dlg.umdlg { width:min(680px, 100%); height:auto; max-height:min(800px, 100%); }
+  .umdlg .dlg-head { justify-content:center; position:relative; padding-top:12px; } .umdlg .dlg-head h2 { text-align:center; font-size:17px; }
+  #umModalBody .um-actions { position:sticky; bottom:-16px; z-index:1; background:var(--panel); border-top:1px solid var(--line); margin:12px -22px -16px; padding:10px 22px; }
+  .umdlg .dlg-x { position:absolute; right:10px; top:10px; }
+  .umdlg .dlg-body.um-detail { border:0; background:none; padding:6px 22px 16px; flex:0 1 auto; }
+  #umDetail input[type=text], #umDetail input[type=password], #umModalBody input[type=text], #umModalBody input[type=password] { width:100%; max-width:520px; box-sizing:border-box; }
+  #umDetail .um-pw input[type=password] { width:230px; max-width:100%; margin:0; }
+  #umDetail .um-pw { display:flex; justify-content:center; align-items:center; gap:8px; }
+  .um-perm.um-master { border:1px solid var(--line); border-radius:var(--r-m); margin-bottom:8px; }
   @media (max-width:760px) { .um-layout { grid-template-columns:1fr; } }
   /* Manually Add */
   #mnForm input[type=password] { width:100%; }
@@ -557,6 +689,9 @@
   /* hosts-up / remote-up count, left of the Shell button on every tab */
   .navstat { align-self:center; margin-left:auto; margin-right:12px; display:flex; gap:10px; font:500 10.5px/1 var(--f-ui); color:var(--faint); white-space:nowrap; }
   .navstat:empty { display:none; }
+  .navuser { align-self:center; margin-left:auto; margin-right:12px; font:500 10.5px/1 var(--f-ui); color:var(--blue); white-space:nowrap; } .navuser:empty { display:none; } .navuser b { font-weight:600; }
+  #topnav .navstat:not(:empty) + .navuser { margin-left:0; } #topnav .navuser + button.right.first, #topnav .navuser:empty + button.right.first { margin-left:0; }
+  #topnav .navuser:empty + button.right.first { margin-left:auto; }
   .navstat b { font-weight:600; font-variant-numeric:tabular-nums; }
   .navstat .ok { color:var(--ok); } .navstat .warnc { color:var(--orange); } .navstat .bad { color:var(--bad); } .navstat .dim { color:var(--faint); }
   #topnav .navstat + button.right.first { margin-left:0; }
@@ -686,6 +821,8 @@
   #binTable td { vertical-align:middle; }
   #binTable tr.missing td:first-child { box-shadow:inset 3px 0 0 var(--bad); }
   #binTable tr.ready td:first-child { box-shadow:inset 3px 0 0 var(--ok); }
+  #binTable tr.ready td { background:color-mix(in srgb, var(--ok) 11%, transparent); } #binTable tr.missing td { background:color-mix(in srgb, var(--bad) 11%, transparent); }
+  #binTable tr.ready:hover td { background:color-mix(in srgb, var(--ok) 17%, transparent); } #binTable tr.missing:hover td { background:color-mix(in srgb, var(--bad) 17%, transparent); }
   .binfield { min-width:170px; padding:2px 8px; border:1px solid var(--line-hi); border-radius:var(--r-s); background:#090b10; font:11px var(--f-mono); color:var(--text); min-height:24px; display:flex; align-items:center; }
   tr.missing .binfield { border-color:rgba(239,91,97,.45); color:var(--bad); }
   .binactions { display:flex; gap:6px; justify-content:flex-end; white-space:nowrap; }
@@ -844,7 +981,8 @@
     </section>
     <section class="page" id="settings/user-management">
       <div class="card">
-        <div class="um-top"><h2>User Management</h2><button class="act" id="umNew" type="button">New user</button><div class="toggle" id="umTabs"><button type="button" data-t="users" class="on">Users</button><button type="button" data-t="roles">Roles</button></div></div>
+        <div class="um-top"><h2>User Management</h2><p class="dim">Who can sign in, and what each role allows them to do.</p></div>
+        <div class="um-bar"><span class="um-listtitle" id="umListTitle">Users:</span><div class="toggle" id="umTabs"><button type="button" data-t="users" class="on">Users</button><button type="button" data-t="roles">Roles</button></div><button class="act" id="umNew" type="button">New user</button></div>
         <div class="um-layout">
           <div class="um-list" id="umList"></div>
           <div class="um-detail" id="umDetail"></div>
@@ -869,6 +1007,22 @@
           <div class="hs-hosts" id="ssHosts"></div>
           <div class="hs-actions"><button class="act" id="ssSave" type="button" data-perm="system.manage" data-perm-what="change shell settings">Save</button><button class="act sec" id="ssDefaults" type="button" data-perm="system.manage" data-perm-what="change shell settings">Reset to defaults</button><span class="um-msg" id="ssMsg"></span></div>
         </div>
+      </div>
+    </section>
+    <section class="page" id="settings/run-settings">
+      <div class="card">
+        <h2>Run Settings</h2>
+        <p class="dim hs-sub">How many hosts a hunt or response works on at the same time. Each host's collections or actions still run one after another. Changes apply to hunts and responses started afterwards. More hosts at once finishes sooner but loads this server (each WinRM host runs its own PowerShell) and the network.</p>
+        <p class="rs-server" id="rsServer"></p>
+        <div class="hs-block">
+          <span class="fl">Hosts at once (per hunt or response)</span>
+          <div class="hs-row"><input id="rsHosts" type="number" min="1" max="32" step="1"><span class="dim" id="rsHostsHint"></span></div>
+          <div class="rs-adv" id="rsHostsAdvice" hidden></div>
+          <span class="fl">Large file transfers at once (all hunts together)</span>
+          <div class="hs-row"><input id="rsLarge" type="number" min="1" max="16" step="1"><span class="dim" id="rsLargeHint"></span></div>
+          <div class="rs-adv" id="rsLargeAdvice" hidden></div>
+        </div>
+        <div class="hs-actions"><button class="act" id="rsSave" type="button" data-perm="system.manage" data-perm-what="change run settings">Save</button><button class="act sec" id="rsDefaults" type="button" data-perm="system.manage" data-perm-what="change run settings">Reset to defaults</button><span class="um-msg" id="rsMsg"></span></div>
       </div>
     </section>
     <section class="page" id="settings/health-settings">
@@ -906,7 +1060,7 @@
         <div class="card">
           <h2>Saved hosts</h2>
           <input id="hostSearch" type="search" class="hostsearch" placeholder="Search hosts by name, address, OS or protocol" autocomplete="off" spellcheck="false">
-          <table id="hostTable"><thead><tr><th class="hdotc"></th><th class="rown">#</th><th>Name</th><th>Address</th><th>OS</th><th>Protocol</th><th>Profile</th><th>Last verified</th><th>Groups</th><th></th></tr></thead><tbody></tbody></table>
+          <table id="hostTable"><thead><tr><th class="hdotc"></th><th class="rown">#</th><th>Name</th><th>Address</th><th>OS</th><th>Protocol</th><th>Profile</th><th>Last verified</th><th></th><th>Groups</th><th></th></tr></thead><tbody></tbody></table>
         </div>
         <div class="card">
           <h2>Groups</h2>
@@ -1063,13 +1217,58 @@
       </div>
     </section>
     <!-- Browse -->
+    <section class="page" id="browse/pinned">
+      <div class="card bb-pinned" id="bbPinned"></div>
+    </section>
     <section class="page" id="browse/files">
       <div class="browse-layout">
         <div class="card">
-          <div class="bb-top"><div id="bbCrumbs"></div><a class="act sec" id="bbZip" download hidden data-perm="hunts.export" data-perm-what="download files and folders">Download folder (zip)</a></div>
+          <div class="bb-searchrow"><input type="search" id="bbSearch" placeholder="Search file names and the text inside files" autocomplete="off" spellcheck="false"><button type="button" class="act" id="bbSearchGo">Search</button><button type="button" class="act sec" id="bbSearchClear" hidden>Clear</button></div>
+          <div class="dim bb-scope" id="bbSearchScope"></div>
+          <div class="bb-top"><div id="bbCrumbs"></div><span class="bb-topbtns"><button type="button" class="act sec" id="bbPinFolder" hidden>☆ Pin folder</button><button type="button" class="del" id="bbDelFolder" hidden data-perm="hunts.run,actions.run" data-perm-what="delete output">Delete folder</button><a class="act sec" id="bbZip" download hidden data-perm="hunts.export" data-perm-what="download files and folders">Download folder (zip)</a></span></div>
           <div id="bbList"></div>
         </div>
         <div class="card" id="bbPreview"></div>
+      </div>
+    </section>
+    <section class="page" id="output/diff">
+      <div class="card auto">
+        <h2>Diff</h2>
+        <p class="dim hs-sub">Compare two hunts or responses, or pick one file from each to compare just those two (for example the same CSV from two runs). Whole runs are compared file by file: files are matched by their path inside the run (the date in a name is ignored), and each file is compared row by row, in any order.</p>
+        <div class="df-pick">
+          <div><span class="fl">Run A (usually the older)</span><div class="df-sel"><select id="dfA"></select><button type="button" class="act sec" id="dfPinA" title="Pin run A">☆</button></div><select id="dfFA" class="df-file-sel"></select></div>
+          <button type="button" class="act sec" id="dfSwap" title="Swap A and B">⇄</button>
+          <div><span class="fl">Run B (usually the newer)</span><div class="df-sel"><select id="dfB"></select><button type="button" class="act sec" id="dfPinB" title="Pin run B">☆</button></div><select id="dfFB" class="df-file-sel"></select></div>
+          <button type="button" class="act" id="dfGo">Compare</button>
+        </div>
+      </div>
+      <div class="card" id="dfOut"></div>
+    </section>
+    <section class="page" id="output/ioc">
+      <div class="card" id="iocCard">
+        <div class="ioc-top"><h2>IOC</h2><button type="button" class="act" id="iocAdd" data-perm="hunts.run" data-perm-what="add IOC lists">Add IOC list</button></div>
+        <p class="dim hs-sub">Upload indicators (IPs, domains, hashes, URLs, file names). Each list gets a header here, and under it you see the hunts whose results contain one of its indicators, and the individual files that returned it.</p>
+        <div id="iocLists"></div>
+      </div>
+    </section>
+    <section class="page" id="output/compare">
+      <div class="card auto">
+        <h2>Cross-host comparison</h2>
+        <p class="dim hs-sub">Put one CSV from a hunt side by side across all its hosts. Every row shows how many hosts have it, so something found on one host out of many stands out.</p>
+        <div class="cp-pick">
+          <div><span class="fl">Hunt or response</span><select id="cpRun"></select></div>
+          <div><span class="fl">CSV</span><select id="cpFile"></select></div>
+          <button type="button" class="act" id="cpGo">Compare</button>
+        </div>
+      </div>
+      <div class="card" id="cpOut"></div>
+    </section>
+    <section class="page" id="output/baseline">
+      <div class="card" id="blCard">
+        <div class="ioc-top"><h2>Baseline</h2><button type="button" class="act" id="blAdd" data-perm="hunts.run" data-perm-what="upload baselines">Upload baseline</button></div>
+        <p class="dim hs-sub">Keep an initial baseline scan here: the known-good state of a host or group of hosts, to compare later hunts against.</p>
+        <div class="bl-note">Comparing hunts against a baseline is not available yet. For now baselines are only uploaded and stored.</div>
+        <div id="blList"></div>
       </div>
     </section>
     <section class="page" id="output/log">
@@ -1237,6 +1436,44 @@
     <div class="dlg-foot"><button class="act" id="denyOk" type="button">OK</button></div>
   </div>
 </div>
+<div class="modal" id="iocModal" hidden role="dialog" aria-modal="true" aria-labelledby="iocTitle">
+  <div class="dlg iocdlg">
+    <div class="dlg-head"><h2 id="iocTitle">Add IOC list</h2><button class="dlg-x" id="iocX" type="button" aria-label="Close">×</button></div>
+    <div class="dlg-body um-detail">
+      <span class="fl">List name</span><input id="iocName" type="text" maxlength="80" placeholder="e.g. Threat report 2026-10" autocomplete="off" spellcheck="false">
+      <span class="fl">Indicators</span>
+      <div class="ioc-file"><label class="act sec" for="iocFile">Choose a file…</label><input type="file" id="iocFile" accept=".txt,.csv,.ioc,.tsv,.list,.json,text/*" hidden><span class="dim" id="iocFileName">.txt or .csv, one indicator per line</span></div>
+      <textarea id="iocText" rows="9" spellcheck="false" placeholder="Or paste them here, one per line&#10;185.220.101.4&#10;evil-domain.example&#10;44d88612fea8a8f36de82e1278abb02f&#10;C:UsersPublicevil.exe"></textarea>
+      <div class="dim" style="margin-top:4px">A CSV can use a column called ioc, indicator, value, hash, ip, domain or url. Lines starting with # are ignored, and defanged indicators (hxxp, [.]) are restored.</div>
+      <span class="fl">Note (optional)</span><input id="iocNote" type="text" maxlength="500" placeholder="Where these came from" autocomplete="off">
+      <div class="um-actions"><button class="act" type="button" id="iocSave">Add list</button><button class="act sec" type="button" id="iocCancel">Cancel</button><span class="um-msg" id="iocMsg"></span></div>
+    </div>
+  </div>
+</div>
+<div class="modal" id="blModal" hidden role="dialog" aria-modal="true" aria-labelledby="blTitle">
+  <div class="dlg iocdlg">
+    <div class="dlg-head"><h2 id="blTitle">Upload baseline</h2><button class="dlg-x" id="blX" type="button" aria-label="Close">×</button></div>
+    <div class="dlg-body um-detail">
+      <span class="fl">Baseline name</span><input id="blName" type="text" maxlength="80" placeholder="e.g. Domain controllers, golden image" autocomplete="off" spellcheck="false">
+      <span class="fl">Scan file</span>
+      <div class="ioc-file"><label class="act sec" for="blFile">Choose a file…</label><input type="file" id="blFile" hidden><span class="dim" id="blFileName">A CSV, JSON or zip of the baseline scan (up to 200 MB)</span></div>
+      <span class="fl">Note (optional)</span><input id="blNote" type="text" maxlength="500" placeholder="Which hosts, when it was taken" autocomplete="off">
+      <div class="um-actions"><button class="act" type="button" id="blSave">Upload</button><button class="act sec" type="button" id="blCancel">Cancel</button><span class="um-msg" id="blMsg"></span></div>
+    </div>
+  </div>
+</div>
+<div class="modal" id="hostModal" hidden role="dialog" aria-modal="true" aria-labelledby="hdTitle">
+  <div class="dlg hddlg">
+    <div class="dlg-head"><h2 id="hdTitle">Host</h2><button class="dlg-x" id="hdX" type="button" aria-label="Close">×</button></div>
+    <div class="dlg-body" id="hdBody"></div>
+  </div>
+</div>
+<div class="modal" id="umModal" hidden role="dialog" aria-modal="true" aria-labelledby="umModalTitle">
+  <div class="dlg umdlg">
+    <div class="dlg-head"><h2 id="umModalTitle">New user</h2><button class="dlg-x" id="umModalX" type="button" aria-label="Close">×</button></div>
+    <div class="dlg-body um-detail" id="umModalBody"></div>
+  </div>
+</div>
 <div class="modal" id="groupsModal" hidden role="dialog" aria-modal="true" aria-labelledby="gmTitle">
   <div class="dlg gm">
     <div class="dlg-head"><h2 id="gmTitle">Manage groups</h2><button class="dlg-x" id="gmX" aria-label="Close">×</button></div>
@@ -1314,5 +1551,9 @@
 <script src="respond.js"></script>
 <script src="recurring.js"></script>
 <script src="report.js"></script>
+<script src="browse.js"></script>
+<script src="analysis.js"></script>
+<script src="iocs.js"></script>
+<script src="hostdetail.js"></script>
 </body>
 </html>

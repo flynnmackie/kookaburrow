@@ -2,11 +2,12 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { db, save, id } = require('./store');
-const { runConcurrency } = require('./config');
+const runSettings = require('./run-settings');
 const collections = require('./collections');
 const { createAudit, sha256 } = require('./audit');
 const { safeName, createRunFolder, parseCsv, combine } = require('./output');
 const { runLarge } = require('./large-transfer');
+const cancel = require('./cancel');
 
 // A hunt runs one or more collections on a set of hosts and writes what comes back under output/hunts/ (the layout is described in
 // src/output.js): a folder per hunt, a folder per host inside it with one CSV per collection, and the hunt's log, All_Hosts CSV and
@@ -64,32 +65,48 @@ function startHunt({ name, collectionIds, hosts, params, startedBy, scheduleId, 
   const hostBase = (h) => `${folder.base}_${safeName(h.address, 'host')}`;
 
   const data = new Map(); // `${collectionId}|${hostId}` -> csv text
+  const signal = cancel.begin(run.id); // aborted by Cancel: stops the host being worked on and skips everything not started
   (async () => {
     let next = 0;
     // one worker per host at a time; a host's collections run one after another
-    await Promise.all(Array.from({ length: Math.min(runConcurrency, hosts.length) }, async () => {
+    await Promise.all(Array.from({ length: Math.min(runSettings.settings().concurrency, hosts.length) }, async () => {
       while (next < hosts.length) {
         const host = hosts[next++];
         let okRuns = 0;
         audit.log({ kind: 'session', host: host.address, action: 'host started', detail: `${label(host)} over ${proto(host)}` });
         for (const c of chosen) {
           const res = run.results.find((r) => r.hostId === host.id && r.collectionId === c.id);
-          res.status = 'running'; save();
+          if (signal.aborted) { Object.assign(res, { status: 'cancelled', finishedAt: new Date().toISOString() }); save(); continue; }
+          res.status = 'running'; res.startedAt = new Date().toISOString(); save();
           audit.log({ kind: 'collect', host: host.address, action: 'collection started', artefact: c.name,
             detail: `${c.kind}, footprint ${c.footprint}, returns ${c.returns}${c.dependencies.length ? `; copies ${c.dependencies.join(', ')} to a temporary folder on the host` : ''}` });
           // A large-transfer collection writes files on the host that are pulled back over SMB (Windows) or SFTP (Linux): <host folder>/raw/<collection>/
           let rawRel = '';
-          const out = c.transfer === 'large'
+          // large transfers share a limit across all running hunts; a host over it waits for a free slot
+          let release = null;
+          if (c.transfer === 'large') {
+            release = await runSettings.acquireLarge(() => { res.waiting = true; save(); }, signal);
+            delete res.waiting;
+          }
+          const out = c.transfer === 'large' && !release ? { exitCode: -2, stdout: '', stderr: 'Cancelled', truncated: false, durationMs: 0 }
+            : c.transfer === 'large'
             ? await runLarge(host, runnable.get(c.id), {
-              csv: true, audit,
+              csv: true, audit, signal,
               rawDir: path.join(folder.abs, hostBase(host), 'raw', safeName(path.basename(c.file, path.extname(c.file)), 'collection')),
               onProgress: (p) => { res.transfer = p; save(); },
             })
-            : await collections.executeOnHost(host, runnable.get(c.id), { csv: true });
+            : await collections.executeOnHost(host, runnable.get(c.id), { csv: true, signal });
+          if (release) release();
           if (c.transfer === 'large') {
             rawRel = `${hostBase(host)}/raw/${safeName(path.basename(c.file, path.extname(c.file)), 'collection')}`;
             delete res.transfer;
             Object.assign(res, { rawPath: rawRel, rawFiles: (out.files || []).filter((f) => f.ok).length, rawBytes: out.transferBytes || 0, transferMethod: out.method, ...(out.warning ? { warning: out.warning } : {}) });
+          }
+          if (signal.aborted && out.exitCode !== 0) {
+            audit.log({ kind: 'warn', host: host.address, action: 'collection cancelled', artefact: c.name, outcome: 'cancelled', detail: `stopped by ${run.cancelledBy || 'a user'} after ${((Date.now() - new Date(res.startedAt)) / 1000).toFixed(0)}s; nothing was kept for this collection on this host` });
+            Object.assign(res, { status: 'cancelled', exitCode: out.exitCode, durationMs: out.durationMs, finishedAt: new Date().toISOString() });
+            delete res.transfer; save();
+            continue;
           }
           const ok = out.exitCode === 0;
           let rows = 0, file = '';
@@ -146,7 +163,7 @@ function startHunt({ name, collectionIds, hosts, params, startedBy, scheduleId, 
         })),
       };
     });
-    run.status = run.results.some((r) => r.status === 'error') ? 'completed_with_errors' : 'completed';
+    run.status = run.results.some((r) => r.status === 'cancelled') ? 'cancelled' : run.results.some((r) => r.status === 'error') ? 'completed_with_errors' : 'completed';
     run.finishedAt = new Date().toISOString();
     const huntJson = JSON.stringify({
       name: huntName, startedBy: startedBy || null, folder: folder.base, status: run.status, startedAt: run.startedAt, finishedAt: run.finishedAt,
@@ -156,10 +173,10 @@ function startHunt({ name, collectionIds, hosts, params, startedBy, scheduleId, 
     fs.writeFileSync(path.join(folder.abs, `${allBase}.json`), huntJson);
     audit.log({ kind: 'evidence', host: 'All hosts', action: 'output written', artefact: 'All_Hosts.json', size: Buffer.byteLength(huntJson), receivedHash: sha256(huntJson), detail: `${allBase}.json` });
     const okAll = run.results.filter((r) => r.status === 'ok').length;
-    audit.log({ kind: 'hunt', action: run.status === 'completed' ? 'Hunt complete' : 'Hunt completed with errors', outcome: run.status === 'completed' ? 'ok' : 'errors',
+    audit.log({ kind: 'hunt', action: run.status === 'completed' ? 'Hunt complete' : run.status === 'cancelled' ? 'Hunt cancelled' : 'Hunt completed with errors', outcome: run.status === 'completed' ? 'ok' : run.status === 'cancelled' ? 'cancelled' : 'errors',
       detail: `${okAll} of ${run.results.length} collection runs ok; output saved to output/${folder.rel}` });
     save();
-  })().finally(() => { for (const f of tmpFiles) fs.promises.unlink(f).catch(() => {}); }).catch((e) => {
+  })().finally(() => { cancel.end(run.id); for (const f of tmpFiles) fs.promises.unlink(f).catch(() => {}); }).catch((e) => {
     run.status = 'failed'; run.error = e.message; run.finishedAt = new Date().toISOString();
     audit.log({ kind: 'error', action: 'Hunt failed', outcome: 'error', detail: e.message });
     save();

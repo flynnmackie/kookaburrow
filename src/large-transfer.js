@@ -90,17 +90,19 @@ async function runWindows(host, c, ctx) {
     log('SMB connection established', `\\\\${A}\\${conn.share} with the host's saved credentials`);
 
     ran = true;
-    script = await collections.executeOnHost(host, c, { csv: ctx.csv, outDir: opened.outDir, timeoutMs: largeTimeoutMs });
+    script = await collections.executeOnHost(host, c, { csv: ctx.csv, outDir: opened.outDir, timeoutMs: largeTimeoutMs, signal: ctx.signal });
+    if (ctx.signal?.aborted) throw new Error('Cancelled');
     const list = await winrm.smbList(host, opened.outDir, largeTimeoutMs);
     pulled = await pullAll({ files: [].concat(list), host, destDir: ctx.rawDir, ctx: { ...ctx, name: c.name }, via: 'SMB',
       copyOne: (f, dest, onBytes) => smb.fetch(conn, `${opened.outDir}\\${f.path}`, dest, onBytes) });
   } catch (e) {
     problem = e.message;
-    log('transfer failed', problem, 'error', 'error');
+    if (ctx.signal?.aborted) log('transfer cancelled', 'the collection was cancelled; the temporary folder on the host is being removed', 'warning', 'warn');
+    else log('transfer failed', problem, 'error', 'error');
   } finally {
     if (conn) { try { await smb.disconnect(conn); } catch { /* the close below does not need it */ } }
     if (opened) {
-      const intact = (!problem && pulled.ok) || !ran; // a folder the collection never wrote to holds nothing worth keeping
+      const intact = (!problem && pulled.ok) || !ran || !!ctx.signal?.aborted; // a folder the collection never wrote to holds nothing worth keeping
       try {
         const r = await winrm.smbClose(host, opened.ok ? opened.outDir : '', opened.state, intact);
         if (opened.ok && intact) log('host folder removed', r.outDirRemoved ? 'the temporary folder on the host was removed' : 'the temporary folder on the host could not be removed; delete it by hand', r.outDirRemoved ? 'ok' : 'warning', r.outDirRemoved ? 'session' : 'warn');
@@ -139,7 +141,8 @@ async function runSftp(host, c, ctx) {
     if (mk.exitCode !== 0) throw new Error(`could not create ${outDir} on the host: ${(mk.stderr || mk.stdout).trim().split(/\r?\n/)[0]}`);
     made = true;
     ran = true;
-    script = await collections.executeOnHost(host, c, { csv: ctx.csv, outDir, timeoutMs: largeTimeoutMs });
+    script = await collections.executeOnHost(host, c, { csv: ctx.csv, outDir, timeoutMs: largeTimeoutMs, signal: ctx.signal });
+    if (ctx.signal?.aborted) throw new Error('Cancelled');
     session = await sftp.open(host);
     const list = await sftp.list(session, outDir);
     const hr = await ssh.exec(host, `cd ${q(outDir)} && find . -type f -exec sha256sum {} +`, undefined, largeTimeoutMs);
@@ -149,11 +152,12 @@ async function runSftp(host, c, ctx) {
       copyOne: (f, dest, onBytes) => sftp.fetch(session, `${outDir}/${f.path}`, dest, onBytes) });
   } catch (e) {
     problem = e.message;
-    log('transfer failed', problem, 'error', 'error');
+    if (ctx.signal?.aborted) log('transfer cancelled', 'the collection was cancelled; the temporary folder on the host is being removed', 'warning', 'warn');
+    else log('transfer failed', problem, 'error', 'error');
   } finally {
     if (session) sftp.close(session);
     if (made) {
-      if ((!problem && pulled.ok) || !ran) {
+      if ((!problem && pulled.ok) || !ran || ctx.signal?.aborted) {
         const rm = await ssh.exec(host, `rm -rf ${q(outDir)}; test ! -e ${q(outDir)}`);
         log('host folder removed', rm.exitCode === 0 ? `${outDir} was removed from the host` : `${outDir} could not be removed from the host; delete it by hand`, rm.exitCode === 0 ? 'ok' : 'warning', rm.exitCode === 0 ? 'session' : 'warn');
       } else {

@@ -8,6 +8,7 @@ const { Client } = require('ssh2');
 const { db, save } = require('./store');
 const { decrypt } = require('./crypto');
 const { outputDir } = require('./config');
+const pyruntime = require('./remote/pyruntime');
 
 // Interactive shells for the Shell page. One session per authenticated host:
 //   SSH hosts    a real terminal (pty) through ssh2; keystrokes go straight to the host
@@ -184,8 +185,12 @@ function create(hostId, { cols = 100, rows = 30 } = {}) {
       ...process.env, KB_HOST: host.address, KB_PORT: String(host.port || (host.useSsl ? 5986 : 5985)),
       KB_USER: host.username, KB_PASS: password, KB_AUTH: host.auth || 'Negotiate', KB_SSL: host.useSsl ? '1' : '0',
     };
-    const ps = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', path.join(__dirname, 'remote', 'winrm-shell.ps1')],
-      { env, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
+    // the bundled pypsrp engine when it is installed (needs no setup on this server or the host), otherwise PowerShell remoting
+    const py = process.env.KB_ENGINE === 'powershell' ? null : pyruntime.command();
+    const ps = py
+      ? spawn(py.exe, py.args, { env: { ...env, ...py.env, KB_MODE: 'shell' }, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] })
+      : spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', path.join(__dirname, 'remote', 'winrm-shell.ps1')],
+        { env, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
     const dec = new StringDecoder('utf8');
     ps.stdout.on('data', (d) => push(dec.write(d)));
     ps.stderr.on('data', (d) => push(dec.write(d)));

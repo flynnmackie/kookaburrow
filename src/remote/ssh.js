@@ -7,7 +7,7 @@ const sftp = require('./sftp');
 const { decrypt } = require('../crypto');
 const { maxOutputBytes, hostTimeoutMs } = require('../config');
 
-function exec(profile, command, stdin, timeoutMs = hostTimeoutMs) {
+function exec(profile, command, stdin, timeoutMs = hostTimeoutMs, signal = null) {
   return new Promise((resolve) => {
     const conn = new Client();
     let stdout = '', stderr = '', truncated = false;
@@ -20,11 +20,15 @@ function exec(profile, command, stdin, timeoutMs = hostTimeoutMs) {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      signal?.removeEventListener('abort', onAbort);
       try { conn.end(); } catch { /* ignore */ }
       resolve({ exitCode, stdout, stderr: extraErr ? `${stderr}${extraErr}` : stderr, truncated });
     };
     const timer = setTimeout(() => finish(-1, 'Timed out'), timeoutMs);
+    const onAbort = () => finish(-2, 'Cancelled');
 
+    if (signal?.aborted) return finish(-2, 'Cancelled');
+    signal?.addEventListener('abort', onAbort, { once: true });
     conn.on('ready', () => {
       conn.exec(command, (err, stream) => {
         if (err) return finish(-1, err.message);
@@ -66,20 +70,20 @@ async function verify(profile) {
 // opts.outDir (large-transfer collections): the folder the script writes its files to, set as $OUT_DIR (bash) or $OutDir (PowerShell).
 // opts.binaries: local files the script needs. They are uploaded over SFTP to a private folder on the host (set as $BIN_DIR / $BinDir)
 // and the folder is removed afterwards, the same as the binaries staged on Windows hosts.
-function runWith(profile, scriptText, type, vars, timeoutMs) {
+function runWith(profile, scriptText, type, vars, timeoutMs, signal) {
   const q = (v) => `'${String(v).replace(/'/g, `'\\''`)}'`; // single-quote for bash
   const pq = (v) => `'${String(v).replace(/'/g, "''")}'`; // single-quote for PowerShell
   if (type === 'bash') {
     const pre = [vars.outDir && ['OUT_DIR', vars.outDir], vars.binDir && ['BIN_DIR', vars.binDir]].filter(Boolean).map(([k, v]) => `${k}=${q(v)}\nexport ${k}\n`).join('');
-    return exec(profile, 'bash -s', pre + scriptText, timeoutMs);
+    return exec(profile, 'bash -s', pre + scriptText, timeoutMs, signal);
   }
   const shell = profile.platform === 'windows' ? 'powershell' : 'pwsh';
   const pre = [vars.outDir && ['OutDir', vars.outDir], vars.binDir && ['BinDir', vars.binDir]].filter(Boolean).map(([k, v]) => `$${k} = ${pq(v)}\n`).join('');
-  return exec(profile, `${shell} -NoProfile -NonInteractive -Command -`, pre + scriptText, timeoutMs);
+  return exec(profile, `${shell} -NoProfile -NonInteractive -Command -`, pre + scriptText, timeoutMs, signal);
 }
 async function runScript(profile, scriptText, type = 'powershell', opts = {}) {
   const bins = opts.binaries || [];
-  if (!bins.length) return runWith(profile, scriptText, type, { outDir: opts.outDir }, opts.timeoutMs);
+  if (!bins.length) return runWith(profile, scriptText, type, { outDir: opts.outDir }, opts.timeoutMs, opts.signal);
   const dir = `/var/tmp/kb-bin-${crypto.randomBytes(8).toString('hex')}`;
   let session = null, made = false;
   try {
@@ -89,7 +93,7 @@ async function runScript(profile, scriptText, type = 'powershell', opts = {}) {
     session = await sftp.open(profile);
     for (const f of bins) await sftp.put(session, f, `${dir}/${path.basename(f)}`);
     sftp.close(session); session = null;
-    return await runWith(profile, scriptText, type, { outDir: opts.outDir, binDir: dir }, opts.timeoutMs);
+    return await runWith(profile, scriptText, type, { outDir: opts.outDir, binDir: dir }, opts.timeoutMs, opts.signal);
   } catch (e) {
     return { exitCode: -1, stdout: '', stderr: `Could not stage the binaries on the host: ${e.message}`, truncated: false };
   } finally {

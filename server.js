@@ -14,6 +14,7 @@ const audit = require('./src/audit');
 const browse = require('./src/browse');
 const authTest = require('./src/auth-test');
 const huntRunner = require('./src/hunt-runner');
+const cancel = require('./src/cancel');
 const shell = require('./src/shell');
 const monitor = require('./src/monitor');
 const quarantine = require('./src/quarantine');
@@ -22,6 +23,7 @@ const permissions = require('./src/permissions');
 const routePerms = require('./src/route-perms');
 
 const app = express();
+app.use('/api/iocs', express.json({ limit: '6mb' })); // an IOC list can be thousands of lines
 app.use(express.json({ limit: '400kb' }));
 
 // The app holds credentials and runs code on remote hosts, so it is localhost-only and rejects
@@ -206,6 +208,25 @@ app.post('/api/hosts', wrap(async (req, res) => {
 }));
 
 app.get('/api/hosts', (req, res) => res.json(db.hosts.map(publicHost)));
+// Everything known about one host: its details, groups, the hunts and responses that ran on it, quarantine history and recent health checks.
+app.get('/api/hosts/:id/history', wrap((req, res) => {
+  const h = db.hosts.find((x) => x.id === req.params.id); if (!h) throw new Error('Host not found');
+  const runs = db.runs.filter((r) => (r.results || []).some((x) => x.hostId === h.id || x.address === h.address))
+    .map((r) => {
+      const mine = r.results.filter((x) => x.hostId === h.id || x.address === h.address);
+      return { id: r.id, kind: r.kind === 'response' ? 'response' : 'hunt', name: r.name || r.collectionName || r.actionName || 'Run', startedAt: r.startedAt, finishedAt: r.finishedAt || null, status: r.status, startedBy: r.startedBy || null, quick: !!r.quick,
+        items: mine.map((x) => ({ name: x.collectionName || x.actionName || x.name || '', status: x.status, rows: x.rows ?? null })) };
+    }).sort((a, b) => String(b.startedAt).localeCompare(String(a.startedAt)));
+  const q = db.quarantine?.[h.id] || null;
+  const log = (db.quarantineLog || []).filter((e) => e.hostId === h.id).slice(-100).reverse();
+  const checks = monitor.getLog(1500).filter((e) => e.address === h.address).slice(0, 60);
+  const ups = checks.filter((e) => e.ok).length;
+  res.json({
+    host: publicHost(h), groups: db.lists.filter((l) => l.hostIds.includes(h.id)).map((l) => ({ id: l.id, name: l.name })),
+    runs: runs.slice(0, 100), runTotal: runs.length, quarantine: q ? { state: q.status, since: q.since || null, until: q.until || null, by: q.by || null } : null, quarantineLog: log,
+    checks, checkSummary: { total: checks.length, up: ups },
+  });
+}));
 // Rename a saved host. An empty name goes back to the name discovered for it (its hostname, or its address).
 app.put('/api/hosts/:id', wrap(async (req, res) => {
   const h = db.hosts.find((x) => x.id === req.params.id);
@@ -431,6 +452,26 @@ app.get('/api/runs/:id', (req, res) => {
   const r = db.runs.find((x) => x.id === req.params.id);
   r ? res.json(r) : res.status(404).json({ error: 'Not found' });
 });
+// Cancels a hunt or response that is running: the host being worked on is cut off, everything not yet started is skipped, and what
+// was already collected is kept. The run ends as "cancelled". A response changes hosts, so its cancel must be confirmed (body { confirm: true }).
+function cancelRun(req, res, kind) {
+  const r = db.runs.find((x) => x.id === req.params.id && (kind === 'response' ? x.kind === 'response' : x.kind !== 'response'));
+  if (!r) throw new Error('Not found');
+  if (r.status !== 'running') throw new Error('It is not running');
+  if (kind === 'response' && req.body?.confirm !== true) throw new Error('Cancelling a response can leave hosts partly changed. Confirm to continue.');
+  r.cancelRequested = { by: req.user || null, at: new Date().toISOString() };
+  r.cancelledBy = req.user || null;
+  if (!cancel.cancel(r.id)) {
+    // left as "running" by an earlier server process: nothing is working on it any more, so just close it
+    for (const x of r.results) if (x.status === 'queued' || x.status === 'running') Object.assign(x, { status: 'cancelled', finishedAt: new Date().toISOString() });
+    r.status = 'cancelled'; r.finishedAt = new Date().toISOString();
+  }
+  save();
+  res.json({ ok: true });
+}
+app.post('/api/runs/:id/cancel', wrap((req, res) => cancelRun(req, res, 'hunt')));
+app.post('/api/responses/:id/cancel', wrap((req, res) => cancelRun(req, res, 'response')));
+
 // Deletes a run's output folder (only ever one folder directly inside output/hunts or output/responses).
 function removeOutput(r) {
   const dir = outputs.runDir(r);
@@ -583,7 +624,7 @@ app.get('/api/about', (req, res) => {
   const addresses = Object.values(os.networkInterfaces()).flat()
     .filter((i) => i && i.family === 'IPv4' && !i.internal).map((i) => i.address);
   res.json({
-    version: require('./package.json').version, node: process.version,
+    version: require('./package.json').version, node: process.version, winrm: require('./src/remote/winrm').engine(),
     hostname: os.hostname(), dnsDomain: process.env.USERDNSDOMAIN || '',
     bind: `${config.host}:${config.port}`, addresses,
     os: `${os.version()} ${os.release()} (${os.arch()})`,
@@ -726,6 +767,113 @@ const browseWrap = (fn) => (req, res) => {
 };
 app.get('/api/browse', browseWrap((req, res) => res.json(browse.list(String(req.query.path || '/')))));
 app.get('/api/browse/file', browseWrap((req, res) => res.json(browse.preview(String(req.query.path || '')))));
+app.get('/api/browse/evtx', wrap(async (req, res) => { try { res.json(await browse.evtxView(String(req.query.path || ''))); } catch (e) { res.status(e.status || 400).json({ error: firstLine(e.message) }); } }));
+// Search file and folder names and the text inside files: below ?path= (the top level searches everything except Binaries).
+app.get('/api/browse/search', async (req, res) => {
+  try { res.json(await browse.search(req.query.q, String(req.query.path || '/'))); } catch (e) { res.status(e.status || 400).json({ error: firstLine(e.message) }); }
+});
+// Delete output, a report or a pulled file. Deleting a run's folder also forgets the run, so Results no longer lists it.
+app.delete('/api/browse', browseWrap((req, res) => {
+  const vpath = String(req.query.path || '');
+  const r = browse.remove(vpath);
+  if (r.runFolder) {
+    const gone = db.runs.filter((x) => x.outputPath === r.runFolder);
+    if (gone.some((x) => x.status === 'running')) throw new Error('That run is still running. Wait for it to finish.');
+    db.runs = db.runs.filter((x) => x.outputPath !== r.runFolder);
+    for (const x of gone) { const f = reports.reportFile(x); if (f) require('fs').rmSync(f, { force: true }); }
+    save();
+  }
+  res.json({ ok: true, removed: r.path });
+}));
+
+// Pins: each user's pinned files and folders (any Browse path), each with a note. Kept on the user record.
+const pinsOf = (req) => { const u = db.users.find((x) => x.username === req.user); if (!u) throw new Error('Sign in required'); return (u.pins ||= []); };
+const pinView = (p) => ({ ...p, ...browse.describe(p.path) });
+app.get('/api/pins', wrap((req, res) => res.json(pinsOf(req).map(pinView))));
+app.post('/api/pins', wrap((req, res) => {
+  const pins = pinsOf(req), p = String(req.body?.path || '');
+  const d = browse.describe(p); if (!d.exists || p === '/') throw new Error('That cannot be pinned');
+  if (pins.some((x) => x.path === p)) throw new Error('Already pinned');
+  if (pins.length >= 200) throw new Error('You have 200 pins already. Remove some first.');
+  const pin = { id: id(), path: p, note: String(req.body?.note ?? '').slice(0, 1000), at: new Date().toISOString() };
+  pins.push(pin); save(); res.json(pinView(pin));
+}));
+app.put('/api/pins/:id', wrap((req, res) => {
+  const pin = pinsOf(req).find((x) => x.id === req.params.id); if (!pin) throw new Error('Pin not found');
+  pin.note = String(req.body?.note ?? '').slice(0, 1000); save(); res.json(pinView(pin));
+}));
+app.delete('/api/pins/:id', wrap((req, res) => {
+  const u = db.users.find((x) => x.username === req.user); if (u) { u.pins = (u.pins || []).filter((x) => x.id !== req.params.id); save(); }
+  res.json({ ok: true });
+}));
+
+// Diff: compare two runs (or two files) from Browse. The summary lists every file; detail gives the rows of one changed file.
+const runFolders = () => {
+  const out = [];
+  for (const [kind, group] of [['hunt', 'hunts'], ['response', 'responses']]) {
+    const dir = require('path').join(config.outputDir, group);
+    let names = []; try { names = require('fs').readdirSync(dir); } catch { /* none yet */ }
+    for (const n of names) {
+      let st; try { st = require('fs').statSync(require('path').join(dir, n)); } catch { continue; }
+      if (!st.isDirectory()) continue;
+      const rec = db.runs.find((r) => r.outputPath === `${group}/${n}`);
+      out.push({ kind, folder: n, path: `/output/${group}/${n}`, name: rec?.name || rec?.collectionName || n, startedAt: rec?.startedAt || st.mtime.toISOString() });
+    }
+  }
+  return out.sort((a, b) => String(b.startedAt).localeCompare(String(a.startedAt)));
+};
+app.get('/api/diff/runs', wrap((req, res) => res.json(runFolders())));
+const diffWrap = (fn) => (req, res) => { try { res.json(fn(req.body || {})); } catch (e) { res.status(e.status || 400).json({ error: firstLine(e.message) }); } };
+app.post('/api/diff/files', diffWrap((b) => require('./src/diff').list(String(b.path || ''))));
+app.post('/api/diff', diffWrap((b) => require('./src/diff').summarise(String(b.a || ''), String(b.b || ''))));
+app.post('/api/diff/file', diffWrap((b) => require('./src/diff').detail(String(b.a || ''), String(b.b || ''), b.key)));
+
+// Cross-host comparison (Results > Analysis): list the CSVs of a run, then compare one across its hosts.
+const compareMod = require('./src/compare');
+const hostNameAt = (folder) => { const h = db.hosts.find((x) => x.address === folder); return h ? (h.name || h.hostname || folder) : folder; };
+// only the runs that have at least one CSV from two or more hosts
+app.get('/api/compare/runs', wrap((req, res) => res.json(runFolders().filter((r) => { try { return compareMod.list(r.path).files.length > 0; } catch { return false; } }))));
+app.post('/api/compare/files', diffWrap((b) => compareMod.list(String(b.path || ''))));
+app.post('/api/compare', diffWrap((b) => compareMod.compare(String(b.path || ''), String(b.key || ''), b.columns, hostNameAt)));
+
+// Baselines (Results > Analysis > Baseline): an initial scan kept for later. For now they are only stored (data/baselines/); nothing compares against them yet.
+const BASELINE_MAX = 200 * 1024 * 1024;
+const baselineDir = require('path').join(config.dataDir, 'baselines');
+const baselineList = () => (db.baselines ||= []);
+app.get('/api/baselines', wrap((req, res) => res.json(baselineList())));
+app.post('/api/baselines', (req, res) => {
+  const fsx = require('fs'), name = String(req.query.name || '').trim(), note = String(req.query.note || '').slice(0, 500);
+  const filename = require('path').basename(String(req.query.filename || 'baseline')).replace(/[\u0000-\u001f]/g, '').slice(0, 120) || 'baseline';
+  if (!name || name.length > 80) return res.status(400).json({ error: 'Give the baseline a name (80 characters at most)' });
+  if (baselineList().some((b) => b.name.toLowerCase() === name.toLowerCase())) return res.status(400).json({ error: 'A baseline with that name already exists' });
+  fsx.mkdirSync(baselineDir, { recursive: true });
+  const bid = id(), dest = require('path').join(baselineDir, `${bid}.dat`), out = fsx.createWriteStream(dest), hash = require('crypto').createHash('sha256');
+  let size = 0, failed = false;
+  const fail = (code, msg) => { if (failed) return; failed = true; out.destroy(); fsx.rm(dest, { force: true }, () => {}); if (!res.headersSent) res.status(code).json({ error: msg }); };
+  req.on('data', (c) => { size += c.length; hash.update(c); if (size > BASELINE_MAX) { fail(413, 'That file is over 200 MB'); req.destroy(); } });
+  req.on('error', () => fail(400, 'The upload was interrupted'));
+  out.on('error', () => fail(500, 'Could not save the file'));
+  out.on('finish', () => {
+    if (failed) return;
+    if (!size) return fail(400, 'The file is empty');
+    const rec = { id: bid, name, note, filename, size, sha256: hash.digest('hex'), uploadedBy: req.user, at: new Date().toISOString() };
+    baselineList().push(rec); save(); res.json(rec);
+  });
+  req.pipe(out);
+});
+app.delete('/api/baselines/:id', wrap((req, res) => {
+  const b = baselineList().find((x) => x.id === req.params.id); if (!b) throw new Error('Baseline not found');
+  require('fs').rmSync(require('path').join(baselineDir, `${b.id}.dat`), { force: true });
+  db.baselines = baselineList().filter((x) => x.id !== b.id); save(); res.json({ ok: true });
+}));
+
+// IOC lists (Results > Analysis > IOC) and the hunts whose output contains them.
+const iocs = require('./src/iocs');
+app.get('/api/iocs', wrap((req, res) => res.json(iocs.list())));
+app.post('/api/iocs', wrap((req, res) => res.json(iocs.add(req.body || {}, req.user))));
+app.get('/api/iocs/:id', wrap((req, res) => { const l = iocs.get(req.params.id); if (!l) throw new Error('List not found'); res.json(iocs.view(l)); }));
+app.get('/api/iocs/:id/matches', wrap(async (req, res) => res.json(await iocs.matches(req.params.id))));
+app.delete('/api/iocs/:id', wrap((req, res) => { iocs.remove(req.params.id); res.json({ ok: true }); }));
 app.get('/api/browse/download', browseWrap((req, res) => {
   if (req.query.folder === '1') { // a folder, as a zip
     const d = browse.dirSource(String(req.query.path || ''));
@@ -754,6 +902,11 @@ app.get('/api/settings/health', (req, res) => res.json({
   hosts: db.hosts.map((h) => ({ id: h.id, name: h.name || h.hostname || h.address, address: h.address, protocol: h.protocol, os: h.os || null })),
 }));
 app.put('/api/settings/health', wrap((req, res) => { monitor.setSettings(req.body || {}); res.json({ settings: monitor.settings() }); }));
+
+// ---- Run Settings: how many hosts a hunt or response works on at once (Settings > System > Run Settings) ----
+const runSettings = require('./src/run-settings');
+app.get('/api/settings/runs', (req, res) => res.json({ settings: runSettings.settings(), defaults: runSettings.DEFAULTS, limits: runSettings.LIMITS, server: runSettings.serverInfo() }));
+app.put('/api/settings/runs', wrap((req, res) => { runSettings.setSettings(req.body || {}); res.json({ settings: runSettings.settings() }); }));
 
 // ---- Shell Settings: shell access on or off, which hosts, how many at once and the idle timeout (Settings > System > Shell Settings) ----
 app.get('/api/settings/shell', (req, res) => res.json({
@@ -784,6 +937,7 @@ app.delete('/api/quarantine/:id', wrap(async (req, res) => {
 app.get('/api/quarantine', (req, res) => res.json(quarantine.records()));
 app.get('/api/quarantine/log', (req, res) => res.json({ entries: quarantine.getLog(Math.min(Number(req.query.limit) || 500, 2000)) }));
 
+console.log(`WinRM engine: ${require('./src/remote/winrm').engine()}`);
 const server = app.listen(config.port, config.host, () => {
   console.log(`Kookaburrow running at http://${config.host}:${config.port}`);
   monitor.start();

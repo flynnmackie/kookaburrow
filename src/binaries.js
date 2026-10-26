@@ -9,6 +9,9 @@ const { pipeline } = require('stream/promises');
 const { binariesDir } = require('./config');
 const collections = require('./collections');
 
+// Collections and actions both declare binaries (the deploy actions need installers).
+const declaring = () => [...collections.listCollections(), ...collections.listActions()];
+
 const MAX_BYTES = 500 * 1024 * 1024;
 
 // Bare file names only: no separators, no leading dot, no traversal.
@@ -21,7 +24,7 @@ function sha256(file) {
 // Every declared dependency (even if not uploaded yet) plus any stray files already in the folder.
 function listBinaries() {
   const usedBy = new Map();
-  for (const h of collections.listCollections()) {
+  for (const h of declaring()) {
     for (const dep of h.dependencies) {
       if (!usedBy.has(dep)) usedBy.set(dep, []);
       usedBy.get(dep).push({ id: h.id, name: h.name });
@@ -48,7 +51,7 @@ function listBinaries() {
 // Only names a collection asks for can be uploaded, so the folder cannot be filled with arbitrary files.
 function saveBinary(name, data) {
   if (!isSafeName(name)) throw new Error('Invalid binary name');
-  if (!collections.listCollections().some((h) => h.dependencies.includes(name))) throw new Error(`No collection requires "${name}"`);
+  if (!declaring().some((h) => h.dependencies.includes(name))) throw new Error(`No collection requires "${name}"`);
   if (!Buffer.isBuffer(data) || !data.length) throw new Error('No file received');
   if (data.length > MAX_BYTES) throw new Error(`File is too large (the limit is ${MAX_BYTES / 1024 / 1024} MB)`);
   if (/\.(exe|dll|sys)$/i.test(name) && data.subarray(0, 2).toString('latin1') !== 'MZ') {
@@ -66,7 +69,7 @@ function saveBinary(name, data) {
 // an expected SHA-256, when given, must match or nothing is kept.
 async function importStream(name, stream, { overwrite = false, expectedSha256 = '' } = {}) {
   if (!isSafeName(name)) throw new Error('Invalid binary name');
-  if (!collections.listCollections().some((h) => h.dependencies.includes(name))) throw new Error(`No collection requires "${name}"`);
+  if (!declaring().some((h) => h.dependencies.includes(name))) throw new Error(`No collection requires "${name}"`);
   const expected = String(expectedSha256 ?? '').trim().toLowerCase();
   if (expected && !/^[0-9a-f]{64}$/.test(expected)) throw new Error('The expected SHA-256 must be 64 hex characters');
   const dest = path.join(binariesDir, name);
@@ -100,7 +103,7 @@ function removeBinary(name) {
 
 // How many of the binaries the collections ask for have been uploaded (a count only: nothing is hashed, so it is cheap enough for the Home page).
 function summary() {
-  const declared = new Set(collections.listCollections().flatMap((h) => h.dependencies));
+  const declared = new Set(declaring().flatMap((h) => h.dependencies));
   const have = (n) => isSafeName(n) && fs.existsSync(path.join(binariesDir, n));
   const uploaded = [...declared].filter(have).length;
   return { uploaded, missing: declared.size - uploaded };

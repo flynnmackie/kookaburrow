@@ -42,7 +42,10 @@ async function loadAccess() {
     const [me, groups] = await Promise.all([api('GET', '/api/auth/me'), api('GET', '/api/permissions')]);
     access = { id: me.id, username: me.username, roles: me.roleNames, permissions: new Set(me.permissions), all: me.all, options: Object.fromEntries(groups.flatMap((g) => g.permissions).map((p) => [p.key, p])) };
   } catch { /* a 401 already redirected to the sign-in page */ }
+  setNavUser();
 }
+// "Logged in as: name", small and blue, after the Shell and Health buttons.
+function setNavUser() { const s = $('navUser'); if (s) s.innerHTML = access.username ? `Logged in as: <b>${esc(access.username)}</b>` : ''; }
 const permLabel = (key) => access.options[key]?.label || key;
 
 // The popup. `needed` is the list of labels the server sent (any one of them would have been enough).
@@ -89,12 +92,12 @@ document.addEventListener('mousedown', (e) => { const el = lockedTarget(e); if (
 
 // Which permission each page needs. The top-bar tab for an area is locked when every page in it is.
 const PAGE_PERM = {
-  'settings/user-management': 'users.view', 'settings/shell-settings': 'system.view', 'settings/health-settings': 'system.view',
+  'settings/user-management': 'users.view', 'settings/shell-settings': 'system.view', 'settings/health-settings': 'system.view', 'settings/run-settings': 'system.view',
   'settings/view-collections': 'collections.view', 'settings/add-collections': 'collections.manage', 'settings/binaries': 'collections.manage',
   'settings/view-actions': 'actions.view', 'settings/add-actions': 'actions.manage',
   'hosts/view-hosts': 'hosts.view', 'hosts/profiles': 'hosts.view', 'hosts/groups': 'hosts.view', 'hosts/discover': 'hosts.manage', 'hosts/manual': 'hosts.manage',
   'burrow/hunt': 'hunts.view', 'burrow/respond': 'actions.view', 'burrow/recurring': 'hunts.view,actions.view',
-  'output/log': 'hunts.view', 'output/report': 'hunts.view', 'output/json': 'hunts.view', 'browse/files': 'hunts.view',
+  'output/log': 'hunts.view', 'output/report': 'hunts.view', 'output/json': 'hunts.view', 'browse/files': 'hunts.view', 'browse/pinned': 'hunts.view', 'output/diff': 'hunts.view', 'output/compare': 'hunts.view', 'output/ioc': 'hunts.view', 'output/baseline': 'hunts.view',
   'shell/shell': 'shell.open', 'health/monitor': 'system.view', 'health/monitor-log': 'system.view', 'health/quarantine-log': 'system.view',
 };
 const pageAllowed = (slug) => can(PAGE_PERM[slug]);
@@ -114,7 +117,7 @@ const NAV = [
   // A third entry puts a page under a titled dropdown in the side menu (the titles are not pages).
   // { heading: 'Name' } is a titled dropdown with no pages yet.
   { id: 'settings', label: 'Settings', pages: [
-    ['user-management', 'User Management', 'System'], ['shell-settings', 'Shell Settings', 'System'], ['health-settings', 'Health Settings', 'System'],
+    ['user-management', 'User Management', 'System'], ['shell-settings', 'Shell Settings', 'System'], ['health-settings', 'Health Settings', 'System'], ['run-settings', 'Run Settings', 'System'],
     ['view-collections', 'View Collections', 'Collections'], ['add-collections', 'Add Collections', 'Collections'],
     ['view-actions', 'View Actions', 'Actions'], ['add-actions', 'Add Actions', 'Actions'],
     ['binaries', 'Upload Binaries'],
@@ -126,8 +129,11 @@ const NAV = [
   { id: 'burrow', label: 'Burrow!', accent: true, pages: [['hunt', 'Hunt'], ['respond', 'Respond'], ['recurring', 'Recurring']],
     // Hyperlink-style shortcuts under the pages: [label, slug of the page they open]
     links: [['View Collections (Hunt)', 'settings/view-collections'], ['View Actions (Respond)', 'settings/view-actions'], ['Upload Binaries', 'settings/binaries']] },
-  { id: 'output', label: 'Results', pages: [['log', 'Log'], ['report', 'Report'], ['json', 'JSON']] },
-  { id: 'browse', label: 'Browse', pages: [['files', 'Files']] },
+  { id: 'output', label: 'Results', pages: [
+    ['log', 'Activity', 'Logs'], ['json', 'JSON', 'Logs'],
+    ['report', 'Report', 'Analysis'], ['diff', 'Diff', 'Analysis'], ['compare', 'Cross-host comparison', 'Analysis'], ['ioc', 'IOC', 'Analysis'], ['baseline', 'Baseline', 'Analysis'],
+  ] },
+  { id: 'browse', label: 'Browse', pages: [['files', 'Files'], ['pinned', 'Pinned']] },
   // The logo in the header opens this landing page. It has no tab of its own and no side menu.
   { id: 'home', label: 'Home', hidden: true, pages: [['home', 'Home']] },
   // Shell and Health are placed apart on the right of the top bar.
@@ -141,7 +147,12 @@ const loaders = {
   'burrow/recurring': () => window.loadRecurring?.(),
   'output/report': () => window.loadReports?.(), // report.js loads after this file
   'burrow/respond': () => window.loadRespond?.(), // respond.js loads after this file
-  'browse/files': () => loadBrowse('/'),
+  'browse/files': () => window.bbEnter?.(), // browse.js
+  'browse/pinned': () => window.loadPins?.(),
+  'output/diff': () => window.loadDiff?.(), // browse.js
+  'output/compare': () => window.loadCompare?.(), // analysis.js
+  'output/baseline': () => window.loadBaselines?.(),
+  'output/ioc': () => window.loadIocs?.(), // iocs.js
   'home/home': loadHome,
   'shell/shell': loadShell,
   'health/monitor': loadMonitor,
@@ -149,6 +160,7 @@ const loaders = {
   'health/quarantine-log': loadQuarantineLog,
   'settings/user-management': loadUserMgmt,
   'settings/health-settings': loadHealthSettings,
+  'settings/run-settings': loadRunSettings,
   'settings/shell-settings': loadShellSettings,
   'settings/add-collections': () => addCollections(),
   'settings/add-actions': () => addActions(),
@@ -192,7 +204,7 @@ function renderSide() {
     const key = group ? `${tab.id}/${group}` : null;
     if (group && group !== last) heading(group);
     last = group || null;
-    if (key && !openGroups.has(key)) continue;
+    if (key && !openGroups.has(key) && currentSlug !== `${tab.id}/${pid}`) continue; // the page you are on always shows
     const locked = !pageAllowed(`${tab.id}/${pid}`);
     html += `<button data-tab="${tab.id}" data-page="${pid}" class="${group ? 'sub' : ''} ${currentSlug === `${tab.id}/${pid}` ? 'on' : ''} ${locked ? 'locked' : ''}"${locked ? ` title="Locked: needs ${esc(permLabel(PAGE_PERM[`${tab.id}/${pid}`]))}"` : ''}>${locked ? LOCK : ''}${esc(label)}</button>`;
   }
@@ -234,13 +246,13 @@ NAV.forEach((t, i) => {
   b.textContent = t.label; b.dataset.tab = t.id;
   if (t.id === 'shell') { // a small hosts-up / remote-up count to the left of the Shell button, on every tab; filled in by the monitor poll
     const s = document.createElement('span'); s.className = 'navstat'; s.id = 'navStats'; $('topnav').append(s);
+    const u = document.createElement('span'); u.className = 'navuser'; u.id = 'navUser'; $('topnav').append(u); setNavUser(); // "Logged in as", just left of the Shell button
   }
   if (t.accent) b.className = 'accent';
   if (t.right) b.className = `right${NAV[i - 1]?.right ? '' : ' first'}`;
   b.onclick = () => go(t.id);
   $('topnav').append(b);
-});
-$('sidenav').onclick = (e) => {
+});$('sidenav').onclick = (e) => {
   const fold = e.target.closest('[data-shfold]');
   if (fold) { const g = fold.dataset.shfold; if (shellFolded.has(g)) shellFolded.delete(g); else shellFolded.add(g); renderShellList(); return; }
   const sh = e.target.closest('button[data-shell-host]');
@@ -530,9 +542,10 @@ function renderHosts() {
     <td class="hname" data-hname="${esc(h.id)}">${esc(h.name)} <a class="hren" data-rename="${esc(h.id)}" data-perm="hosts.manage" data-perm-what="rename hosts" title="Rename this host. Leave the name empty to go back to the discovered name">Rename</a></td><td>${esc(h.address)}</td><td class="${pc}" title="${esc(h.os)}">${esc(String(h.os || '').replace(/^Microsoft /, '').replace(/\s*\(\d[\d.]*\)$/, ''))}</td><td class="${pc}">${h.protocol === 'ssh' ? 'SSH' : 'WinRM'}</td>
     <td class="dim" title="The credential profile this host was authenticated with">${esc(h.profileName || '-')}</td>
     <td class="${rc.up ? 'ok' : 'bad'}" data-lastver="${esc(h.id)}">${fmtVerified(rc.at)}</td>
+    <td><button class="act sec" type="button" data-details="${esc(h.id)}" title="History and details of this host">Details</button></td>
     <td>${groupCell(h)}</td>
     <td><a data-del-host="${h.id}" data-perm="hosts.manage" data-perm-what="delete hosts">Delete</a></td></tr>`;
-  }).join('') || `<tr><td colspan="10" class="dim">${hosts.length ? 'No hosts match' : 'No hosts saved'}</td></tr>`;
+  }).join('') || `<tr><td colspan="11" class="dim">${hosts.length ? 'No hosts match' : 'No hosts saved'}</td></tr>`;
 
   $('groupBox').innerHTML = groupsHtml(hosts, lists);
   paintHostDots();
@@ -584,6 +597,8 @@ $('groupBox').onclick = foldGroup;
 $('hosts/view-hosts').onclick = async (e) => {
   const rn = e.target.closest('[data-rename]');
   if (rn) { hostRenameStart(rn.dataset.rename); return; }
+  const dt = e.target.closest('[data-details]');
+  if (dt) { window.openHostDetail?.(dt.dataset.details); return; }
   const m = e.target.closest('[data-manage]');
   if (m) { gmHost = m.dataset.manage; renderGroupsModal(); $('groupsModal').hidden = false; $('gmDone').focus(); return; }
   if (e.target.dataset.delHost) { await api('DELETE', `/api/hosts/${e.target.dataset.delHost}`); loadHosts(); return; }
@@ -1210,9 +1225,52 @@ const fmtDur = (ms) => {
 };
 const huntElapsed = (r) => fmtDur((r.finishedAt ? new Date(r.finishedAt) : Date.now()) - new Date(r.startedAt));
 const huntStatus = (r) => {
-  const text = r.status.replaceAll('_', ' ');
-  return `<span class="${r.status === 'completed' ? 'ok' : r.status === 'running' ? 'st-run' : r.status === 'completed_with_errors' ? 'st-warn' : 'bad'}">${esc(text[0].toUpperCase() + text.slice(1))}</span>`;
+  const cancelling = r.status === 'running' && r.cancelRequested;
+  const text = cancelling ? 'cancelling…' : r.status.replaceAll('_', ' ');
+  return `<span class="${r.status === 'completed' ? 'ok' : cancelling || r.status === 'completed_with_errors' || r.status === 'cancelled' ? 'st-warn' : r.status === 'running' ? 'st-run' : 'bad'}">${esc(text[0].toUpperCase() + text.slice(1))}</span>`;
 };
+// Progress of a hunt or response host by host: a bar of finished / total per host, what it is working on now and how long it has taken.
+// Works for a run in progress (refreshed every 2 s with the list) and for one that has finished.
+function hostProgressHtml(r, isHunt) {
+  const nameKey = isHunt ? 'collectionName' : 'actionName', noun = isHunt ? 'collection' : 'action';
+  const hosts = new Map();
+  for (const x of r.results) { if (!hosts.has(x.hostId)) hosts.set(x.hostId, { label: x.hostLabel, address: x.address, items: [] }); hosts.get(x.hostId).items.push(x); }
+  const isDone = (x) => x.status === 'ok' || x.status === 'error' || x.status === 'cancelled';
+  const n = (list, s) => list.filter((x) => x.status === s).length;
+  const bar = (list) => {
+    const t = list.length || 1, seg = (s, cls) => (n(list, s) ? `<i class="${cls}" style="width:${(n(list, s) / t) * 100}%"></i>` : '');
+    return `<span class="pbar">${seg('ok', 'ok')}${seg('error', 'bad')}${seg('cancelled', 'can')}${seg('running', 'run')}</span>`;
+  };
+  const rows = [...hosts.values()].map((h) => {
+    const list = h.items, done = list.filter(isDone).length, running = list.find((x) => x.status === 'running');
+    const starts = list.map((x) => x.startedAt).filter(Boolean).sort(), ends = list.filter(isDone).map((x) => x.finishedAt).filter(Boolean).sort();
+    const finished = done === list.length;
+    const el = starts.length ? fmtDur((finished && ends.length ? new Date(ends[ends.length - 1]) : Date.now()) - new Date(starts[0])) : '';
+    let state;
+    if (running) {
+      const t = running.transfer;
+      state = running.waiting ? '<span class="st-warn">Waiting</span> <span class="dim">for a free file-transfer slot</span>' : `<span class="st-run">Running</span> <span class="dim">${esc(running[nameKey] || '')}${t && t.total ? ` · pulling files ${bbFmt(t.bytes)} of ${bbFmt(t.total)}` : ''}</span>`;
+    } else if (!finished) state = '<span class="dim">Waiting</span>';
+    else {
+      const bad = n(list, 'error'), can = n(list, 'cancelled');
+      state = can ? `<span class="st-warn">Cancelled</span> <span class="dim">${can} not finished${bad ? `, ${bad} failed` : ''}</span>` : bad ? `<span class="bad">${bad} failed</span>` : '<span class="ok">Done</span>';
+    }
+    return `<tr><td>${esc(h.label || h.address)}${h.label && h.label !== h.address ? ` <span class="dim">${esc(h.address)}</span>` : ''}</td><td>${bar(list)}</td><td class="num dim">${done}/${list.length}</td><td>${state}</td><td class="num dim">${esc(el)}</td></tr>`;
+  }).join('');
+  const total = r.results.length, done = r.results.filter(isDone).length, hostsDone = [...hosts.values()].filter((h) => h.items.every(isDone)).length;
+  return `<div class="hd-label">Progress by host</div>
+    <div class="pall">${bar(r.results)}<span>${done} of ${total} ${noun} run${total === 1 ? '' : 's'} finished · ${hostsDone} of ${hosts.size} host${hosts.size === 1 ? '' : 's'} done</span>${r.status === 'running' && !r.cancelRequested ? `<a class="act sec bad" data-cancel="${esc(r.id)}" data-perm="${isHunt ? 'hunts.run' : 'actions.run'}" data-perm-what="cancel ${isHunt ? 'hunts' : 'responses'}" title="Stop this ${isHunt ? 'hunt' : 'response'}">Cancel ${isHunt ? 'hunt' : 'response'}</a>` : r.status === 'running' ? '<span class="st-warn">Cancelling…</span>' : ''}</div>
+    <table class="bh"><thead><tr><th>Host</th><th style="width:34%">Progress</th><th class="num">Done</th><th>Now</th><th class="num">Elapsed</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+// Cancels a running hunt or response after a warning. A response changes hosts, so its warning is stronger and the server asks for the confirmation too.
+async function cancelRunUi(r, isHunt) {
+  const name = huntName(r);
+  const msg = isHunt
+    ? `Cancel the hunt "${name}"?\n\nThe host being worked on is cut off and collections that have not started are skipped. What was already collected is kept.`
+    : `WARNING: cancel the response "${name}"?\n\nActions CHANGE the hosts they run on. Cancelling cuts the connection to the host that is being worked on part-way through, so its action may have changed that host partly or completely, and it may even finish on its own on the host. Actions that have not started are skipped.\n\nAfter cancelling, check the affected hosts (the response log says which action was cut off).\n\nCancel this response?`;
+  if (!confirm(msg)) return false;
+  try { await api('POST', isHunt ? `/api/runs/${r.id}/cancel` : `/api/responses/${r.id}/cancel`, isHunt ? {} : { confirm: true }); toast('Cancelling…'); return true; } catch (e) { toast(e.message); return false; }
+}
 const huntName = (r) => r.name || r.collectionName || 'Hunt';
 
 async function loadBurrowHunts() {
@@ -1231,7 +1289,7 @@ function renderHuntList() {
   $('bhList').innerHTML = bh.runs.length
     ? `<table class="bh"><thead><tr><th>Hunt</th><th>Run by</th><th>Status</th><th>Started</th><th>Finished</th><th>Elapsed</th><th></th></tr></thead><tbody>${bh.runs.map((r) => `<tr class="bh-row ${r.id === bh.sel ? 'on' : ''}" data-id="${esc(r.id)}">
         <td class="bh-name">${esc(huntName(r))}${schedTag(r)}</td><td>${r.startedBy ? esc(r.startedBy) : '<span class="dim">-</span>'}</td><td>${huntStatus(r)}</td>
-        <td class="dim">${esc(new Date(r.startedAt).toLocaleString())}</td><td class="dim">${r.finishedAt ? esc(new Date(r.finishedAt).toLocaleString()) : '-'}</td><td class="dim">${esc(huntElapsed(r))}</td><td class="bh-del"><a class="dl bad" data-del="${esc(r.id)}" data-perm="hunts.run" data-perm-what="delete hunts" title="Delete this hunt and its output folder">Delete</a></td></tr>`).join('')}</tbody></table>`
+        <td class="dim">${esc(new Date(r.startedAt).toLocaleString())}</td><td class="dim">${r.finishedAt ? esc(new Date(r.finishedAt).toLocaleString()) : '-'}</td><td class="dim">${esc(huntElapsed(r))}</td><td class="bh-del">${r.status === 'running' && !r.cancelRequested ? `<a class="dl bad" data-cancel="${esc(r.id)}" data-perm="hunts.run" data-perm-what="cancel hunts" title="Stop this run">Cancel</a> ` : ''}<a class="dl bad" data-del="${esc(r.id)}" data-perm="hunts.run" data-perm-what="delete hunts" title="Delete this hunt and its output folder">Delete</a></td></tr>`).join('')}</tbody></table>`
     : '<p class="dim" style="margin:0">No hunts yet. Use New Hunt to run collections against your hosts.</p>';
 }
 // A collection or action that needs a binary that has not been uploaded cannot be picked: clicking it says what is missing.
@@ -1297,6 +1355,7 @@ function bdRender({ kind, r, events, files, tab, notebook }) {
     pane = `<div class="bd-facts"><div><span>Status</span>${huntStatus(r)}</div><div><span>Run by</span>${r.startedBy ? esc(r.startedBy) : '-'}</div><div><span>Started</span>${esc(new Date(r.startedAt).toLocaleString())}</div>
       <div><span>Finished</span>${r.finishedAt ? esc(new Date(r.finishedAt).toLocaleString()) : '-'}</div><div><span>Elapsed</span>${esc(huntElapsed(r))}</div><div><span>Hosts</span>${hosts}</div></div>
     ${r.error ? `<div class="hd-unmet">${esc(r.error)}</div>` : ''}
+    ${hostProgressHtml(r, isHunt)}
     <div class="hd-label">${isHunt ? 'Collections' : 'Actions'} run</div>
     <table class="bh"><thead><tr><th>${isHunt ? 'Collection' : 'Action'}</th>${isHunt ? '' : '<th>Parameters</th>'}<th>Result on each host</th>${isHunt ? '<th class="num">Rows</th>' : ''}</tr></thead><tbody>${rows || '<tr><td colspan="3" class="dim">None</td></tr>'}</tbody></table>
     <div class="hd-label">Error log <span class="dim">(${problems.length})</span></div>
@@ -1316,6 +1375,8 @@ async function showHunt(id) {
   if (keep) box.querySelector('.bd-json').scrollTop = keep; // the running-hunt refresh does not jump back to the top
 }
 $('bhList').onclick = async (e) => {
+  const can = e.target.closest('[data-cancel]');
+  if (can) { const r = bh.runs.find((x) => x.id === can.dataset.cancel); if (r && await cancelRunUi(r, true)) loadBurrowHunts(); return; }
   const del = e.target.closest('[data-del]');
   if (del) {
     const r = bh.runs.find((x) => x.id === del.dataset.del);
@@ -1324,7 +1385,9 @@ $('bhList').onclick = async (e) => {
   }
   const tr = e.target.closest('.bh-row'); if (tr) showHunt(tr.dataset.id);
 };
-$('bhDetail').onclick = (e) => {
+$('bhDetail').onclick = async (e) => {
+  const can = e.target.closest('[data-cancel]');
+  if (can) { const r = bh.runs.find((x) => x.id === can.dataset.cancel); if (r && await cancelRunUi(r, true)) loadBurrowHunts(); return; }
   const t = e.target.closest('[data-bdtab]');
   if (t) { bh.tab = t.dataset.bdtab; showHunt(bh.sel); return; }
   const p = e.target.dataset.evidence; if (!p) return;
@@ -1644,57 +1707,8 @@ hmEl('Run').onclick = async () => {
   hmEl('Run').disabled = false;
 };
 
-// ---- Browse ----
-// A read-only file view over collections, actions, binaries and what hunts and responses brought back. Click a folder to open
-// it, click a file to preview it on the right.
-const bb = { path: '/', entries: [], open: null };
+// ---- Browse ---- (the Files and Diff pages are in browse.js)
 const bbFmt = (n) => (n == null ? '' : n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1048576).toFixed(1)} MB`);
-const bbIcon = (dir) => dir
-  ? '<svg class="ico" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M1.5 3.5h4.2l1.3 1.5h7.5v7.5h-13z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>'
-  : '<svg class="ico" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M3.5 1.5h6l3 3v10h-9z M9.5 1.5v3h3" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>';
-async function loadBrowse(path) {
-  if (typeof path === 'string') { bb.path = path; bb.open = null; }
-  try {
-    const r = await api('GET', `/api/browse?path=${encodeURIComponent(bb.path)}`);
-    bb.entries = r.entries;
-  } catch (e) { $('bbList').innerHTML = `<p class="bad">${esc(e.message)}</p>`; return; }
-  renderBrowse();
-  if (!bb.open) $('bbPreview').innerHTML = '<p class="dim">Select a file to preview it.</p>';
-}
-function renderBrowse() {
-  const segs = bb.path.split('/').filter(Boolean);
-  let acc = '';
-  $('bbCrumbs').innerHTML = `<a data-path="/">Browse</a>` + segs.map((s) => { acc += '/' + s; return ` <span class="sep">/</span> <a data-path="${esc(acc)}">${esc(s)}</a>`; }).join('');
-  const top = bb.path === '/';
-  // The button at the top right downloads what is being viewed: the open file as it is, otherwise the folder as a zip (nothing at the
-  // top level, which is only the list of locations).
-  const dlBtn = $('bbZip');
-  dlBtn.hidden = top;
-  if (!top && bb.open) { dlBtn.textContent = 'Download'; dlBtn.href = `/api/browse/download?path=${encodeURIComponent(bb.path + '/' + bb.open)}`; }
-  else if (!top) { dlBtn.textContent = 'Download folder (zip)'; dlBtn.href = `/api/browse/download?folder=1&path=${encodeURIComponent(bb.path)}`; }
-  const rows = bb.entries.map((e) => `<tr class="bb-row" data-name="${esc(e.name)}" data-dir="${e.dir ? 1 : 0}">
-      <td class="bb-name">${bbIcon(e.dir)}<span>${esc(e.label || e.name)}</span>${e.desc ? `<span class="bb-desc">${esc(e.desc)}</span>` : ''}</td>
-      <td class="dim">${e.dir ? `${e.count} item${e.count === 1 ? '' : 's'}` : bbFmt(e.size)}</td>
-      <td class="dim">${top || !e.modified ? '' : esc(new Date(e.modified).toLocaleString())}</td></tr>`).join('');
-  $('bbList').innerHTML = `<table><thead><tr><th>Name</th><th>${top ? 'Contents' : 'Size / items'}</th><th>${top ? '' : 'Modified'}</th></tr></thead><tbody>${rows || '<tr><td colspan="3" class="dim">This folder is empty.</td></tr>'}</tbody></table>`;
-  document.querySelectorAll('#bbList .bb-row').forEach((tr) => tr.classList.toggle('on', tr.dataset.dir === '0' && tr.dataset.name === bb.open));
-}
-$('bbCrumbs').onclick = (e) => { const p = e.target.dataset.path; if (p) loadBrowse(p); };
-$('bbList').onclick = async (e) => {
-  const tr = e.target.closest('.bb-row'); if (!tr) return;
-  const full = (bb.path === '/' ? '' : bb.path) + '/' + tr.dataset.name;
-  if (tr.dataset.dir === '1') { loadBrowse(full); return; }
-  bb.open = tr.dataset.name;
-  renderBrowse();
-  try {
-    const f = await api('GET', `/api/browse/file?path=${encodeURIComponent(full)}`);
-    if (bb.open !== tr.dataset.name) return;
-    const ext = f.name.slice(f.name.lastIndexOf('.') + 1).toLowerCase();
-    const body = f.binary ? `<p class="dim">Binary file (${bbFmt(f.size)}); no preview. Use Download to save it.</p>`
-      : `<pre class="code">${ext === 'ps1' ? highlight(f.text, 'powershell') : ext === 'sh' ? highlight(f.text, 'bash') : ext === 'json' ? highlightJson(f.text) : esc(f.text)}</pre>${f.truncated ? `<p class="dim" style="margin-top:6px">Showing the first 512 KB of ${bbFmt(f.size)}.</p>` : ''}`;
-    $('bbPreview').innerHTML = `<div class="bb-head"><div><div class="bb-title">${esc(f.name)}</div><div class="hd-file">${esc(f.path)} · ${bbFmt(f.size)} · ${esc(new Date(f.modified).toLocaleString())}</div></div></div>${body}`;
-  } catch (err) { $('bbPreview').innerHTML = `<p class="bad">${esc(err.message)}</p>`; }
-};
 
 // ---- Settings: User Management ----
 // Two tabs. Users: click a user to see (and, with Manage roles, change) their roles and the permissions those give them, or
@@ -1729,16 +1743,17 @@ function umPerms(granted, tip, editable = false) {
         const why = !editable ? tip : !umGrantable(p.key) ? "You can't grant a permission you don't have" : '';
         const inc = umIncluded(p.key);
         return `<label class="um-perm ${off ? '' : 'um-on'}" title="${esc(why)}"><input type="checkbox" data-pk="${esc(p.key)}" ${off ? 'disabled' : ''} ${granted.has(p.key) ? 'checked' : ''}>
-        <span><b>${esc(p.label)}</b> <span class="dim">${esc(p.desc)}</span>${inc.length ? `<span class="um-inc">Includes: ${inc.map((k) => esc(umInfo[k].label)).join(', ')}</span>` : ''}</span></label>`;
+        <span><b>${esc(p.label)}</b><span class="um-inc">${esc(p.desc)}</span>${inc.length ? `<span class="um-inc">Includes: ${inc.map((k) => esc(umInfo[k].label)).join(', ')}</span>` : ''}</span></label>`;
       }).join('')}</div></div>`;
   }).join('');
 }
 // Brings the tick boxes and the per-area counts in line with the draft without re-drawing the form.
 function umRefreshTicks() {
-  $('umDetail').querySelectorAll('input[data-pk]').forEach((i) => { i.checked = um.draft.has(i.dataset.pk); });
+  const root = um.mode === 'new' ? $('umModalBody') : $('umDetail');
+  root.querySelectorAll('input[data-pk]').forEach((i) => { i.checked = um.draft.has(i.dataset.pk); });
   for (const g of um.groups) {
     const have = g.permissions.filter((p) => um.draft.has(p.key)).length;
-    const c = $('umDetail').querySelector(`[data-gcount="${g.id}"]`), h = $('umDetail').querySelector(`[data-ghead="${g.id}"]`);
+    const c = root.querySelector(`[data-gcount="${g.id}"]`), h = root.querySelector(`[data-ghead="${g.id}"]`);
     if (c) c.textContent = `${have}/${g.permissions.length}`;
     if (h) h.checked = have === g.permissions.length;
   }
@@ -1750,6 +1765,7 @@ function renderUserMgmt() {
   const users = um.tab === 'users', items = users ? um.users : um.roles, sel = items.find((x) => x.id === um.sel[um.tab]);
   const nb = $('umNew');
   nb.textContent = users ? 'New user' : 'New role';
+  $('umListTitle').textContent = users ? 'Users:' : 'Roles:';
   nb.dataset.perm = users ? 'users.manage' : 'roles.manage';
   nb.dataset.permWhat = users ? 'create users' : 'create roles';
   nb.classList.toggle('on', um.mode === 'new');
@@ -1759,7 +1775,8 @@ function renderUserMgmt() {
       <div class="um-sub">${users ? (x.roles.length ? x.roles.map((r) => umChip(um.roles.find((q) => q.id === r)?.name || r)).join('') : '<span class="dim">No roles</span>')
         : `${x.members.length} member${x.members.length === 1 ? '' : 's'} · ${x.all ? 'full access' : `${x.permissions.length} permissions`}`}</div></div>`).join('')
     || `<p class="dim" style="margin:6px 10px">No ${um.tab} yet.</p>`;
-  if (um.mode === 'new') return users ? renderNewUser() : renderRoleForm(null);
+  $('umModal').hidden = um.mode !== 'new';
+  if (um.mode === 'new') { $('umDetail').innerHTML = ''; $('umModalTitle').textContent = users ? 'New user' : 'New role'; return users ? renderNewUser() : renderRoleForm(null); }
   if (!sel) { $('umDetail').innerHTML = ''; return; }
   if (users) renderUserDetail(sel); else if (sel.builtin) renderBuiltinRole(sel); else renderRoleForm(sel);
 }
@@ -1770,14 +1787,13 @@ function umRoleBoxes(draft, locked) {
     const has = draft.has(r.id), manage = can('roles.manage');
     const off = locked || !manage || (!has && !umRoleGrantable(r));
     const why = locked ? 'Locked: an admin keeps every role' : !manage ? 'Changing roles needs Manage roles' : !has && !umRoleGrantable(r) ? "You can't grant permissions you don't have" : '';
-    return `<label class="um-perm ${off ? '' : 'um-on'}" title="${esc(why)}"><input type="checkbox" data-rid="${esc(r.id)}" ${off ? 'disabled' : ''} ${has ? 'checked' : ''}> <b>${esc(r.name)}</b> <span class="dim">${esc(r.description)}</span></label>`;
+    return `<label class="um-perm ${off ? '' : 'um-on'}" title="${esc(why)}"><input type="checkbox" data-rid="${esc(r.id)}" ${off ? 'disabled' : ''} ${has ? 'checked' : ''}><span><b>${esc(r.name)}</b><span class="um-inc">${esc(r.description)}</span></span></label>`;
   }).join('');
 }
 
 function renderNewUser() {
   um.draft = um.draft || new Set();
-  $('umDetail').innerHTML = `<div class="um-title">New user</div>
-    <div class="dim" style="margin-bottom:8px">The new user signs in with this username and password.</div>
+  $('umModalBody').innerHTML = `<div class="dim" style="margin-bottom:8px; text-align:center">The new user signs in with this username and password.</div>
     <span class="fl">Username</span><input id="umUser" type="text" autocomplete="off" spellcheck="false" placeholder="e.g. jsmith">
     <span class="fl">Password <span class="dim">(at least 8 characters)</span></span><input id="umPass" type="password" autocomplete="new-password">
     <div class="hd-label hd-label-dep">Roles</div>
@@ -1807,15 +1823,14 @@ function renderBuiltinRole(sel) {
     <div class="hd-label hd-label-dep">Members</div>
     <div class="um-chips">${sel.members.length ? sel.members.map((m) => umChip(m)).join('') : '<span class="dim">No members</span>'}</div>
     <div class="hd-label hd-label-dep">Permissions</div>
-    <label class="um-perm um-master" title="Locked: the admin role has every permission"><input type="checkbox" disabled checked> <b>Full access to everything</b> <span class="dim">including permissions added in future</span></label>
+    <label class="um-perm um-master" title="Locked: the admin role has every permission"><input type="checkbox" disabled checked><span><b>Full access to everything</b><span class="um-inc">including permissions added in future</span></span></label>
     ${umPerms(new Set(sel.permissions), 'Locked: the admin role has every permission')}`;
 }
 // New role (sel is null) or an existing custom role.
 function renderRoleForm(sel) {
   um.draft = um.draft || new Set(sel ? sel.permissions : []);
   const manage = can('roles.manage');
-  $('umDetail').innerHTML = `<div class="um-title">${sel ? esc(sel.name) : 'New role'}</div>
-    ${sel ? '' : '<div class="dim" style="margin-bottom:8px">Choose what people with this role can do.</div>'}
+  (sel ? $('umDetail') : $('umModalBody')).innerHTML = `${sel ? `<div class="um-title">${esc(sel.name)}</div>` : '<div class="dim" style="margin-bottom:8px; text-align:center">Choose what people with this role can do.</div>'}
     ${sel ? '' : '<span class="fl">Name</span><input id="umRoleName" type="text" autocomplete="off" spellcheck="false" placeholder="e.g. analyst">'}
     <span class="fl">Description</span><input id="umRoleDesc" type="text" autocomplete="off" maxlength="200" placeholder="What this role is for" value="${esc(sel ? sel.description : '')}">
     ${sel ? `<div class="hd-label hd-label-dep">Members</div><div class="um-chips">${sel.members.length ? sel.members.map((m) => umChip(m)).join('') : '<span class="dim">No members</span>'}</div>` : ''}
@@ -1866,8 +1881,12 @@ async function umAct(act) {
 $('umTabs').onclick = (e) => { if (e.target.dataset.t) { um.tab = e.target.dataset.t; um.mode = 'view'; um.draft = null; renderUserMgmt(); } };
 $('umNew').onclick = () => { um.mode = 'new'; um.draft = null; renderUserMgmt(); };
 $('umList').onclick = (e) => { const it = e.target.closest('.um-item'); if (it) { um.sel[um.tab] = it.dataset.id; um.mode = 'view'; um.draft = null; renderUserMgmt(); } };
-$('umDetail').onclick = (e) => { const b = e.target.closest('[data-uma]'); if (b) umAct(b.dataset.uma); };
-$('umDetail').onchange = (e) => {
+$('umDetail').onclick = $('umModalBody').onclick = (e) => { const b = e.target.closest('[data-uma]'); if (b) umAct(b.dataset.uma); };
+const umCancelNew = () => { if (um.mode === 'new') { um.mode = 'view'; um.draft = null; renderUserMgmt(); } };
+$('umModalX').onclick = umCancelNew;
+$('umModal').onclick = (e) => { if (e.target.id === 'umModal') umCancelNew(); };
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('umModal').hidden) umCancelNew(); });
+$('umDetail').onchange = $('umModalBody').onchange = (e) => {
   const t = e.target;
   if (t.dataset.rid) { t.checked ? um.draft.add(t.dataset.rid) : um.draft.delete(t.dataset.rid); return; }
   if (!t.dataset.pk) return;
@@ -2037,6 +2056,51 @@ $('ssSave').onclick = async () => {
     await api('PUT', '/api/settings/shell', { hostMode: ss.mode, allowedHosts: [...ss.allowed], maxSessions: Number($('ssMax').value), timeoutMinutes: Number($('ssTimeout').value) });
     toast('Shell settings saved'); loadShellSettings();
   } catch (e) { $('ssMsg').textContent = e.message; $('ssMsg').className = 'um-msg bad'; }
+};
+
+// ---- Run Settings: how many hosts a hunt or response works on at once ----
+const rs = { defaults: null, limits: null, server: null };
+// How the number typed compares with what this server can take: { level: 'ok' | 'warn' | 'bad', text } or null when it is not a valid number.
+function rsAdvice(key, n) {
+  const sv = rs.server, rec = sv.recommended, gb = (x) => (x >= 10 ? Math.round(x) : x.toFixed(1));
+  if (key === 'concurrency') {
+    const mem = (n * sv.perHostMb) / 1024, memTxt = `about ${gb(mem)} GB of memory for the PowerShell sessions`;
+    if (n <= rec.concurrency) return { level: 'ok', text: `Within what this server handles comfortably (up to ${rec.concurrency}); ${memTxt}.` };
+    if (n <= rec.caution) return { level: 'warn', text: `Above the recommended ${rec.concurrency} for ${sv.cores} cores and ${gb(sv.ramGb)} GB: hunts will finish sooner but the server may slow down while sessions start; ${memTxt}.` };
+    return { level: 'bad', text: `Too high for ${sv.cores} cores and ${gb(sv.ramGb)} GB (above ${rec.caution}): expect a slow server, timeouts on hosts and possible memory shortage; ${memTxt}. Recommended: ${rec.concurrency}.` };
+  }
+  const base = n <= rec.largeConcurrency ? { level: 'ok', text: `Fine for this server (recommended up to ${rec.largeConcurrency}).` }
+    : n <= rec.largeConcurrency * 2 ? { level: 'warn', text: `Above the recommended ${rec.largeConcurrency}: transfers are limited by disk and network, so each one will be slower, and large collections can be several GB each.` }
+    : { level: 'bad', text: `Far above the recommended ${rec.largeConcurrency}: the disk and network will be saturated and transfers may time out.` };
+  if (sv.freeDiskGb != null && n > 1 && sv.freeDiskGb < 20 * n) { base.text += ` Free disk space for results is ${sv.freeDiskGb} GB, which may not be enough for ${n} large collections at once.`; if (base.level === 'ok') base.level = 'warn'; }
+  return base;
+}
+function rsHints() {
+  const chk = (id, key) => {
+    const n = Number($(id).value), [lo, hi] = rs.limits[key], bad = !Number.isInteger(n) || n < lo || n > hi;
+    $(id + 'Hint').textContent = bad ? `Must be a whole number from ${lo} to ${hi}` : `default ${rs.defaults[key]}, up to ${hi}`; $(id + 'Hint').className = bad ? 'bad' : 'dim';
+    const adv = bad ? null : rsAdvice(key, n), box = $(id + 'Advice');
+    box.hidden = !adv; if (adv) { box.className = `rs-adv ${adv.level}`; box.textContent = (adv.level === 'ok' ? '\u2713 ' : '\u26A0 ') + adv.text; }
+  };
+  chk('rsHosts', 'concurrency'); chk('rsLarge', 'largeConcurrency');
+  const sv = rs.server;
+  $('rsServer').textContent = `This server: ${sv.cores} CPU cores, ${sv.ramGb} GB RAM (${sv.freeRamGb} GB free now)${sv.freeDiskGb != null ? `, ${sv.freeDiskGb} GB free where results are kept` : ''}. Recommended: ${sv.recommended.concurrency} hosts at once and ${sv.recommended.largeConcurrency} large transfers.`;
+}
+async function loadRunSettings() {
+  let r;
+  try { r = await api('GET', '/api/settings/runs'); } catch (e) { $('rsMsg').textContent = e.message; $('rsMsg').className = 'um-msg bad'; return; }
+  rs.defaults = r.defaults; rs.limits = r.limits; rs.server = r.server;
+  $('rsHosts').value = r.settings.concurrency; $('rsLarge').value = r.settings.largeConcurrency;
+  $('rsHosts').disabled = $('rsLarge').disabled = !can('system.manage');
+  $('rsMsg').textContent = ''; rsHints();
+}
+$('rsHosts').oninput = $('rsLarge').oninput = rsHints;
+$('rsDefaults').onclick = () => { $('rsHosts').value = rs.defaults.concurrency; $('rsLarge').value = rs.defaults.largeConcurrency; rsHints(); $('rsMsg').textContent = 'Defaults restored. Press Save to apply them.'; $('rsMsg').className = 'um-msg dim'; };
+$('rsSave').onclick = async () => {
+  const risky = [['rsHosts', 'concurrency'], ['rsLarge', 'largeConcurrency']].map(([id, k]) => [Number($(id).value), k]).filter(([n, k]) => Number.isInteger(n) && rsAdvice(k, n).level === 'bad');
+  if (risky.length && !confirm(`These settings are well above what this server (${rs.server.cores} cores, ${rs.server.ramGb} GB RAM) can handle:\n\n${risky.map(([n, k]) => rsAdvice(k, n).text).join('\n\n')}\n\nSave them anyway?`)) return;
+  try { await api('PUT', '/api/settings/runs', { concurrency: Number($('rsHosts').value), largeConcurrency: Number($('rsLarge').value) }); toast('Run settings saved'); loadRunSettings(); }
+  catch (e) { $('rsMsg').textContent = e.message; $('rsMsg').className = 'um-msg bad'; }
 };
 
 // ---- Health: monitor ----
@@ -2490,6 +2554,7 @@ async function loadHome() {
       ['IP addresses', a.addresses.length ? a.addresses.slice(0, 4).map(esc).join('<br>') : '<span class="dim">none found</span>'],
       ['Version', esc(a.version)],
       ['Runtime', `Node ${esc(a.node)}`],
+      ['WinRM engine', esc(a.winrm)],
       ['System', esc(a.os)],
       ['Uptime', fmtUptime(a.uptimeSec)],
       ['Storage', a.storage ? `${fmtBytes(a.storage.used)} used / ${fmtBytes(a.storage.free)} available` : '<span class="dim">unknown</span>'],
@@ -2589,7 +2654,7 @@ async function loadBinaries() {
   const list = await api('GET', '/api/binaries');
   $('binTable').tBodies[0].innerHTML = list.map((b) => `<tr class="${b.present ? 'ready' : 'missing'}">
     <td><b>${esc(b.name)}</b></td>
-    <td>${b.usedBy.map((h) => esc(h.name)).join('<br>') || '<span class="dim">No collection uses this</span>'}</td>
+    <td>${b.usedBy.map((h) => esc(h.name)).join('<br>') || '<span class="dim">Nothing uses this</span>'}</td>
     <td><div class="binfield" title="${b.present ? `SHA-256 ${esc(b.sha256)}` : ''}">${b.present
       ? `${esc(b.name)} <span class="dim" style="margin-left:8px">${fmtSize(b.size)} · ${esc(b.sha256.slice(0, 12))}…</span>`
       : 'No file uploaded'}</div></td>

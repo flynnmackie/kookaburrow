@@ -6,6 +6,9 @@ data/
 binaries/*
 !binaries/.gitkeep
 
+# The bundled WinRM engine (private Python + pypsrp), built by: npm run setup-winrm
+vendor/
+
 # What hunts and responses brought back
 output/
 evidence/

@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { outputDir } = require('./config');
-const { runDir } = require('./output');
+const { runDir, parseCsv } = require('./output');
 
 // Builds the HTML report for one hunt or response (Results > Report). One self-contained page, no external files, in the layout of the
 // Windows baseline reports: a title block, a sticky search bar, a section list down the left and one section per collection (or
@@ -24,6 +24,58 @@ function dataOf(run) {
 
 // hosts (optional) is the address each row belongs to, so the host filter at the top of the report can show or hide it.
 const table = (cols, rows, cls = 'dfir', hosts = null) => `<div class='tablewrap'><table class='${cls}'><thead><tr>${cols.map((c) => `<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${rows.map((r, i) => `<tr${hosts && hosts[i] != null ? ` data-host='${esc(hosts[i])}'` : ''}>${r.map((v) => `<td>${esc(v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+
+const ART_ROWS = 100; // rows of each artefact shown per host; the CSV in the output folder has all of them
+function artefactSections(run, hostName) {
+  const base = runDir(run);
+  if (!base || run.kind === 'response') return [];
+  const perHost = []; // { address, summary: [{ cat }], dir }
+  for (const r of run.results) {
+    if (!r.rawPath || perHost.some((h) => h.address === r.address)) continue;
+    const dir = path.resolve(base, r.rawPath);
+    if (!dir.startsWith(path.resolve(base) + path.sep)) continue;
+    let table;
+    try { table = parseCsv(fs.readFileSync(path.join(dir, 'summary.csv'), 'utf8')); } catch { continue; }
+    if (table.length < 2) continue;
+    const head = table[0], idx = (n) => head.indexOf(n);
+    if (idx('Category') < 0 || idx('Id') < 0) continue;
+    const rows = table.slice(1).map((c) => Object.fromEntries(head.map((h, i) => [h, c[i] ?? '']))).filter((x) => x.Id);
+    perHost.push({ address: r.address, dir, rows });
+  }
+  if (!perHost.length) return [];
+  const cats = [], seen = new Set();
+  for (const h of perHost) for (const x of h.rows) if (!seen.has(x.Id)) { seen.add(x.Id); cats.push({ id: x.Id, title: x.Category }); }
+  const out = [];
+  for (const cat of cats) {
+    let total = 0, bad = false, html = '';
+    const status = [], data = [];
+    for (const h of perHost) {
+      const x = h.rows.find((r) => r.Id === cat.id);
+      if (!x) continue;
+      total += Number(x.Records) || 0;
+      if (x.Status === 'error') bad = true;
+      status.push([hostName.get(h.address) || h.address, h.address, x.Status, x.Records, `${x.Seconds}s`, x.Columns || '', x.Notes || '']);
+      if (x.File) {
+        try {
+          const t = parseCsv(fs.readFileSync(path.join(h.dir, path.basename(x.File)), 'utf8'));
+          if (t.length > 1) data.push({ address: h.address, head: t[0], rows: t.slice(1), shown: Math.min(ART_ROWS, t.length - 1) });
+        } catch { /* the file was not pulled: the status row says so */ }
+      }
+    }
+    html += `<p class='desc'>What the baseline captured for this artefact on each host: how many records, whether it worked, how long it took and anything it could not read.</p>`;
+    html += table(['Host', 'Address', 'Status', 'Records', 'Time', 'Columns', 'Notes'], status, 'dfir', status.map((s) => s[1]));
+    if (data.length) {
+      const cols = [...new Set(data.flatMap((d) => d.head))];
+      const rows = [], owners = [];
+      for (const d of data) for (const r of d.rows.slice(0, ART_ROWS)) { rows.push([hostName.get(d.address) || d.address, ...cols.map((c) => { const i = d.head.indexOf(c); return i < 0 ? '' : r[i] ?? ''; })]); owners.push(d.address); }
+      const cut = data.filter((d) => d.rows.length > ART_ROWS);
+      html += `<div style='height:12px'></div>${table(['Host', ...cols], rows, 'dfir', owners)}`;
+      if (cut.length) html += `<p class='fallbacknote'>Showing the first ${ART_ROWS} of ${cut.map((d) => `${d.rows.length} rows (${esc(hostName.get(d.address) || d.address)})`).join(', ')}. The CSV in the output folder has every row.</p>`;
+    } else html += `<p class='empty'>No rows were captured for this artefact.</p>`;
+    out.push({ title: cat.title, count: total, err: bad, html });
+  }
+  return out;
+}
 
 function generateReport(run, hostsInfo = []) {
   const isHunt = run.kind !== 'response', noun = isHunt ? 'Hunt' : 'Response', data = dataOf(run);
@@ -73,6 +125,10 @@ function generateReport(run, hostsInfo = []) {
     html += rows.length ? table(showCols, rows, 'dfir', records.map((r) => r.TargetIP ?? r.HostAddress ?? null)) : `<p class='empty'>${mine.some((r) => r.status === 'ok') || !mine.length ? 'No rows were returned.' : 'No data: every host failed.'}</p>`;
     sections.push({ title: name, count: rows.length, err: bad.length > 0, html });
   }
+
+  // ---- Large-transfer collections that write a summary.csv next to numbered CSVs (Baseline - Windows Full): one section per artefact
+  // category with what was found on each host (status, record count, time, notes) and the first rows of its CSV.
+  for (const s of artefactSections(run, hostName)) sections.push(s);
 
   const title = `${run.name || run.collectionName || noun} - ${noun} report`;
   const nav = sections.map((s, i) => `<li><a href='#sec${i + 1}'>${esc(s.title)} <span class='badge${s.err ? ' err' : s.count ? '' : ' zero'}'>${s.count}</span></a></li>`).join('');

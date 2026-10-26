@@ -50,7 +50,7 @@ Avoid putting well-known attacker tool names in a PowerShell collection, even in
 
 ## How remote execution works
 
-- **WinRM**: the server spawns `powershell.exe` running [winrm-run.ps1](src/remote/winrm-run.ps1), which calls `Invoke-Command -FilePath <collection>`. Credentials are passed by environment variable, not the command line. For non-domain targets, add the target to `TrustedHosts` on this machine or use HTTPS.
+- **WinRM**: runs on a bundled engine, [winrm_helper.py](src/remote/winrm_helper.py), built on [pypsrp](https://github.com/jborean93/pypsrp) (the library KingfishIR uses). It speaks the WinRM protocol itself with NTLM and message encryption over HTTP 5985, so nothing needs configuring on this server or the targets (no TrustedHosts, no AllowUnencrypted). `npm install` (or `npm run setup-winrm`) builds the engine in `vendor/winrm-runtime`: on Windows a private embeddable Python is downloaded (nothing is installed system-wide); on Linux/macOS a virtual environment is made with the Python 3 already installed (`python3-venv` on Debian/Ubuntu). The Shell page uses the same engine. If the engine is not installed, Kookaburrow falls back to [winrm-run.ps1](src/remote/winrm-run.ps1), which runs `Invoke-Command` from `powershell.exe` on this server and needs the target in `TrustedHosts` for IP addresses. Credentials are passed by environment variable, not the command line. Home shows which engine is in use.
 - **SSH**: [ssh.js](src/remote/ssh.js) streams the script to `pwsh -Command -` (or `powershell` on Windows) over stdin, so nothing is written to the target.
 
 ## Large file transfers (SMB and SFTP)

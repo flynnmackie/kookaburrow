@@ -10,6 +10,7 @@
   "powershell/ad-spn-accounts.ps1": "38422de4cf8c07300c9cb098cb0b0317d4d019350b33977dc8d0906d30d523db",
   "powershell/autoruns-all.ps1": "0f733c77829a5730f248d46be610385b5e6d5e0d8ab86b2785549fea656219b2",
   "powershell/autoruns-unsigned.ps1": "d94a1e410b9ccf01c5eb3dabfa518ae127857c1f243df260c73cd33a0cba6386",
+  "powershell/baseline-windows-full.ps1": "f583993b80fa2ccb91bc608c119947fe1a6322e75f6f64030d52b3454d73eb18",
   "powershell/browser-collect.ps1": "8e95100e1a82d668181fbbd6374f425bdbef8222bc8dd431bea9afae902e785b",
   "powershell/browser-extensions.ps1": "87d394cd3f19dd72bde1eaa73a2e1d531a96b82457eca55c3027beae7d88efa8",
   "powershell/browser-history-nirsoft.ps1": "83c23106af51d191a87d334910886e99524069f9926aa18fcb9ce0aee430f36f",

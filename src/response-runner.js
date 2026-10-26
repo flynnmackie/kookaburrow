@@ -2,10 +2,11 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { db, save, id } = require('./store');
-const { runConcurrency } = require('./config');
+const runSettings = require('./run-settings');
 const collections = require('./collections');
 const { createAudit, sha256 } = require('./audit');
 const { safeName, createRunFolder, streamsToCsv, combine } = require('./output');
+const cancel = require('./cancel');
 
 // A response runs one or more actions (scripts that CHANGE a host) on a set of hosts. It mirrors a hunt, under output/responses/ (the
 // layout is described in src/output.js): a folder per response, a folder per host with one CSV per action (what the action printed,
@@ -44,16 +45,18 @@ function startResponse({ name, actionIds, hosts, params, startedBy, scheduleId, 
   const audit = createAudit(run, path.join(folder.abs, `${folder.base}_Log.csv`));
   audit.log({ kind: 'hunt', action: quick ? 'Quick response started' : 'Response started', detail: `${respName}: ${chosen.length} action${chosen.length === 1 ? '' : 's'} (${run.collectionName}) on ${hosts.length} host${hosts.length === 1 ? '' : 's'}${startedBy ? `, started by ${startedBy}` : ''}` });
 
+  const signal = cancel.begin(run.id); // aborted by Cancel: stops the host being worked on and skips every action not started
   (async () => {
     let next = 0;
-    await Promise.all(Array.from({ length: Math.min(runConcurrency, hosts.length) }, async () => {
+    await Promise.all(Array.from({ length: Math.min(runSettings.settings().concurrency, hosts.length) }, async () => {
       while (next < hosts.length) {
         const host = hosts[next++];
         let okRuns = 0;
         audit.log({ kind: 'session', host: host.address, action: 'host started', detail: `${label(host)} over ${proto(host)}` });
         for (const a of chosen) {
           const res = run.results.find((r) => r.hostId === host.id && r.actionId === a.id);
-          res.status = 'running'; save();
+          if (signal.aborted) { Object.assign(res, { status: 'cancelled', finishedAt: new Date().toISOString() }); save(); continue; }
+          res.status = 'running'; res.startedAt = new Date().toISOString(); save();
           audit.log({ kind: 'collect', host: host.address, action: 'action started', artefact: a.name,
             detail: `${a.kind}, footprint ${a.footprint}${a.parameters.length ? `; parameters: ${a.parameters.join(', ')}` : ''}${a.dependencies.length ? `; copies ${a.dependencies.join(', ')} to a temporary folder on the host` : ''}` });
           const full = collections.withParams(a, values.get(a.id));
@@ -61,8 +64,15 @@ function startResponse({ name, actionIds, hosts, params, startedBy, scheduleId, 
           let out;
           try {
             fs.writeFileSync(tmp, full);
-            out = await collections.executeOnHost(host, { ...a, file: tmp, text: full }, { csv: false });
+            out = await collections.executeOnHost(host, { ...a, file: tmp, text: full }, { csv: false, signal });
           } finally { fs.promises.unlink(tmp).catch(() => {}); }
+          if (signal.aborted && out.exitCode !== 0) {
+            // the connection was cut part-way: the action may have done some, all or none of its work on the host
+            audit.log({ kind: 'warn', host: host.address, action: 'action cancelled', artefact: a.name, outcome: 'cancelled', detail: `stopped by ${run.cancelledBy || 'a user'} after ${((Date.now() - new Date(res.startedAt)) / 1000).toFixed(0)}s while it was running; it may have changed the host partly or completely, check the host` });
+            Object.assign(res, { status: 'cancelled', exitCode: out.exitCode, durationMs: out.durationMs, finishedAt: new Date().toISOString() });
+            save();
+            continue;
+          }
           const ok = out.exitCode === 0;
           const dir = path.join(folder.abs, hostBase(host));
           fs.mkdirSync(dir, { recursive: true });
@@ -86,7 +96,7 @@ function startResponse({ name, actionIds, hosts, params, startedBy, scheduleId, 
         audit.log({ kind: 'session', host: host.address, action: 'host finished', outcome: okRuns === chosen.length ? 'ok' : 'errors', detail: `${okRuns} of ${chosen.length} action${chosen.length === 1 ? '' : 's'} ok` });
       }
     }));
-    run.status = run.results.some((r) => r.status === 'error') ? 'completed_with_errors' : 'completed';
+    run.status = run.results.some((r) => r.status === 'cancelled') ? 'cancelled' : run.results.some((r) => r.status === 'error') ? 'completed_with_errors' : 'completed';
     run.finishedAt = new Date().toISOString();
     // The All_Hosts CSV (every action on every host in one file) and JSON, at the top level of the response's folder
     const allBase = `${folder.base}_All_Hosts`;
@@ -106,9 +116,9 @@ function startResponse({ name, actionIds, hosts, params, startedBy, scheduleId, 
     fs.writeFileSync(path.join(folder.abs, `${allBase}.json`), json);
     audit.log({ kind: 'evidence', host: 'All hosts', action: 'output written', artefact: 'All_Hosts.json', size: Buffer.byteLength(json), receivedHash: sha256(json), detail: `${allBase}.json` });
     const okAll = run.results.filter((r) => r.status === 'ok').length;
-    audit.log({ kind: 'hunt', action: run.status === 'completed' ? 'Response complete' : 'Response completed with errors', outcome: run.status === 'completed' ? 'ok' : 'errors', detail: `${okAll} of ${run.results.length} action runs ok; output saved to output/${folder.rel}` });
+    audit.log({ kind: 'hunt', action: run.status === 'completed' ? 'Response complete' : run.status === 'cancelled' ? 'Response cancelled' : 'Response completed with errors', outcome: run.status === 'completed' ? 'ok' : run.status === 'cancelled' ? 'cancelled' : 'errors', detail: `${okAll} of ${run.results.length} action runs ok; output saved to output/${folder.rel}` });
     save();
-  })().catch((e) => {
+  })().finally(() => cancel.end(run.id)).catch((e) => {
     run.status = 'failed'; run.error = e.message; run.finishedAt = new Date().toISOString();
     audit.log({ kind: 'error', action: 'Response failed', outcome: 'error', detail: e.message });
     save();

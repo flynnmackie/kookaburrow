@@ -1,7 +1,8 @@
 ﻿const fs = require('fs');
 const crypto = require('crypto');
 const path = require('path');
-const { collectionsDir, actionsDir, binariesDir, runConcurrency } = require('./config');
+const { collectionsDir, actionsDir, binariesDir } = require('./config');
+const runSettings = require('./run-settings');
 const { db, save, id } = require('./store');
 const winrm = require('./remote/winrm');
 const ssh = require('./remote/ssh');
@@ -233,15 +234,15 @@ function withParams(item, values) {
   return `${lines.join(nl)}${nl}${item.text}`;
 }
 
-async function executeOnHost(host, collection, { csv = false, outDir = '', timeoutMs } = {}) {
+async function executeOnHost(host, collection, { csv = false, outDir = '', timeoutMs, signal } = {}) {
   const started = Date.now();
   let r;
   try {
     const bins = resolveBinaries(collection);
     if (bins.missing.length) throw new Error(`Missing binaries: ${bins.missing.join(', ')}. Place them in the binaries folder and run again.`);
 
-    if (collection.type === 'powershell' && host.protocol === 'winrm') r = await winrm.runScript(host, collection.file, bins.found, { csv, outDir, timeoutMs });
-    else if (host.protocol === 'ssh') r = await ssh.runScript(host, collection.text, collection.type, { outDir, timeoutMs, binaries: bins.found });
+    if (collection.type === 'powershell' && host.protocol === 'winrm') r = await winrm.runScript(host, collection.file, bins.found, { csv, outDir, timeoutMs, signal });
+    else if (host.protocol === 'ssh') r = await ssh.runScript(host, collection.text, collection.type, { outDir, timeoutMs, binaries: bins.found, signal });
     else throw new Error(`${collection.type} collections cannot run over ${host.protocol}`);
   } catch (e) {
     r = { exitCode: -1, stdout: '', stderr: e.message, truncated: false };
@@ -263,7 +264,7 @@ function startRun(collection, hosts) {
 
   (async () => {
     let next = 0;
-    await Promise.all(Array.from({ length: Math.min(runConcurrency, hosts.length) }, async () => {
+    await Promise.all(Array.from({ length: Math.min(runSettings.settings().concurrency, hosts.length) }, async () => {
       while (next < hosts.length) {
         const i = next++;
         const res = run.results[i];

@@ -21,7 +21,7 @@ function renderRespList() {
   $('brList').innerHTML = br.runs.length
     ? `<table class="bh"><thead><tr><th>Response</th><th>Run by</th><th>Status</th><th>Started</th><th>Finished</th><th>Elapsed</th><th></th></tr></thead><tbody>${br.runs.map((r) => `<tr class="bh-row ${r.id === br.sel ? 'on' : ''}" data-id="${esc(r.id)}">
         <td class="bh-name">${esc(huntName(r))}${schedTag(r)}</td><td>${r.startedBy ? esc(r.startedBy) : '<span class="dim">-</span>'}</td><td>${huntStatus(r)}</td>
-        <td class="dim">${esc(new Date(r.startedAt).toLocaleString())}</td><td class="dim">${r.finishedAt ? esc(new Date(r.finishedAt).toLocaleString()) : '-'}</td><td class="dim">${esc(huntElapsed(r))}</td><td class="bh-del"><a class="dl bad" data-del="${esc(r.id)}" data-perm="actions.run" data-perm-what="delete responses" title="Delete this response and its output folder">Delete</a></td></tr>`).join('')}</tbody></table>`
+        <td class="dim">${esc(new Date(r.startedAt).toLocaleString())}</td><td class="dim">${r.finishedAt ? esc(new Date(r.finishedAt).toLocaleString()) : '-'}</td><td class="dim">${esc(huntElapsed(r))}</td><td class="bh-del">${r.status === 'running' && !r.cancelRequested ? `<a class="dl bad" data-cancel="${esc(r.id)}" data-perm="actions.run" data-perm-what="cancel responses" title="Stop this run">Cancel</a> ` : ''}<a class="dl bad" data-del="${esc(r.id)}" data-perm="actions.run" data-perm-what="delete responses" title="Delete this response and its output folder">Delete</a></td></tr>`).join('')}</tbody></table>`
     : '<p class="dim" style="margin:0">No responses yet. Use New Response to run actions on your hosts.</p>';
 }
 async function showResponse(id) {
@@ -37,6 +37,8 @@ async function showResponse(id) {
   if (keep) box.querySelector('.bd-json').scrollTop = keep;
 }
 $('brList').onclick = async (e) => {
+  const can = e.target.closest('[data-cancel]');
+  if (can) { const r = br.runs.find((x) => x.id === can.dataset.cancel); if (r && await cancelRunUi(r, false)) loadRespond(); return; }
   const del = e.target.closest('[data-del]');
   if (del) {
     const r = br.runs.find((x) => x.id === del.dataset.del);
@@ -45,7 +47,9 @@ $('brList').onclick = async (e) => {
   }
   const tr = e.target.closest('.bh-row'); if (tr) showResponse(tr.dataset.id);
 };
-$('brDetail').onclick = (e) => {
+$('brDetail').onclick = async (e) => {
+  const can = e.target.closest('[data-cancel]');
+  if (can) { const r = br.runs.find((x) => x.id === can.dataset.cancel); if (r && await cancelRunUi(r, false)) loadRespond(); return; }
   const t = e.target.closest('[data-bdtab]');
   if (t) { br.tab = t.dataset.bdtab; showResponse(br.sel); return; }
   const p = e.target.dataset.evidence; if (!p) return;
