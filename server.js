@@ -19,20 +19,25 @@ const shell = require('./src/shell');
 const monitor = require('./src/monitor');
 const quarantine = require('./src/quarantine');
 const auth = require('./src/auth');
+const serverSettings = require('./src/server-settings');
 const permissions = require('./src/permissions');
 const routePerms = require('./src/route-perms');
 
 const app = express();
+let running = serverSettings.settings(); // what the server is listening on now (set at start-up; see the end of this file)
 app.use('/api/iocs', express.json({ limit: '6mb' })); // an IOC list can be thousands of lines
 app.use(express.json({ limit: '400kb' }));
 
-// The app holds credentials and runs code on remote hosts, so it is localhost-only and rejects
-// requests whose Host/Origin is not this server (blocks DNS rebinding and cross-site requests).
+// The app holds credentials and runs code on remote hosts, so only this PC and the addresses listed in Server Settings may connect, and
+// requests whose Host/Origin is not this server are rejected (blocks DNS rebinding and cross-site requests).
 app.use((req, res, next) => {
-  const allowed = new Set([`${config.host}:${config.port}`, `localhost:${config.port}`, `127.0.0.1:${config.port}`]);
-  if (!allowed.has(req.headers.host)) return res.status(403).json({ error: 'Bad Host header' });
+  if (!serverSettings.clientAllowed(req.socket.remoteAddress)) return res.status(403).type('text').send('Forbidden: this address is not allowed to use this server.');
+  const allowed = serverSettings.allowedHosts(running);
+  if (!allowed.has(String(req.headers.host || '').toLowerCase())) return res.status(403).json({ error: 'Bad Host header' });
   const origin = req.headers.origin;
-  if (origin && !allowed.has(new URL(origin).host)) return res.status(403).json({ error: 'Bad Origin' });
+  let originHost = null;
+  try { originHost = origin ? new URL(origin).host.toLowerCase() : null; } catch { return res.status(403).json({ error: 'Bad Origin' }); }
+  if (origin && !allowed.has(originHost)) return res.status(403).json({ error: 'Bad Origin' });
   next();
 });
 
@@ -626,7 +631,7 @@ app.get('/api/about', (req, res) => {
   res.json({
     version: require('./package.json').version, node: process.version, winrm: require('./src/remote/winrm').engine(),
     hostname: os.hostname(), dnsDomain: process.env.USERDNSDOMAIN || '',
-    bind: `${config.host}:${config.port}`, addresses,
+    bind: `${running.host === '0.0.0.0' ? 'all interfaces' : running.host}:${running.port}`, addresses,
     os: `${os.version()} ${os.release()} (${os.arch()})`,
     uptimeSec: Math.round(process.uptime()), started: new Date(Date.now() - process.uptime() * 1000).toISOString(),
     // the library: "standard" is a script that still matches the shipped, verified version; "custom" is anything added or edited
@@ -908,6 +913,21 @@ const runSettings = require('./src/run-settings');
 app.get('/api/settings/runs', (req, res) => res.json({ settings: runSettings.settings(), defaults: runSettings.DEFAULTS, limits: runSettings.LIMITS, server: runSettings.serverInfo() }));
 app.put('/api/settings/runs', wrap((req, res) => { runSettings.setSettings(req.body || {}); res.json({ settings: runSettings.settings() }); }));
 
+// ---- Server Settings: the address and port the server listens on and who may connect (Settings > System > Server Settings) ----
+// Saving restarts the server. This PC (localhost) is always allowed and always listened on.
+const reqCtx = (req) => ({ clientAddr: req.socket.remoteAddress, hostHeader: req.headers.host });
+app.get('/api/settings/server', (req, res) => res.json({
+  settings: serverSettings.settings(), running, defaults: serverSettings.DEFAULTS, saved: serverSettings.hasSaved(),
+  addresses: serverSettings.localAddresses().map((a) => ({ name: a.name, address: a.address })),
+  fallback: serverSettings.fallback(), you: { address: serverSettings.clean(req.socket.remoteAddress), host: req.headers.host },
+}));
+app.post('/api/settings/server/check', wrap(async (req, res) => res.json(await serverSettings.check(req.body || {}, reqCtx(req)))));
+app.put('/api/settings/server', wrap(async (req, res) => {
+  const c = await serverSettings.setSettings(req.body || {}, reqCtx(req));
+  res.json({ ok: true, urls: c.urls, restarting: true });
+}));
+app.delete('/api/settings/server/fallback', wrap((req, res) => { serverSettings.dismissFallback(); res.json({ ok: true }); }));
+
 // ---- Shell Settings: shell access on or off, which hosts, how many at once and the idle timeout (Settings > System > Shell Settings) ----
 app.get('/api/settings/shell', (req, res) => res.json({
   settings: shell.settings(), defaults: shell.DEFAULTS, limits: shell.LIMITS, active: shell.config().active,
@@ -938,13 +958,52 @@ app.get('/api/quarantine', (req, res) => res.json(quarantine.records()));
 app.get('/api/quarantine/log', (req, res) => res.json({ entries: quarantine.getLog(Math.min(Number(req.query.limit) || 500, 2000)) }));
 
 console.log(`WinRM engine: ${require('./src/remote/winrm').engine()}`);
-const server = app.listen(config.port, config.host, () => {
-  console.log(`Kookaburrow running at http://${config.host}:${config.port}`);
+
+// ---- Listening ----
+// The saved Server Settings (or KB_HOST / KB_PORT / the defaults when none are saved). If they cannot be used (the port is taken, the
+// address is no longer on this machine) the server falls back to localhost and the settings page says why, so it can always be reached.
+// localhost (127.0.0.1 and ::1) is always listened on, even when the server is set to one network address.
+const servers = [];
+const listenOn = (cfg) => new Promise((resolve, reject) => {
+  const s = app.listen(cfg.port, cfg.host);
+  s.once('listening', () => { servers.push(s); resolve(s); });
+  s.once('error', reject);
+});
+async function listenWithRetry(cfg, tries) { // after a restart the old process may still be letting go of the port
+  for (let i = 0; ; i++) {
+    try { return await listenOn(cfg); } catch (e) { if (e.code !== 'EADDRINUSE' || i >= tries) throw e; await new Promise((r) => setTimeout(r, 500)); }
+  }
+}
+async function startListening() {
+  const want = serverSettings.settings();
+  const candidates = [want, { ...want, host: '127.0.0.1' }, { host: '127.0.0.1', port: serverSettings.DEFAULTS.port }]
+    .filter((c, i, a) => a.findIndex((x) => x.host === c.host && x.port === c.port) === i);
+  let reason = null;
+  for (const [i, cfg] of candidates.entries()) {
+    try {
+      await listenWithRetry(cfg, i === 0 ? 8 : 0);
+      running = { ...want, host: cfg.host, port: cfg.port };
+      if (i > 0) {
+        reason = `${want.host === '0.0.0.0' ? 'All interfaces' : want.host}:${want.port}: ${reason}`;
+        serverSettings.noteFallback(reason, `${cfg.host}:${cfg.port}`);
+        console.error(`The saved server settings could not be used (${reason}); listening on ${cfg.host}:${cfg.port} instead.`);
+      }
+      break;
+    } catch (e) { reason = e.code === 'EADDRINUSE' ? 'the port is already in use' : e.code === 'EADDRNOTAVAIL' ? 'that address is not on this machine' : e.code === 'EACCES' ? 'not allowed to use that port' : e.message; if (i === candidates.length - 1) { console.error(`Cannot listen: ${reason}`); process.exit(1); } }
+  }
+  // this PC is always reachable: a specific network address does not include 127.0.0.1, and ::1 is what "localhost" resolves to on some systems
+  if (running.host !== '0.0.0.0' && running.host !== '127.0.0.1') listenOn({ host: '127.0.0.1', port: running.port }).catch(() => {});
+  listenOn({ host: '::1', port: running.port }).catch(() => {});
+  console.log(`Kookaburrow running at http://${running.host === '0.0.0.0' ? '127.0.0.1' : running.host}:${running.port}${running.host === '0.0.0.0' ? ' (all network interfaces)' : ''}${serverSettings.settings().allowFrom.length ? `, also allowed from ${serverSettings.settings().allowFrom.join(', ')}` : ''}`);
   monitor.start();
   quarantine.start();
   scheduler.start();
-});
-server.on('error', (e) => {
-  console.error(e.code === 'EADDRINUSE' ? `Port ${config.port} is already in use (set KB_PORT to change it).` : e.message);
-  process.exit(1);
-});
+}
+// Saving Server Settings restarts the server: stop listening, start a fresh copy of this process (detached) and exit.
+serverSettings.onRestart(() => setTimeout(() => {
+  for (const s of servers) { try { s.close(); s.closeAllConnections?.(); } catch { /* going down anyway */ } }
+  const child = require('child_process').spawn(process.execPath, [...process.execArgv, ...process.argv.slice(1)], { detached: true, stdio: 'ignore', windowsHide: true, cwd: process.cwd(), env: process.env });
+  child.unref();
+  setTimeout(() => process.exit(0), 300);
+}, 900));
+startListening();

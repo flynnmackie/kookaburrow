@@ -54,7 +54,7 @@ const RULES = [
   ['GET', /^\/api\/quarantine(\/log)?$/, ['system.view']],
   ['*', /^\/api\/quarantine\/[^/]+$/, ['actions.run']], // isolating a host runs the Host - Isolate action
   ['*', /^\/api\/monitor(\/|$)/, ['system.view']],
-  ['GET', /^\/api\/settings\/(health|shell|runs)$/, ['system.view']],
+  ['GET', /^\/api\/settings\/(health|shell|runs|server)$/, ['system.view']],
   ['*', /^\/api\/settings(\/|$)/, ['system.manage']],
 
   ['GET', /^\/api\/(users|roles)$/, ['users.view']],

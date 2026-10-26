@@ -92,7 +92,7 @@ document.addEventListener('mousedown', (e) => { const el = lockedTarget(e); if (
 
 // Which permission each page needs. The top-bar tab for an area is locked when every page in it is.
 const PAGE_PERM = {
-  'settings/user-management': 'users.view', 'settings/shell-settings': 'system.view', 'settings/health-settings': 'system.view', 'settings/run-settings': 'system.view',
+  'settings/user-management': 'users.view', 'settings/shell-settings': 'system.view', 'settings/health-settings': 'system.view', 'settings/run-settings': 'system.view', 'settings/server-settings': 'system.view',
   'settings/view-collections': 'collections.view', 'settings/add-collections': 'collections.manage', 'settings/binaries': 'collections.manage',
   'settings/view-actions': 'actions.view', 'settings/add-actions': 'actions.manage',
   'hosts/view-hosts': 'hosts.view', 'hosts/profiles': 'hosts.view', 'hosts/groups': 'hosts.view', 'hosts/discover': 'hosts.manage', 'hosts/manual': 'hosts.manage',
@@ -117,7 +117,7 @@ const NAV = [
   // A third entry puts a page under a titled dropdown in the side menu (the titles are not pages).
   // { heading: 'Name' } is a titled dropdown with no pages yet.
   { id: 'settings', label: 'Settings', pages: [
-    ['user-management', 'User Management', 'System'], ['shell-settings', 'Shell Settings', 'System'], ['health-settings', 'Health Settings', 'System'], ['run-settings', 'Run Settings', 'System'],
+    ['user-management', 'User Management', 'System'], ['shell-settings', 'Shell Settings', 'System'], ['health-settings', 'Health Settings', 'System'], ['run-settings', 'Run Settings', 'System'], ['server-settings', 'Server Settings', 'System'],
     ['view-collections', 'View Collections', 'Collections'], ['add-collections', 'Add Collections', 'Collections'],
     ['view-actions', 'View Actions', 'Actions'], ['add-actions', 'Add Actions', 'Actions'],
     ['binaries', 'Upload Binaries'],
@@ -161,6 +161,7 @@ const loaders = {
   'settings/user-management': loadUserMgmt,
   'settings/health-settings': loadHealthSettings,
   'settings/run-settings': loadRunSettings,
+  'settings/server-settings': loadServerSettings,
   'settings/shell-settings': loadShellSettings,
   'settings/add-collections': () => addCollections(),
   'settings/add-actions': () => addActions(),
@@ -2101,6 +2102,87 @@ $('rsSave').onclick = async () => {
   if (risky.length && !confirm(`These settings are well above what this server (${rs.server.cores} cores, ${rs.server.ramGb} GB RAM) can handle:\n\n${risky.map(([n, k]) => rsAdvice(k, n).text).join('\n\n')}\n\nSave them anyway?`)) return;
   try { await api('PUT', '/api/settings/runs', { concurrency: Number($('rsHosts').value), largeConcurrency: Number($('rsLarge').value) }); toast('Run settings saved'); loadRunSettings(); }
   catch (e) { $('rsMsg').textContent = e.message; $('rsMsg').className = 'um-msg bad'; }
+};
+
+// ---- Server Settings: the address and port the server listens on and who may connect ----
+// Every change is checked by the server as you type (/api/settings/server/check): errors stop the save, warnings ask for a confirmation.
+// Saving restarts the server; this page then waits for it to come back (at the new address when that changed).
+const sv = { r: null, timer: null, seq: 0, last: null };
+const svForm = () => {
+  const mode = document.querySelector('input[name=svMode]:checked')?.value || 'local';
+  return { host: mode === 'local' ? '127.0.0.1' : mode === 'all' ? '0.0.0.0' : $('svAddr').value, port: Number($('svPort').value), allowFrom: $('svAllow').value };
+};
+function svRenderAdvice(c) {
+  sv.last = c;
+  const box = $('svAdvice'), items = [...c.errors.map((t) => ['bad', '\u2716 ' + t]), ...c.warnings.map((t) => ['warn', '\u26A0 ' + t])];
+  box.innerHTML = items.map(([k, t]) => `<div class="rs-adv ${k}">${esc(t)}</div>`).join('') + (!c.errors.length ? `<div class="rs-adv ok">\u2713 After saving, the server will be reachable at: ${c.urls.map((u) => esc(u)).join(', ')}. This PC (localhost) can always connect.</div>` : '');
+  $('svSave').disabled = !!c.errors.length || !can('system.manage');
+}
+async function svCheck() {
+  const n = ++sv.seq;
+  try { const c = await api('POST', '/api/settings/server/check', svForm()); if (n === sv.seq) svRenderAdvice(c); }
+  catch (e) { if (n === sv.seq) { $('svAdvice').innerHTML = `<div class="rs-adv bad">${esc(e.message)}</div>`; $('svSave').disabled = true; } }
+}
+const svSoon = () => { clearTimeout(sv.timer); sv.timer = setTimeout(svCheck, 350); };
+async function loadServerSettings() {
+  let r;
+  try { r = await api('GET', '/api/settings/server'); } catch (e) { $('svMsg').textContent = e.message; $('svMsg').className = 'um-msg bad'; return; }
+  sv.r = r;
+  const s = r.settings;
+  $('svAddr').innerHTML = r.addresses.map((a) => `<option value="${esc(a.address)}">${esc(a.address)} (${esc(a.name)})</option>`).join('') || '<option value="">no network address found</option>';
+  const mode = s.host === '127.0.0.1' ? 'local' : s.host === '0.0.0.0' ? 'all' : 'one';
+  document.querySelectorAll('input[name=svMode]').forEach((x) => { x.checked = x.value === mode; });
+  if (mode === 'one') { if (![...$('svAddr').options].some((o) => o.value === s.host)) $('svAddr').insertAdjacentHTML('beforeend', `<option value="${esc(s.host)}">${esc(s.host)} (not found on this machine)</option>`); $('svAddr').value = s.host; }
+  $('svPort').value = s.port; $('svAllow').value = s.allowFrom.join('\n');
+  const editable = can('system.manage');
+  document.querySelectorAll('input[name=svMode]').forEach((x) => { x.disabled = !editable; });
+  $('svAddr').disabled = $('svPort').disabled = $('svAllow').disabled = !editable;
+  $('svAddr').hidden = mode !== 'one';
+  $('svNow').textContent = `Listening on ${r.running.host === '0.0.0.0' ? 'all network interfaces' : r.running.host}, port ${r.running.port}. You are connected from ${r.you.address} as ${r.you.host}.`;
+  $('svFallback').hidden = !r.fallback;
+  if (r.fallback) $('svFallbackText').textContent = `The saved settings could not be used (${r.fallback.reason}), so the server started on ${r.fallback.used} instead. Fix the settings below and save, or dismiss this.`;
+  $('svMsg').textContent = '';
+  svCheck();
+}
+document.querySelectorAll('input[name=svMode]').forEach((x) => { x.onchange = () => { $('svAddr').hidden = x.value !== 'one' || !x.checked; svSoon(); }; });
+$('svAddr').onchange = $('svPort').oninput = $('svAllow').oninput = svSoon;
+$('svFallbackDismiss').onclick = async () => { await api('DELETE', '/api/settings/server/fallback').catch(() => {}); $('svFallback').hidden = true; };
+$('svReset').onclick = () => {
+  const d = sv.r.defaults;
+  document.querySelectorAll('input[name=svMode]').forEach((x) => { x.checked = x.value === (d.host === '127.0.0.1' ? 'local' : 'all'); });
+  $('svAddr').hidden = true; $('svPort').value = d.port; $('svAllow').value = ''; svCheck();
+  $('svMsg').textContent = 'Defaults restored (this PC only). Press Save to apply them.'; $('svMsg').className = 'um-msg dim';
+};
+// After a save the server restarts: wait for it, at the new address when that changed, then open the page there.
+async function svWaitForRestart(urls, port) {
+  const here = new URL(location.href);
+  const target = (() => {
+    const h = here.hostname, local = h === 'localhost' || h === '127.0.0.1' || h === '[::1]';
+    const pick = urls.find((u) => new URL(u).hostname === h) || (local ? urls.find((u) => new URL(u).hostname === '127.0.0.1') : urls[0]) || `http://127.0.0.1:${port}`;
+    return local ? `http://${h}:${port}` : pick;
+  })();
+  $('svMsg').className = 'um-msg dim';
+  const t0 = Date.now();
+  await new Promise((r) => setTimeout(r, 2500));
+  while (Date.now() - t0 < 40000) {
+    $('svMsg').textContent = `Restarting the server… waiting for ${target}`;
+    try { await fetch(`${target}/login.html`, { mode: 'no-cors', cache: 'no-store' }); location.href = `${target}/#settings/server-settings`; return; } catch { /* not up yet */ }
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+  $('svMsg').className = 'um-msg bad';
+  $('svMsg').textContent = `The server did not answer at ${target}. From the server PC, open http://127.0.0.1:${port} (localhost always works); if the saved settings could not be used it falls back to localhost and says why on this page.`;
+}
+$('svSave').onclick = async () => {
+  const body = svForm();
+  const c = sv.last;
+  if (!c || c.errors.length) return;
+  if (c.warnings.length && !confirm(`The server will restart with these settings, but they look wrong:\n\n${c.warnings.map((w) => '\u2022 ' + w).join('\n\n')}\n\nSave and restart anyway?`)) return;
+  if (!c.warnings.length && !confirm('Save these settings and restart the server? Everyone using it is disconnected for a few seconds; running hunts are not resumed.')) return;
+  const running = [...bh.runs, ...br.runs].filter((x) => x.status === 'running').length;
+  if (running && !confirm(`${running} hunt/response${running === 1 ? ' is' : 's are'} still running. Restarting stops ${running === 1 ? 'it' : 'them'}. Restart anyway?`)) return;
+  $('svSave').disabled = true;
+  try { const r = await api('PUT', '/api/settings/server', { ...body, confirm: true }); svWaitForRestart(r.urls, c.normalized.port); }
+  catch (e) { $('svMsg').textContent = e.message; $('svMsg').className = 'um-msg bad'; $('svSave').disabled = false; }
 };
 
 // ---- Health: monitor ----

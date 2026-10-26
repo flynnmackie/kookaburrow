@@ -1025,6 +1025,28 @@
         <div class="hs-actions"><button class="act" id="rsSave" type="button" data-perm="system.manage" data-perm-what="change run settings">Save</button><button class="act sec" id="rsDefaults" type="button" data-perm="system.manage" data-perm-what="change run settings">Reset to defaults</button><span class="um-msg" id="rsMsg"></span></div>
       </div>
     </section>
+    <section class="page" id="settings/server-settings">
+      <div class="card">
+        <h2>Server Settings</h2>
+        <p class="dim hs-sub">The address and port this server listens on, and which other computers may connect. Saving restarts the server. This PC (localhost) can always connect, whatever is set here.</p>
+        <div class="rs-adv warn" id="svFallback" hidden><span id="svFallbackText"></span> <a id="svFallbackDismiss" style="cursor:pointer">Dismiss</a></div>
+        <p class="rs-server" id="svNow"></p>
+        <div class="hs-block">
+          <span class="fl">Listen on</span>
+          <div class="ss-modes" style="flex-direction:column;align-items:flex-start;gap:6px">
+            <label><input type="radio" name="svMode" value="local"> This PC only (127.0.0.1)</label>
+            <label><input type="radio" name="svMode" value="all"> All network interfaces (0.0.0.0)</label>
+            <label><input type="radio" name="svMode" value="one"> One address of this machine <select id="svAddr" hidden></select></label>
+          </div>
+          <span class="fl">Port</span>
+          <div class="hs-row"><input id="svPort" type="number" min="1" max="65535" step="1"></div>
+          <span class="fl">Allowed to connect (besides this PC)</span>
+          <textarea id="svAllow" rows="4" spellcheck="false" placeholder="One per line: an address (10.0.0.5) or a range (192.168.1.0/24)" style="width:360px;max-width:100%;background:var(--panel2,#11161d);color:var(--text);border:1px solid var(--line-hi);border-radius:6px;padding:6px 8px;font:12.5px var(--f-mono,monospace)"></textarea>
+        </div>
+        <div id="svAdvice"></div>
+        <div class="hs-actions"><button class="act" id="svSave" type="button" data-perm="system.manage" data-perm-what="change server settings">Save and restart</button><button class="act sec" id="svReset" type="button" data-perm="system.manage" data-perm-what="change server settings">Reset to defaults</button><span class="um-msg" id="svMsg"></span></div>
+      </div>
+    </section>
     <section class="page" id="settings/health-settings">
       <div class="card">
         <h2>Health Settings</h2>
