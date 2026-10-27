@@ -11,6 +11,7 @@
 - [Managing the service](#managing-the-service)
 - [Upgrading](#upgrading)
 - [Uninstalling](#uninstalling)
+- [Signing and trust](#signing-and-trust)
 - [Running from source](#running-from-source)
 - [Building the installer](#building-the-installer)
 
@@ -123,6 +124,33 @@ msiexec /x Kookaburrow-1.0.0-x64.msi
 ```
 
 This removes the program, the service and the firewall rule. **The data folder is kept** so a later install can reuse it. For a complete removal, delete `C:\ProgramData\Kookaburrow` afterwards (this deletes all collected results and saved credentials).
+
+## Signing and trust
+
+An unsigned MSI installs fine, but Windows shows **Unknown publisher** (and SmartScreen may warn on a downloaded file). Signing the MSI with a code-signing certificate fixes that. Windows checks the signature **offline**: it needs the signing certificate to chain to a root the machine trusts, not internet access. A timestamp (added at signing time) keeps the signature valid after the certificate expires.
+
+Sign when building:
+
+| Certificate | How | Trusted where |
+|---|---|---|
+| **Self-signed** (labs, internal use) | `node scripts/build-msi.js --sign-self` | Only machines that import its public certificate (below) |
+| **A certificate file** (.pfx) | `$env:KB_SIGN_PFX_PASSWORD='...'; node scripts/build-msi.js --sign-pfx=C:\keys\cert.pfx` | Wherever the issuing CA is trusted |
+| **A certificate in the store or on a token** | `node scripts/build-msi.js --sign-thumbprint=<thumbprint>` | Same |
+
+`scripts/sign-msi.ps1` does the signing and can be run on its own against any .msi.
+
+**Self-signed:** the first run makes a certificate in `build\signing` (the private key stays there; keep it private and out of git) and copies the public `Kookaburrow-signing.cer` next to the MSI. On each machine that should trust the installer, run once as an administrator:
+
+```powershell
+Import-Certificate -FilePath .\Kookaburrow-signing.cer -CertStoreLocation Cert:\LocalMachine\Root
+Import-Certificate -FilePath .\Kookaburrow-signing.cer -CertStoreLocation Cert:\LocalMachine\TrustedPublisher
+```
+
+Then the MSI shows *Verified publisher: Kookaburrow*. This works fully offline. Only import the certificate on machines you control.
+
+**Publicly trusted:** a certificate from a public CA is trusted on every Windows machine without importing anything. Certificate authorities now issue code-signing keys on hardware tokens or cloud services, so a plain .pfx in CI is no longer how new certificates are issued; options include a cloud signing service (such as Azure Artifact Signing) and, for open-source projects, programmes like SignPath Foundation. The GitHub release workflow signs automatically when the repository secrets `SIGNING_PFX_BASE64` and `SIGNING_PFX_PASSWORD` exist.
+
+To check a download: `Get-AuthenticodeSignature .\Kookaburrow-1.0.0-x64.msi` shows the signer and status, and `Get-FileHash .\Kookaburrow-1.0.0-x64.msi` should match the hash in the release notes.
 
 ## Running from source
 

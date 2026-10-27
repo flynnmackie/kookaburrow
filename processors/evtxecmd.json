@@ -1,0 +1,17 @@
+{
+  "id": "evtxecmd",
+  "name": "EvtxECmd - Event Log Parser",
+  "description": "Runs Eric Zimmerman's EvtxECmd over collected .evtx files and writes one CSV of normalised events (maps turn the common event IDs into readable fields). Needs the .NET 10 runtime on the server.",
+  "homepage": "https://ericzimmerman.github.io/",
+  "accepts": ["evtx"],
+  "requires": ["dotnet10"],
+  "launcher": "dotnet",
+  "tool": {
+    "win32": { "archive": "EvtxECmd.zip", "exe": "EvtxECmd.dll" },
+    "linux": { "archive": "EvtxECmd.zip", "exe": "EvtxECmd.dll" }
+  },
+  "parameters": [],
+  "command": ["-d", "{input}", "--csv", "{output}", "--csvf", "evtxecmd.csv", "--co", "false"],
+  "outputs": [{ "file": "evtxecmd.csv", "format": "csv", "timeUtc": true, "timeColumn": "TimeCreated" }],
+  "timeoutMinutes": 120
+}

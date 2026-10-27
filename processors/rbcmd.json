@@ -1,0 +1,44 @@
+{
+  "id": "rbcmd",
+  "name": "RBCmd - Recycle Bin Parser",
+  "description": "Runs Eric Zimmerman's RBCmd over collected Recycle Bin $I files: the original path, size and deletion time of deleted files. Needs the .NET 10 runtime on the server.",
+  "accepts": [
+    "recyclebin"
+  ],
+  "homepage": "https://ericzimmerman.github.io/",
+  "requires": [
+    "dotnet10"
+  ],
+  "launcher": "dotnet",
+  "tool": {
+    "win32": {
+      "archive": "RBCmd.zip",
+      "exe": "RBCmd.dll"
+    },
+    "linux": {
+      "archive": "RBCmd.zip",
+      "exe": "RBCmd.dll"
+    }
+  },
+  "parameters": [],
+  "command": [
+    "-d",
+    "{input}",
+    "--csv",
+    "{output}",
+    "--csvf",
+    "rbcmd.csv",
+    "-q",
+    "--co",
+    "false"
+  ],
+  "outputs": [
+    {
+      "file": "rbcmd*.csv",
+      "format": "csv",
+      "timeUtc": true,
+      "timeColumn": "DeletedOn"
+    }
+  ],
+  "timeoutMinutes": 30
+}

@@ -1,0 +1,42 @@
+{
+  "id": "sbecmd",
+  "name": "SBECmd - ShellBags Parser",
+  "description": "Runs Eric Zimmerman's SBECmd over collected user registry hives (NTUSER.DAT, UsrClass.dat): the folders each user browsed, including removable and network locations. Needs the .NET 10 runtime on the server.",
+  "accepts": [
+    "registry"
+  ],
+  "homepage": "https://ericzimmerman.github.io/",
+  "requires": [
+    "dotnet10"
+  ],
+  "launcher": "dotnet",
+  "tool": {
+    "win32": {
+      "archive": "SBECmd.zip",
+      "exe": "SBECmd.dll"
+    },
+    "linux": {
+      "archive": "SBECmd.zip",
+      "exe": "SBECmd.dll"
+    }
+  },
+  "parameters": [],
+  "command": [
+    "-d",
+    "{input}",
+    "--csv",
+    "{output}",
+    "--nl",
+    "--co",
+    "false"
+  ],
+  "outputs": [
+    {
+      "file": "*.csv",
+      "format": "csv",
+      "timeUtc": true,
+      "timeColumn": "LastWriteTime"
+    }
+  ],
+  "timeoutMinutes": 60
+}

@@ -1,0 +1,44 @@
+{
+  "id": "jlecmd",
+  "name": "JLECmd - Jump List Parser",
+  "description": "Runs Eric Zimmerman's JLECmd over collected Jump List files: the applications and files each user opened, with timestamps. Needs the .NET 10 runtime on the server.",
+  "accepts": [
+    "jumplists"
+  ],
+  "homepage": "https://ericzimmerman.github.io/",
+  "requires": [
+    "dotnet10"
+  ],
+  "launcher": "dotnet",
+  "tool": {
+    "win32": {
+      "archive": "JLECmd.zip",
+      "exe": "JLECmd.dll"
+    },
+    "linux": {
+      "archive": "JLECmd.zip",
+      "exe": "JLECmd.dll"
+    }
+  },
+  "parameters": [],
+  "command": [
+    "-d",
+    "{input}",
+    "--csv",
+    "{output}",
+    "--csvf",
+    "jlecmd.csv",
+    "-q",
+    "--co",
+    "false"
+  ],
+  "outputs": [
+    {
+      "file": "jlecmd*.csv",
+      "format": "csv",
+      "timeUtc": true,
+      "timeColumn": "SourceModified"
+    }
+  ],
+  "timeoutMinutes": 60
+}

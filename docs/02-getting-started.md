@@ -28,7 +28,7 @@ The top bar holds the main areas. Anything your role cannot use is greyed out.
 
 | Tab | What it is for |
 |---|---|
-| **Settings** | System settings (users, shell, health, run, server, certificate, Elastic), the collection and action libraries, and Upload Binaries |
+| **Settings** | System settings (users, shell, health, run, server, certificate, Elastic), the collection and action libraries, and External (Binaries and Dependencies) |
 | **Host Management** | View Hosts, Profiles, Groups, Discover (scan), Manually Add |
 | **Burrow!** | Hunt, Respond, Workflow, Recurring |
 | **Results** | Activity log, JSON, and Analysis: Report, Diff, Cross-host comparison, IOC, Baseline |
@@ -54,7 +54,8 @@ The host now appears in **Host Management > View Hosts**. For scanning a subnet,
 2. **Who**: tick the host (or a group).
 3. **Collections**: choose a collection list (PowerShell for Windows hosts, Linux for SSH hosts) and tick a few, for example `System - Info` and `Network - Connections`.
 4. **Parameters**: only shown if a chosen collection takes some.
-5. **Overview**: name the hunt, check the summary and press **Run Hunt**.
+5. **Automation**: optional. A workflow to run afterwards, whether to send results to Elastic, and whether the hunt repeats. Leave it as it is for now.
+6. **Overview**: name the hunt, check the summary and press **Run Hunt**.
 
 The hunt appears in **Previous hunts** with a live status per host. Select it for details, errors and downloads. More in [Hunts](04-hunts.md).
 

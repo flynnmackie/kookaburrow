@@ -5,13 +5,21 @@
 // line, where a value that ends in a backslash or is empty would otherwise be mangled.
 // Never run it while the server is running; the server would overwrite the database again.
 const net = require('net');
+const fs = require('fs');
+const path = require('path');
 
 const arg = {};
 for (const a of process.argv.slice(2)) {
   const m = /^--([a-z]+)=(.*)$/s.exec(a);
   if (m) arg[m[1]] = m[2].length >= 2 ? m[2].slice(1, -1) : '';
 }
-const fail = (m) => { console.error('Kookaburrow set-up: ' + m); process.exit(1); };
+// --home=x<data folder>x : where the server keeps its data (the installer runs this program without KB_HOME set, so it is passed here).
+if (arg.home) process.env.KB_HOME = arg.home;
+// Whatever goes wrong is also written to <data folder>\install-setup.log, because the installer only reports "error 1603".
+const logFile = path.join(process.env.KB_HOME || path.join(__dirname, '..'), 'install-setup.log');
+const note = (m) => { try { fs.mkdirSync(path.dirname(logFile), { recursive: true }); fs.appendFileSync(logFile, new Date().toISOString() + ' ' + m + '\n'); } catch { /* the log is a convenience */ } };
+const fail = (m) => { note('FAILED: ' + m); console.error('Kookaburrow set-up: ' + m); process.exit(1); };
+process.on('uncaughtException', (e) => fail(String(e && e.stack || e)));
 
 const host = (arg.host || '127.0.0.1').trim();
 const port = Number(arg.port || 46200);
@@ -49,6 +57,7 @@ db.sessions = [];
 db.settings = { ...(db.settings || {}), server: { host, port, allowFrom: ranges } };
 save();
 setTimeout(() => {
+  note(`ok: admin "${username}" on ${host}:${port}, data in ${process.env.KB_HOME || 'the program folder'}`);
   console.log(`Kookaburrow set-up: admin "${username}", listening on ${host}:${port}${ranges.length ? `, allowed from ${ranges.join(', ')}` : ''}`);
   process.exit(0);
 }, 400);

@@ -1,0 +1,38 @@
+{
+  "id": "zeek",
+  "name": "Zeek - Network Log Analysis",
+  "description": "Runs Zeek over each collected packet capture (.pcap, .pcapng) and writes its logs (conn, dns, http, ssl, files and more), one folder per capture. Zeek is installed on the server, not uploaded, and runs on Linux only.",
+  "homepage": "https://zeek.org/",
+  "accepts": [
+    "pcap"
+  ],
+  "requires": [
+    "zeek"
+  ],
+  "tool": {
+    "linux": {
+      "system": "zeek"
+    }
+  },
+  "parameters": [],
+  "each": [
+    "*.pcap",
+    "*.pcapng",
+    "*.cap"
+  ],
+  "cwd": "{output}/capture{n}",
+  "command": [
+    "-C",
+    "-r",
+    "{file}"
+  ],
+  "outputs": [
+    {
+      "file": "capture*/*.log",
+      "format": "zeek",
+      "timeColumn": "ts",
+      "timeEpoch": true
+    }
+  ],
+  "timeoutMinutes": 120
+}

@@ -1,0 +1,45 @@
+{
+  "id": "mftecmd",
+  "name": "MFTECmd - MFT and USN Journal Parser",
+  "description": "Runs Eric Zimmerman's MFTECmd over a collected $MFT and $J (USN journal): every file and folder with its timestamps, one row per entry. The output can be very large. Needs the .NET 10 runtime on the server.",
+  "accepts": [
+    "mft"
+  ],
+  "homepage": "https://ericzimmerman.github.io/",
+  "requires": [
+    "dotnet10"
+  ],
+  "launcher": "dotnet",
+  "tool": {
+    "win32": {
+      "archive": "MFTECmd.zip",
+      "exe": "MFTECmd.dll"
+    },
+    "linux": {
+      "archive": "MFTECmd.zip",
+      "exe": "MFTECmd.dll"
+    }
+  },
+  "parameters": [],
+  "each": [
+    "$MFT",
+    "$J"
+  ],
+  "command": [
+    "-f",
+    "{file}",
+    "--csv",
+    "{output}",
+    "--csvf",
+    "mftecmd-{n}-{name}.csv",
+    "--co",
+    "false"
+  ],
+  "outputs": [
+    {
+      "file": "mftecmd-*.csv",
+      "format": "csv"
+    }
+  ],
+  "timeoutMinutes": 180
+}

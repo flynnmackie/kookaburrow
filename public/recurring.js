@@ -28,7 +28,7 @@ function rcItem(s) {
   const total = s.until.type === 'forever' ? 'Runs indefinitely' : `${s.totalRuns} run${s.totalRuns === 1 ? '' : 's'}`;
   const body = !open ? '' : `<div class="lg-body rc-body">
       <div class="bd-facts"><div><span>Runs every</span>${esc(rcEvery(s.everyMinutes))}</div><div><span>Until</span>${esc(until)}</div><div><span>Planned runs</span>${esc(total)}</div>
-        <div><span>Ran so far</span>${s.runCount}</div><div><span>Created by</span>${s.createdBy ? esc(s.createdBy) : '-'}</div><div><span>Created</span>${esc(new Date(s.createdAt).toLocaleString())}</div></div>
+        <div><span>Ran so far</span>${s.runCount}</div>${s.workflow ? `<div><span>Workflow</span>${esc(s.workflow)}</div>` : ''}${s.kind === 'hunt' && s.sendElastic !== null ? `<div><span>Elastic</span>${s.sendElastic ? 'Sent' : 'Not sent'}</div>` : ''}<div><span>Created by</span>${s.createdBy ? esc(s.createdBy) : '-'}</div><div><span>Created</span>${esc(new Date(s.createdAt).toLocaleString())}</div></div>
       ${s.lastError ? `<div class="hd-warn" style="margin-top:8px">${esc(s.lastError)}</div>` : ''}
       <div class="hd-label">${noun}</div>
       <div class="rc-items">${s.items.map((i) => `<div class="rc-item"><b>${esc(i.name)}</b>${i.type ? `<span class="dim">${i.type === 'bash' ? 'Linux' : 'PowerShell'}</span>` : ''}${i.parameters.length ? `<span class="dim">parameters: ${esc(i.parameters.join(', '))}</span>` : ''}<div class="dim">${esc(i.description)}</div></div>`).join('')}</div>
@@ -47,7 +47,7 @@ function rcItem(s) {
 const RC_NONE = {
   hunt: 'No recurring hunts. Turn on Recurring in the New Hunt dialog to make one.',
   response: 'No recurring actions. Turn on Recurring in the New Response dialog to make one.',
-  workflow: 'No recurring workflows. Scheduling workflows is not available yet.',
+  workflow: 'Workflows run after a hunt: attach one to a recurring hunt (Workflow on the Automation tab) and it runs every time.',
 };
 function renderRecurring() {
   document.querySelectorAll('#rcKind button').forEach((b) => b.classList.toggle('on', b.dataset.kind === rc.kind));

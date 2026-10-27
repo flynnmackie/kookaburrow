@@ -21,16 +21,20 @@ A **hunt** runs read-only **collections** against hosts and keeps what comes bac
 
 ## The New Hunt wizard
 
-**Burrow! > Hunt > New Hunt** has four steps. You can move between them with the tabs at the top.
+**Burrow! > Hunt > New Hunt** has five steps. You can move between them with the tabs at the top.
 
 1. **Who.** Tick **Groups** and/or individual **Hosts**. A host in several chosen groups is run once.
 2. **Collections.** Choose the **PowerShell** or **Linux** list, then tick collections.
    - Search the names and the script text, filter by tag or by type.
    - A star marks your **favourites** (kept per user) so they are easy to find.
-   - A collection that needs a [binary](08-settings.md#upload-binaries) you have not uploaded is greyed out and says what is missing.
+   - A collection that needs a [binary](08-settings.md#binaries) you have not uploaded is greyed out and says what is missing.
    - PowerShell collections are for Windows hosts and Linux collections for SSH hosts. Pick collections that match the hosts you chose: a collection run on the wrong kind of host fails and is recorded as an error.
 3. **Parameters.** Only shown when a chosen collection takes parameters. Collections that need them are red, ones with optional parameters are orange, ones that are set are green. Press **Set parameters** when done. A red collection cannot be run.
-4. **Overview.** Name the hunt (required), check *Will run against* and *Collections to run*, and press **Run Hunt**. Collections that pull large files show a warning that SMB will be switched on temporarily (see [large transfers](#large-file-transfers)). The **Recurring hunt** switch is covered [below](#recurring-hunts).
+4. **Automation.** What happens after and around the hunt:
+   - **Workflow**: attach a [workflow](07-workflows-and-recurring.md) (shown when you may run workflows). Choosing one also ticks the collections it is meant for. A workflow whose tools are not uploaded shows why and **cannot be run**: the hunt is refused before it starts.
+   - **Send results to Elastic**: on or off for this hunt. It starts at the default set in [Settings > Elastic](10-elastic.md#configuring-kookaburrow) and is greyed out until Elastic is set up. When on, the rows each host returns, and any workflow output, are sent.
+   - **Recurring hunt**: repeat the hunt, see [below](#recurring-hunts).
+5. **Overview.** Name the hunt (required) and check the summary: *Will run against*, *Collections to run*, the **workflow** (or none), whether and how often it **repeats**, and where the results are **sent** (Elastic server or not sent). Collections that pull large files show a warning that SMB will be switched on temporarily (see [large transfers](#large-file-transfers)). Press **Run Hunt**.
 
 The name is used in the output folder name, so choose something you will recognise later.
 
@@ -53,7 +57,7 @@ In the New Hunt dialog press **Rerun past hunt**, pick an earlier hunt, and its 
 
 ## Recurring hunts
 
-Turn on **Recurring hunt** on the Overview step:
+Turn on **Recurring hunt** on the Automation step:
 
 | Option | Meaning |
 |---|---|
@@ -64,11 +68,14 @@ The dialog tells you how many runs that makes. The hunt runs **now**, then every
 
 ## Following a hunt
 
-**Burrow! > Hunt** lists **Previous hunts** (newest first) with a status, and tags **Q** (quick) and **R** (recurring). Select one:
+**Burrow! > Hunt** lists **Previous hunts** (newest first) with a status, and tags **Q** (quick), a green **R** (recurring) and an amber **W** (ran with a workflow; a recurring hunt with a workflow shows both). Select one:
 
-- **Progress by host**: one row per host with a progress bar, `done/total` collections, the collection running now, and elapsed time. While waiting for a file-transfer slot it says *Waiting*; while pulling files it shows bytes pulled of total.
-- What it ran, the files it produced per host, and any errors.
-- **Download all (zip)** for the whole folder, and per-file downloads (needs `hunts.export`).
+The box under the list has four tabs:
+
+- **About**: how the hunt was set up, not what it returned. Name, type (single run, quick or recurring), who started it and when (by hand or by its schedule), the number of hosts and collections, the workflow (with the steps it ran) and whether results were sent to Elastic. A recurring hunt also shows its schedule: runs every, until, runs so far of the planned total, status and next run (or that the schedule has since been deleted). It lists the collections run with their parameter *names* (values are not kept) and the hosts it ran on. Older hunts that predate the Elastic setting show *Not recorded*.
+- **Details**: how the run went. Status, start, finish and elapsed time, the error count, and the Elastic result. **Progress by host** shows a summary bar (with the per-host table while the hunt runs, or when a host failed or was cancelled), then the workflow stages and what each collection returned on each host. An **Error log** appears only when something went wrong.
+- **Files**: the files it produced per host, with **Download all (zip)** for the whole folder and per-file downloads (needs `hunts.export`).
+- **Notebook**: the hunt's JSON to scroll through.
 - The list refreshes by itself while a hunt is running.
 
 The hunt's [Activity log](06-results.md#activity-log), [JSON](06-results.md#json), [report](06-results.md#report) and files in [Browse](06-results.md#browse) are the other ways in.
@@ -89,7 +96,8 @@ The hunt ends as *Cancelled*. Needs `hunts.run`.
 2. For each collection the server connects, stages any [dependencies](09-library.md#dependencies) in a temporary folder on the target, runs the script, collects its output and removes the folder.
 3. Output is converted to a CSV, saved per host, and counted as rows. A collection that errors is recorded as an error; the rest continue.
 4. Every step is written to the [activity log](06-results.md#activity-log) with the SHA-256 of what was received.
-5. When all hosts finish the server writes `All_Hosts.csv` and `All_Hosts.json`, sets the final status, and (if [Elastic](10-elastic.md) forwarding is on) the rows are sent as each result arrives.
+5. If a [workflow](07-workflows-and-recurring.md) is attached, its steps now run on the server over the files that came back; the hunt stays *Running* until they finish.
+6. When all hosts finish the server writes `All_Hosts.csv` and `All_Hosts.json`, sets the final status, and (if [Elastic](10-elastic.md) forwarding is on) the rows are sent as each result arrives.
 
 Windows collections run through WinRM (PowerShell remoting with NTLM and message encryption). Linux collections are streamed to the shell over SSH, so nothing is written to the target. Credentials are passed by environment variable, never on a command line.
 
@@ -120,6 +128,7 @@ output/
       H_<name>_<date>_<IP>/                one folder per host
         <collection>_<date>_<IP>.csv       one CSV per collection
         raw/<collection>/...               raw artefacts, only for large-transfer collections
+        processed/<processor>/...          what a workflow's processors produced (only when a workflow ran)
   responses/
     R_<name>_<date>/...                    the same layout for responses
   reports/

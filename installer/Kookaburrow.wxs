@@ -106,7 +106,7 @@
     <!-- Writes the admin account and Server Settings with the bundled Node.js. The values are wrapped in one extra character each side
          (see scripts/install-setup.js); HideTarget keeps the password out of the install log. -->
     <CustomAction Id="RunSetup" Directory="INSTALLFOLDER" Execute="deferred" Impersonate="no" Return="check" HideTarget="yes"
-                  ExeCommand="&quot;[INSTALLFOLDER]runtime\node.exe&quot; &quot;[INSTALLFOLDER]scripts\install-setup.js&quot; &quot;--host=x[KBHOST]x&quot; &quot;--port=x[KBPORT]x&quot; &quot;--allow=x[KBALLOW]x&quot; &quot;--user=x[ADMINLOGIN]x&quot; &quot;--pass=x[ADMINPASS]x&quot;" />
+                  ExeCommand="&quot;[INSTALLFOLDER]runtime\node.exe&quot; &quot;[INSTALLFOLDER]scripts\install-setup.js&quot; &quot;--host=x[KBHOST]x&quot; &quot;--port=x[KBPORT]x&quot; &quot;--allow=x[KBALLOW]x&quot; &quot;--user=x[ADMINLOGIN]x&quot; &quot;--pass=x[ADMINPASS]x&quot; &quot;--home=x[HOMEDIR]x&quot;" />
     <!-- The data folder holds the database and encryption key: only SYSTEM and Administrators. -->
     <CustomAction Id="LockData" Directory="TARGETDIR" Execute="deferred" Impersonate="no" Return="ignore"
                   ExeCommand="&quot;[System64Folder]icacls.exe&quot; &quot;[HOMEDIR].&quot; /inheritance:r /grant:r *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F" />

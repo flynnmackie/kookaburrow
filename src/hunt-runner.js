@@ -9,6 +9,8 @@ const { safeName, createRunFolder, parseCsv, combine } = require('./output');
 const { runLarge } = require('./large-transfer');
 const cancel = require('./cancel');
 const elastic = require('./elastic');
+const workflowRunner = require('./workflow-runner');
+const workflows = require('./workflows');
 
 // A hunt runs one or more collections on a set of hosts and writes what comes back under output/hunts/ (the layout is described in
 // src/output.js): a folder per hunt, a folder per host inside it with one CSV per collection, and the hunt's log, All_Hosts CSV and
@@ -21,7 +23,11 @@ const linesToCsv = (text) => ['Output', ...text.replace(/\r\n/g, '\n').replace(/
 // PowerShell output may carry a leading/trailing blank line from Out-String.
 const tidyCsv = (text) => text.replace(/^\s*\r?\n/, '').replace(/\s+$/, '') + '\r\n';
 
-function startHunt({ name, collectionIds, hosts, params, startedBy, scheduleId, quick = false }) {
+function startHunt({ name, collectionIds, hosts, params, startedBy, scheduleId, quick = false, workflowId = null, sendElastic }) {
+  const send = (typeof sendElastic === 'boolean' ? sendElastic : elastic.defaultOn()) && elastic.configured();
+  const workflow = workflowId ? workflows.find(workflowId) : null;
+  if (workflowId && !workflow) throw new Error('Unknown workflow');
+  if (workflow) workflows.assertReady(workflow); // missing tools: refuse now, before anything is collected
   const chosen = collectionIds.map((cid) => {
     const c = collections.resolveCollection(cid);
     if (!c) throw new Error(`Unknown collection: ${cid}`);
@@ -53,6 +59,7 @@ function startHunt({ name, collectionIds, hosts, params, startedBy, scheduleId, 
     collectionIds: chosen.map((c) => c.id), collectionNames: chosen.map((c) => c.name),
     collectionName: chosen.map((c) => c.name).join(', '),
     parameterNames: Object.fromEntries(chosen.filter((c) => c.parameters.length).map((c) => [c.id, c.parameters.map((p) => (c.optionalParameters.includes(p) ? `${p}?` : p))])),
+    ...(workflow ? { workflowId: workflow.id, workflowName: workflow.name } : {}), sendElastic: send,
     outputPath: folder.rel, status: 'running', startedAt: started.toISOString(),
     results: hosts.flatMap((h) => chosen.map((c) => ({
       hostId: h.id, hostLabel: label(h), address: h.address, collectionId: c.id, collectionName: c.name, status: 'queued',
@@ -165,12 +172,18 @@ function startHunt({ name, collectionIds, hosts, params, startedBy, scheduleId, 
         })),
       };
     });
-    run.status = run.results.some((r) => r.status === 'cancelled') ? 'cancelled' : run.results.some((r) => r.status === 'error') ? 'completed_with_errors' : 'completed';
+    // post-processing: the workflow attached to the hunt runs over what was collected (the hunt stays 'running' until it is done)
+    if (workflow && !signal.aborted) {
+      try { await workflowRunner.postProcess({ run, folder, workflow, audit, signal, hostBase, hosts }); }
+      catch (e) { audit.log({ kind: 'error', host: 'All hosts', action: 'Workflow failed', artefact: workflow.name, outcome: 'error', detail: e.message }); run.workflow = { ...(run.workflow || {}), status: 'error', error: e.message }; }
+    }
+    run.status = signal.aborted || run.results.some((r) => r.status === 'cancelled') ? 'cancelled' : run.results.some((r) => r.status === 'error') ? 'completed_with_errors' : 'completed';
     run.finishedAt = new Date().toISOString();
     const huntJson = JSON.stringify({
       name: huntName, startedBy: startedBy || null, folder: folder.base, status: run.status, startedAt: run.startedAt, finishedAt: run.finishedAt,
       hosts: hosts.map((h) => ({ hostname: label(h), address: h.address, os: h.os || null, protocol: h.protocol })),
       collections: details,
+      ...(run.workflow ? { workflow: run.workflow } : {}),
     }, null, 2) + '\n';
     fs.writeFileSync(path.join(folder.abs, `${allBase}.json`), huntJson);
     audit.log({ kind: 'evidence', host: 'All hosts', action: 'output written', artefact: 'All_Hosts.json', size: Buffer.byteLength(huntJson), receivedHash: sha256(huntJson), detail: `${allBase}.json` });

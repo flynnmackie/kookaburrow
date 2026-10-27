@@ -19,6 +19,7 @@ const ssh = require('./remote/ssh');
 //   $Footprint = 'none'                FOOTPRINT="none"      none | transient | persistent  (what it leaves on the host)
 //   $Returns = 'records'               RETURNS="records"     records | files | both         (what comes back)
 //   $Type = 'command'                  TYPE="command"        command | artefact | tool      (how it gets the data)
+//   $Produces = @('evtx')              PRODUCES=(evtx)          the raw artefact kinds it leaves in raw/ (feeds workflow processors, see processors/)
 //   $Transfer = 'none'                 TRANSFER="none"       none | large                   (large: the script writes files to $OutDir / $OUT_DIR, which can be GBs,
 //                                                             and they are pulled back over SMB (Windows hosts) or SFTP (Linux hosts); see src/large-transfer.js)
 // The platform reads them as text and never executes the file to do so. Comments and blank
@@ -96,7 +97,7 @@ const rawParams = (fields) => (Array.isArray(fields.parameters) ? fields.paramet
 function parseCollection(text, type, isAction = false) {
   const s = text.replace(/^\uFEFF/, '');
   const ps = type === 'powershell';
-  const re = ps ? /^[ \t]*\$(Name|Description|Dependencies|Tags|Parameters|Footprint|Returns|Type|Transfer)[ \t]*=[ \t]*/i : /^[ \t]*(NAME|DESCRIPTION|DEPENDENCIES|TAGS|PARAMETERS|FOOTPRINT|RETURNS|TYPE|TRANSFER)=/;
+  const re = ps ? /^[ \t]*\$(Name|Description|Dependencies|Tags|Parameters|Footprint|Returns|Type|Transfer|Produces)[ \t]*=[ \t]*/i : /^[ \t]*(NAME|DESCRIPTION|DEPENDENCIES|TAGS|PARAMETERS|FOOTPRINT|RETURNS|TYPE|TRANSFER|PRODUCES)=/;
   const fields = {};
   let pos = 0, end = 0;
   while (pos < s.length) {
@@ -132,6 +133,8 @@ function parseCollection(text, type, isAction = false) {
     parameters: rawParams(fields).map((x) => x.replace(/\?$/, '')),
     optionalParameters: rawParams(fields).filter((x) => x.endsWith('?')).map((x) => x.slice(0, -1)), // written with a trailing ? in the header
     tags: [...new Set(tags.map((t) => t.trim().toLowerCase()).filter(Boolean))],
+    // The kinds of raw artefact it leaves in raw/ (for example 'evtx'); workflow processors that accept one of them can run on it.
+    produces: [...new Set((Array.isArray(fields.produces) ? fields.produces : String(fields.produces ?? '').split(/[,;]/)).map((t) => t.trim().toLowerCase()).filter(Boolean))],
     body: s.slice(end).replace(/^(?:[ \t]*\r?\n)+/, '').replace(/\s+$/, ''),
     warnings: FIELDS.filter((f) => fields[f] === undefined).map((f) => `Missing ${label(f)} variable at the top of the script`),
   };
@@ -156,7 +159,7 @@ function listScripts(root, query, tags = [], requiresDeps = false) {
       const collection = {
         id: `${type}/${f}`, type, file: f,
         name: p.name || f.slice(0, -ext.length), description: p.description,
-        dependencies: p.dependencies, footprint: p.footprint, returns: p.returns, kind: p.kind, transfer: p.transfer, parameters: p.parameters, optionalParameters: p.optionalParameters, tags: p.tags, warnings: p.warnings,
+        dependencies: p.dependencies, footprint: p.footprint, returns: p.returns, kind: p.kind, transfer: p.transfer, produces: p.produces, parameters: p.parameters, optionalParameters: p.optionalParameters, tags: p.tags, warnings: p.warnings,
         verified: verified[`${type}/${f}`] === hashText(text),
       };
       if (!wanted.every((t) => collection.tags.includes(t))) continue;

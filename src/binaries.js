@@ -10,7 +10,14 @@ const { binariesDir } = require('./config');
 const collections = require('./collections');
 
 // Collections and actions both declare binaries (the deploy actions need installers).
-const declaring = () => [...collections.listCollections(), ...collections.listActions()];
+// kind: 'hunt' (collections), 'action' (responses, for example the deploy installers) - both staged on a target - or 'processing' (workflow tools, unpacked on the server)
+const declaring = () => [
+  ...collections.listCollections().map((h) => ({ ...h, kind: 'hunt' })),
+  ...collections.listActions().map((h) => ({ ...h, kind: 'action' })),
+  ...require('./processors').declared().map((h) => ({ ...h, kind: 'processing' })),
+];
+// Server dependencies still missing for the tool archives that need them: archive name -> readable names.
+const needsSystem = () => { const m = new Map(); for (const p of require('./processors').list()) for (const a of p.dependencies) if (p.missingSystem.length) m.set(a, [...new Set([...(m.get(a) || []), ...p.missingSystem])]); return m; };
 
 const MAX_BYTES = 500 * 1024 * 1024;
 
@@ -27,9 +34,10 @@ function listBinaries() {
   for (const h of declaring()) {
     for (const dep of h.dependencies) {
       if (!usedBy.has(dep)) usedBy.set(dep, []);
-      usedBy.get(dep).push({ id: h.id, name: h.name });
+      usedBy.get(dep).push({ id: h.id, name: h.name, kind: h.kind });
     }
   }
+  const sys = needsSystem();
   fs.mkdirSync(binariesDir, { recursive: true });
   const onDisk = fs.readdirSync(binariesDir).filter((n) => isSafeName(n) && fs.statSync(path.join(binariesDir, n)).isFile());
   const names = [...new Set([...usedBy.keys(), ...onDisk])].sort((a, b) => a.localeCompare(b));
@@ -40,6 +48,8 @@ function listBinaries() {
     return {
       name,
       usedBy: usedBy.get(name) || [],
+      kinds: [...new Set((usedBy.get(name) || []).map((u) => u.kind))],
+      needsSystem: sys.get(name) || [],
       present,
       size: st?.size ?? null,
       modifiedAt: st?.mtime.toISOString() ?? null,

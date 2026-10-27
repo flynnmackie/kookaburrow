@@ -92,7 +92,7 @@ document.addEventListener('mousedown', (e) => { const el = lockedTarget(e); if (
 
 // Which permission each page needs. The top-bar tab for an area is locked when every page in it is.
 const PAGE_PERM = {
-  'settings/user-management': 'users.view', 'settings/shell-settings': 'system.view', 'settings/health-settings': 'system.view', 'settings/run-settings': 'system.view', 'settings/server-settings': 'system.view', 'settings/certificate': 'system.view', 'settings/elastic': 'system.view',
+  'settings/user-management': 'users.view', 'settings/shell-settings': 'system.view', 'settings/health-settings': 'system.view', 'settings/run-settings': 'system.view', 'settings/server-settings': 'system.view', 'settings/certificate': 'system.view', 'settings/elastic': 'system.view', 'settings/dependencies': 'system.view',
   'settings/view-collections': 'collections.view', 'settings/add-collections': 'collections.manage', 'settings/binaries': 'collections.manage',
   'settings/view-actions': 'actions.view', 'settings/add-actions': 'actions.manage',
   'hosts/view-hosts': 'hosts.view', 'hosts/profiles': 'hosts.view', 'hosts/groups': 'hosts.view', 'hosts/discover': 'hosts.manage', 'hosts/manual': 'hosts.manage',
@@ -120,7 +120,7 @@ const NAV = [
     ['user-management', 'User Management', 'System'], ['shell-settings', 'Shell Settings', 'System'], ['health-settings', 'Health Settings', 'System'], ['run-settings', 'Run Settings', 'System'], ['server-settings', 'Server Settings', 'System'], ['certificate', 'Certificate', 'System'], ['elastic', 'Elastic', 'System'],
     ['view-collections', 'View Collections', 'Collections'], ['add-collections', 'Add Collections', 'Collections'],
     ['view-actions', 'View Actions', 'Actions'], ['add-actions', 'Add Actions', 'Actions'],
-    ['binaries', 'Upload Binaries'],
+    ['binaries', 'Binaries', 'External'], ['dependencies', 'Dependencies', 'External'],
   ] },
   { id: 'hosts', label: 'Host Management', pages: [
     ['view-hosts', 'View Hosts', 'Hosts'], ['profiles', 'Profiles', 'Hosts'], ['groups', 'Groups', 'Hosts'],
@@ -165,6 +165,7 @@ const loaders = {
   'settings/server-settings': loadServerSettings,
   'settings/certificate': loadCertificate,
   'settings/elastic': loadElastic,
+  'settings/dependencies': loadDependencies,
   'settings/shell-settings': loadShellSettings,
   'settings/add-collections': () => addCollections(),
   'settings/add-actions': () => addActions(),
@@ -980,7 +981,7 @@ function makeLibrary({ id, url, noun, folder, showParams }) {
     ${h.verified ? VERIFIED : ''}<button class="fav-btn ${f.favs.has(h.id) ? 'on' : ''}" data-fav="${esc(h.id)}" title="${f.favs.has(h.id) ? 'Remove from your favourites' : 'Add to your favourites'}" aria-pressed="${f.favs.has(h.id)}">${f.favs.has(h.id) ? '★' : '☆'}</button><div class="hd-name">${esc(h.name)}</div>
     <div class="hd-file">${esc(h.id)}</div>
     ${metaIcons(h, true)}
-    ${h.missingDependencies.length ? `<div class="hd-unmet">Some dependencies missing: ${h.missingDependencies.map(esc).join(', ')}. Upload them in Settings → Binaries.</div>` : ''}
+    ${h.missingDependencies.length ? `<div class="hd-unmet">Some dependencies missing: ${h.missingDependencies.map(esc).join(', ')}. Upload them in Settings → External → Binaries.</div>` : ''}
     ${h.warnings.length ? `<div class="hd-warn">${h.warnings.map(esc).join('<br>')}</div>` : ''}
     <div class="hd-label hd-label-desc">Description</div>
     <div class="hd-desc">${h.description ? esc(h.description) : '<span class="dim">-</span>'}</div>
@@ -1176,7 +1177,7 @@ const addActions = makeEditor({
 // ---- Shared by Hunt and Respond ----
 // A green R after a name marks a run that came from a recurring schedule.
 // Small tags after a name: Q for a quick hunt or response (one host, from the Shell tab), a green R for a recurring run.
-const schedTag = (r) => (r.quick ? '<span class="qtag" title="Quick run: one host, started from the Shell tab">Q</span>' : '') + (r.scheduleId ? '<span class="rtag" title="Ran on a recurring schedule">R</span>' : '');
+const schedTag = (r) => (r.quick ? '<span class="qtag" title="Quick run: one host, started from the Shell tab">Q</span>' : '') + (r.scheduleId ? '<span class="rtag" title="Ran on a recurring schedule">R</span>' : '') + (r.workflowId ? `<span class="wtag" title="Ran a workflow: ${esc(r.workflowName || 'workflow')}">W</span>` : '');
 // Confirms, then deletes a hunt or response: its record and its output folder. A running one can't be deleted.
 async function confirmDeleteRun(r, url, noun) {
   if (r.status === 'running') { toast(`That ${noun} is still running. Wait for it to finish.`); return false; }
@@ -1264,7 +1265,7 @@ function hostProgressHtml(r, isHunt) {
   const total = r.results.length, done = r.results.filter(isDone).length, hostsDone = [...hosts.values()].filter((h) => h.items.every(isDone)).length;
   return `<div class="hd-label">Progress by host</div>
     <div class="pall">${bar(r.results)}<span>${done} of ${total} ${noun} run${total === 1 ? '' : 's'} finished · ${hostsDone} of ${hosts.size} host${hosts.size === 1 ? '' : 's'} done</span>${r.status === 'running' && !r.cancelRequested ? `<a class="act sec bad" data-cancel="${esc(r.id)}" data-perm="${isHunt ? 'hunts.run' : 'actions.run'}" data-perm-what="cancel ${isHunt ? 'hunts' : 'responses'}" title="Stop this ${isHunt ? 'hunt' : 'response'}">Cancel ${isHunt ? 'hunt' : 'response'}</a>` : r.status === 'running' ? '<span class="st-warn">Cancelling…</span>' : ''}</div>
-    <table class="bh"><thead><tr><th>Host</th><th style="width:34%">Progress</th><th class="num">Done</th><th>Now</th><th class="num">Elapsed</th></tr></thead><tbody>${rows}</tbody></table>`;
+    ${r.status === 'running' || r.results.some((x) => x.status !== 'ok') ? `<table class="bh"><thead><tr><th>Host</th><th style="width:34%">Progress</th><th class="num">Done</th><th>Now</th><th class="num">Elapsed</th></tr></thead><tbody>${rows}</tbody></table>` : ''}`;
 }
 // Cancels a running hunt or response after a warning. A response changes hosts, so its warning is stronger and the server asks for the confirmation too.
 async function cancelRunUi(r, isHunt) {
@@ -1300,7 +1301,7 @@ function renderHuntList() {
 function showMissingBinary(item) {
   $('errTitle').textContent = 'Required binary missing';
   $('errWhere').textContent = item.name;
-  $('errBody').textContent = `Required binary missing: ${item.missingDependencies.join(', ')}\n\nUpload it under Settings → Binaries, then pick this again.`;
+  $('errBody').textContent = `Required binary missing: ${item.missingDependencies.join(', ')}\n\nUpload it under Settings → External → Binaries, then pick this again.`;
   $('errModal').hidden = false; $('errOk').focus();
 }
 // Clicking a host's error opens its message in a small popup.
@@ -1315,10 +1316,46 @@ const closeErr = () => { $('errModal').hidden = true; };
 $('errOk').onclick = $('errX').onclick = closeErr;
 $('errModal').onclick = (e) => { if (e.target.id === 'errModal') closeErr(); };
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('errModal').hidden) closeErr(); });
-// The box under the hunt/response list. A header with the downloads, then three tabs: Details (what ran, the facts and the error log),
+// The box under the hunt/response list. A header with the downloads, then four tabs: About (how it was set up), Details (what ran, the facts and the error log),
 // Files (what it collected, each with a download) and Notebook (the hunt's or response's JSON file to scroll through).
 // `kind` is 'hunt' or 'response'; the tab you pick stays selected as you click from one run to the next.
-const BD_TABS = [['details', 'Details'], ['files', 'Files'], ['notebook', 'Notebook']];
+const BD_TABS = [['about', 'About'], ['details', 'Details'], ['files', 'Files'], ['notebook', 'Notebook']];
+// The About tab: how the run was set up, not what it returned. Who started it, what it ran and on which hosts, whether it recurs, the workflow
+// and the Elastic setting. `schedule` is the recurring schedule the run came from (null when it has been deleted or the run was not recurring).
+function bdAbout({ kind, r, schedule }) {
+  const isHunt = kind === 'hunt', noun = isHunt ? 'hunt' : 'response';
+  const idKey = isHunt ? 'collectionId' : 'actionId', nameKey = isHunt ? 'collectionName' : 'actionName';
+  const items = [...new Map(r.results.map((x) => [x[idKey], x[nameKey]])).entries()];
+  const hosts = [...new Map(r.results.map((x) => [x.hostId, x])).values()];
+  const fact = (k, v) => `<div><span>${k}</span>${v}</div>`;
+  const type = r.quick ? 'Quick (one host, from the Shell tab)' : r.scheduleId ? 'Recurring' : 'Single run';
+  const stages = r.workflow && r.workflow.stages ? [...new Map(r.workflow.stages.map((s) => [s.step, s.processor])).values()] : [];
+  const facts = [
+    fact('Name', esc(huntName(r))), fact('Type', type), fact('Run by', r.startedBy ? esc(r.startedBy) : '-'),
+    fact('Started', `${esc(new Date(r.startedAt).toLocaleString())} <span class="dim">${r.scheduleId ? 'by its schedule' : 'by hand'}</span>`),
+    fact('Hosts', hosts.length), fact(isHunt ? 'Collections' : 'Actions', items.length),
+    ...(isHunt ? [fact('Workflow', r.workflowName ? esc(r.workflowName) : 'None'), fact('Send to Elastic', r.sendElastic === true ? 'Yes' : r.sendElastic === false ? 'No' : '<span class="dim">Not recorded</span>')] : []),
+  ].join('');
+  let recurring;
+  if (!r.scheduleId) recurring = `<p class="dim" style="margin:0">Not recurring: this ${noun} ran once.</p>`;
+  else if (!schedule) recurring = '<p class="dim" style="margin:0">This run came from a recurring schedule that has since been deleted.</p>';
+  else {
+    const until = schedule.until.type === 'forever' ? 'Indefinitely, until it is deleted' : new Date(schedule.until.at).toLocaleString();
+    recurring = `<div class="bd-facts">${fact('Schedule', esc(schedule.name))}${fact('Runs every', esc(rcEvery(schedule.everyMinutes)))}${fact('Until', esc(until))}${fact('Ran so far', schedule.runCount + (schedule.until.type === 'forever' ? '' : ` of ${schedule.totalRuns} planned`))}${fact('Status', esc(schedule.status))}${schedule.status === 'active' && schedule.nextRun ? fact('Next run', esc(new Date(schedule.nextRun).toLocaleString())) : ''}${fact('Created by', schedule.createdBy ? esc(schedule.createdBy) : '-')}</div>`;
+  }
+  const list = items.map(([cid, name]) => {
+    const ps = (r.parameterNames || {})[cid] || [];
+    return `<div class="rc-item"><b>${esc(name)}</b>${ps.length ? `<span class="dim">parameters: ${esc(ps.join(', '))}</span>` : ''}</div>`;
+  }).join('') || '<span class="dim">None</span>';
+  return `<div class="bd-facts">${facts}</div>
+    <div class="hd-label">Recurring</div>${recurring}
+    ${isHunt ? `<div class="hd-label">Workflow</div>${r.workflowName ? `<p style="margin:0">${esc(r.workflowName)}${stages.length ? `<span class="dim"> · ${stages.map(esc).join(', then ')}</span>` : ''}</p>` : '<p class="dim" style="margin:0">No workflow was attached.</p>'}` : ''}
+    <div class="hd-label">${isHunt ? 'Collections' : 'Actions'} run</div><div class="rc-items">${list}</div>
+    <p class="dim" style="margin:4px 0 0">Parameter values are not kept with the ${noun}, only their names.</p>
+    <div class="hd-label">Run on <span class="dim">(${hosts.length})</span></div>
+    <div class="ab-hosts">${hosts.map((h) => `<span class="hres dim">${esc(h.hostLabel || h.address)}${h.hostLabel && h.hostLabel !== h.address ? ` (${esc(h.address)})` : ''}</span>`).join('')}</div>`;
+}
+
 async function bdNotebook(url) {
   try {
     let t = JSON.stringify(await api('GET', url), null, 2);
@@ -1327,11 +1364,11 @@ async function bdNotebook(url) {
     return `<pre class="code bd-json">${highlightJson(t)}</pre>${cut ? '<p class="dim" style="margin:6px 0 0">Showing the first part only. Download the file for all of it.</p>' : ''}`;
   } catch (e) { return `<p class="bad">${esc(e.message)}</p>`; }
 }
-function bdRender({ kind, r, events, files, tab, notebook }) {
+function bdRender({ kind, r, events, files, tab, notebook, schedule }) {
   // the run's own files (log, All_Hosts) first, then each host's folder
   files = [...files].sort((a, b) => (a.folder === '') !== (b.folder === '') ? (a.folder === '' ? -1 : 1) : a.folder.localeCompare(b.folder, undefined, { numeric: true }) || a.name.localeCompare(b.name));
   const isHunt = kind === 'hunt', noun = isHunt ? 'hunt' : 'response';
-  const hosts = new Set(r.results.map((x) => x.hostId)).size, idKey = isHunt ? 'collectionId' : 'actionId', nameKey = isHunt ? 'collectionName' : 'actionName';
+  const idKey = isHunt ? 'collectionId' : 'actionId', nameKey = isHunt ? 'collectionName' : 'actionName';
   const rows = [...new Map(r.results.map((x) => [x[idKey], x[nameKey]])).entries()].map(([cid, name]) => {
     const mine = r.results.filter((x) => x[idKey] === cid), ok = mine.filter((x) => x.status === 'ok').length, bad = mine.filter((x) => x.status === 'error').length;
     const hostsCell = mine.map((x) => x.status === 'ok' ? `<span class="hres ok">${esc(x.address)} OK</span>`
@@ -1355,27 +1392,30 @@ function bdRender({ kind, r, events, files, tab, notebook }) {
       : `<p class="dim" style="margin:0">${r.status === 'running' ? 'Nothing yet. Files appear as hosts finish.' : 'No files were saved.'}</p>`);
   } else if (tab === 'notebook') {
     pane = notebook;
+  } else if (tab === 'about') {
+    pane = bdAbout({ kind, r, schedule });
   } else {
-    pane = `<div class="bd-facts"><div><span>Status</span>${huntStatus(r)}</div><div><span>Run by</span>${r.startedBy ? esc(r.startedBy) : '-'}</div><div><span>Started</span>${esc(new Date(r.startedAt).toLocaleString())}</div>
-      <div><span>Finished</span>${r.finishedAt ? esc(new Date(r.finishedAt).toLocaleString()) : '-'}</div><div><span>Elapsed</span>${esc(huntElapsed(r))}</div><div><span>Hosts</span>${hosts}</div></div>
+    pane = `<div class="bd-facts"><div><span>Status</span>${huntStatus(r)}</div><div><span>Started</span>${esc(new Date(r.startedAt).toLocaleString())}</div>
+      <div><span>Finished</span>${r.finishedAt ? esc(new Date(r.finishedAt).toLocaleString()) : '-'}</div><div><span>Elapsed</span>${esc(huntElapsed(r))}</div><div><span>Errors</span>${problems.length ? `<span class="bad">${problems.length}</span>` : 'None'}</div>${isHunt ? `<div><span>Elastic</span>${r.sendElastic === false ? 'Not sent' : r.elastic ? `${(r.elastic.sent || 0).toLocaleString()} rows sent${r.elastic.failed ? `, <span class="bad">${r.elastic.failed.toLocaleString()} failed</span>` : ''}` : r.sendElastic ? 'Sending' : '-'}</div>` : ''}</div>
     ${r.error ? `<div class="hd-unmet">${esc(r.error)}</div>` : ''}
     ${hostProgressHtml(r, isHunt)}
+    ${isHunt && window.wfStagesHtml ? wfStagesHtml(r) : ''}
     <div class="hd-label">${isHunt ? 'Collections' : 'Actions'} run</div>
     <table class="bh"><thead><tr><th>${isHunt ? 'Collection' : 'Action'}</th>${isHunt ? '' : '<th>Parameters</th>'}<th>Result on each host</th>${isHunt ? '<th class="num">Rows</th>' : ''}</tr></thead><tbody>${rows || '<tr><td colspan="3" class="dim">None</td></tr>'}</tbody></table>
-    <div class="hd-label">Error log <span class="dim">(${problems.length})</span></div>
-    ${problems.length ? `<table class="bh"><thead><tr><th>Time</th><th>Host</th><th>${isHunt ? 'Action' : 'Step'}</th><th>${isHunt ? 'Collection' : 'Action'}</th><th>Detail</th></tr></thead><tbody>${problems.map((e) => `<tr class="${e.kind === 'warn' ? 'st-warn' : 'bad'}"><td class="dim">${esc(new Date(e.t).toLocaleTimeString())}</td><td>${esc(e.host)}</td><td>${esc(e.action)}</td><td>${esc(e.artefact)}</td><td class="bh-wrap">${esc(e.detail)}</td></tr>`).join('')}</tbody></table>`
-      : '<p class="ok" style="margin:0">No errors.</p>'}`;
+    ${problems.length ? `<div class="hd-label">Error log <span class="dim">(${problems.length})</span></div><table class="bh"><thead><tr><th>Time</th><th>Host</th><th>${isHunt ? 'Action' : 'Step'}</th><th>${isHunt ? 'Collection' : 'Action'}</th><th>Detail</th></tr></thead><tbody>${problems.map((e) => `<tr class="${e.kind === 'warn' ? 'st-warn' : 'bad'}"><td class="dim">${esc(new Date(e.t).toLocaleTimeString())}</td><td>${esc(e.host)}</td><td>${esc(e.action)}</td><td>${esc(e.artefact)}</td><td class="bh-wrap">${esc(e.detail)}</td></tr>`).join('')}</tbody></table>`
+      : ''}`;
   }
   return head + pane;
 }
 async function showHunt(id) {
   bh.sel = id; renderHuntList();
   const r = bh.runs.find((x) => x.id === id), box = $('bhDetail'); if (!r) return;
-  let events, files, notebook = '';
+  let events, files, notebook = '', schedule = null;
+  if (bh.tab === 'about' && r.scheduleId) { try { schedule = (await api('GET', '/api/schedules')).schedules.find((s) => s.id === r.scheduleId) || null; } catch { /* shown as deleted */ } }
   try { [events, files, notebook] = await Promise.all([api('GET', `/api/runs/${id}/events`), api('GET', `/api/runs/${id}/files`), bh.tab === 'notebook' ? bdNotebook(`/api/runs/${id}/data`) : '']); } catch (e) { box.innerHTML = `<p class="bad">${esc(e.message)}</p>`; return; }
   if (bh.sel !== id) return; // another hunt was clicked while this loaded
   const keep = box.querySelector('.bd-json')?.scrollTop;
-  box.innerHTML = bdRender({ kind: 'hunt', r, events, files, tab: bh.tab, notebook });
+  box.innerHTML = bdRender({ kind: 'hunt', r, events, files, tab: bh.tab, notebook, schedule });
   if (keep) box.querySelector('.bd-json').scrollTop = keep; // the running-hunt refresh does not jump back to the top
 }
 $('bhList').onclick = async (e) => {
@@ -1551,7 +1591,7 @@ function hmTab(name) {
   document.querySelectorAll('#huntModal .hsec').forEach((p) => { p.hidden = p.dataset.pane !== name; });
   hmEl('Run').hidden = name !== 'name'; hmEl('Next').hidden = name === 'name'; // Run Hunt is only on the last tab
   if (name === 'params') hmParams.render();
-  if (name === 'name') { hmRenderTargetList(); hmEl('Name').focus(); }
+  if (name === 'name') { hmRenderTargetList(); hmRenderOverviewOpts(); hmEl('Name').focus(); }
 }
 // The hosts the hunt will run against: the ticked hosts plus every member of the ticked groups, each once.
 function hmRenderTargetList() {
@@ -1575,7 +1615,7 @@ function hmRenderTargetList() {
     ${win.length || !list.length ? `<p><b>SMB is enabled temporarily</b> on ${win.length ? `${win.length} Windows host${win.length === 1 ? '' : 's'} (${names(win)})` : 'Windows hosts'}, for this server only, then switched off again (left as found if already on).</p>` : ''}
     ${lin.length ? `<p>${lin.length} Linux host${lin.length === 1 ? '' : 's'} (${names(lin)}): the files come back over SFTP on the SSH connection, so nothing is switched on.</p>` : ''}` : '';
 }
-const HM_ORDER = ['who', 'coll', 'params', 'name'];
+const HM_ORDER = ['who', 'coll', 'params', 'opts', 'name'];
 hmEl('Next').onclick = () => { const cur = document.querySelector('#hmTabs .on')?.dataset.pane; hmTab(HM_ORDER[Math.min(HM_ORDER.indexOf(cur) + 1, HM_ORDER.length - 1)]); };
 function hmSetRecurring(on) {
   hm.recurring = on;
@@ -1591,11 +1631,12 @@ function hmQuickUi(host) {
   hmEl('TabWho').hidden = q; hmEl('Rerun').hidden = q;
   hmEl('TabColl').querySelector('.hnum').textContent = q ? '1' : '2';
   hmEl('TabParams').querySelector('.hnum').textContent = q ? '2' : '3';
-  hmEl('TabName').querySelector('.hnum').textContent = q ? '3' : '4';
-  hmEl('Recurring').closest('.sw-row').hidden = q;
+  hmEl('TabOpts').querySelector('.hnum').textContent = q ? '3' : '4';
+  hmEl('TabName').querySelector('.hnum').textContent = q ? '4' : '5';
+  hmEl('Recurring').closest('.sw-row').hidden = q; hmEl('RecBox').hidden = hmEl('RecBox').hidden || q;
   hmEl('Run').textContent = q ? 'Run Quick Hunt' : 'Run Hunt';
 }
-async function openHuntModal(quickHost) {
+async function openHuntModal(quickHost, preWorkflow) {
   hm.selC.clear(); hm.selH.clear(); hm.selL.clear(); hmF.reset(); hm.matches = null; hm.type = 'powershell'; hmParams.reset();
   hmQuickUi(quickHost);
   if (quickHost) { hm.selH.add(quickHost.id); hm.type = quickHost.protocol === 'ssh' ? 'bash' : 'powershell'; } // open on the host's own kind of collections
@@ -1608,7 +1649,55 @@ async function openHuntModal(quickHost) {
     [hm.collections, hm.hosts, hm.lists] = await Promise.all([api('GET', '/api/collections'), api('GET', '/api/hosts'), api('GET', '/api/lists')]);
   } catch (e) { hmEl('Msg').textContent = e.message; hmEl('Msg').className = 'bad'; }
   hmF.loadMeta().catch(() => {}); hmRenderCollections(); hmRenderTargets(); hmSummary();
+  await hmLoadElastic();
+  await hmLoadWorkflows(quickHost ? null : preWorkflow);
 }
+// "Workflow": a workflow runs its steps on what the hunt pulled back. Choosing one also picks the collections it is meant for.
+// "Send results to Elastic": decided per hunt. It starts at the default from Settings > System > Elastic and is unavailable until Elastic is set up.
+function hmSetElastic(on) {
+  hm.sendElastic = !!on && !!hm.elastic.configured;
+  hmEl('Elastic').setAttribute('aria-checked', hm.sendElastic);
+  hmEl('Elastic').disabled = !hm.elastic.configured;
+  hmEl('ElasticLabel').textContent = `Send results to Elastic: ${hm.sendElastic ? 'On' : 'Off'}`;
+  hmEl('ElNote').textContent = !hm.elastic.configured ? 'Elastic is not set up (Settings > System > Elastic).' : hm.sendElastic ? `The rows each host returns, and any workflow output, go to ${hm.elastic.target}.` : 'Nothing from this hunt is sent to Elastic.';
+}
+async function hmLoadElastic() {
+  hm.elastic = { configured: false, default: false, target: '' };
+  try { hm.elastic = (await api('GET', '/api/about')).elastic || hm.elastic; } catch { /* leave it off */ }
+  hmSetElastic(hm.elastic.default);
+}
+hmEl('Elastic').onclick = () => { if (hm.elastic.configured) hmSetElastic(!hm.sendElastic); };
+// What the hunt will do, as set on the Automation tab, for the Overview.
+function hmRenderOverviewOpts() {
+  const w = (hm.workflows || []).find((x) => x.id === hmEl('Workflow').value);
+  const rec = hm.recurring ? recRead('hm') : null;
+  const row = (k, v) => `<div><span>${k}</span>${v}</div>`;
+  hmEl('OvOpts').innerHTML = [
+    hm.quick ? '' : row('Workflow', w ? `<b>${esc(w.name)}</b> <span class="dim">${esc(w.steps.map((s) => s.name).join(', ') || 'no steps')}</span>` : '<span class="dim">None</span>'),
+    hm.quick ? '' : row('Repeats', hm.recurring ? (rec && !rec.error ? esc(rec.text) : '<span class="bad">Set when and for how long on the Automation tab</span>') : '<span class="dim">No, runs once</span>'),
+    row('Elastic', hm.sendElastic ? `Sent to <b>${esc(hm.elastic.target)}</b>` : '<span class="dim">Not sent</span>'),
+  ].join('');
+}
+async function hmLoadWorkflows(pre) {
+  hm.workflows = [];
+  hmEl('WfRow').hidden = true; hmEl('Workflow').innerHTML = '<option value="">Nothing</option>'; hmEl('WfNote').textContent = '';
+  if (hm.quick || !can('workflows.run')) return;
+  try { hm.workflows = (await api('GET', '/api/workflows')).workflows; } catch { return; }
+  if (!hm.workflows.length) return;
+  hmEl('Workflow').innerHTML = '<option value="">Nothing</option>' + hm.workflows.map((w) => `<option value="${esc(w.id)}">${esc(w.name)}</option>`).join('');
+  hmEl('WfRow').hidden = false;
+  if (pre && hm.workflows.some((w) => w.id === pre)) { hmEl('Workflow').value = pre; hmWorkflowChosen(); }
+}
+function hmWorkflowChosen() {
+  const w = (hm.workflows || []).find((x) => x.id === hmEl('Workflow').value);
+  if (!w) { hmEl('WfNote').textContent = ''; return; }
+  for (const cid of w.collectionIds) if (hm.collections.some((c) => c.id === cid && !c.missingDependencies.length)) hm.selC.add(cid);
+  hmRenderCollections(); hmSummary();
+  const bad = w.problems.length;
+  hmEl('WfNote').className = bad ? 'bad' : 'dim'; hmEl('WfNote').style.margin = '2px 0 8px';
+  hmEl('WfNote').textContent = bad ? `This workflow cannot run: ${w.problems.join('; ')}.` : `Runs on the server afterwards: ${w.steps.map((s) => s.name).join(', ') || 'no steps'}. Needs a collection that pulls back files the steps read.`;
+}
+hmEl('Workflow').onchange = hmWorkflowChosen;
 const closeHuntModal = () => { $('huntModal').hidden = true; };
 $('bhNew').onclick = () => openHuntModal();
 $('hmCancel').onclick = closeHuntModal;
@@ -1683,6 +1772,7 @@ $('rrUse').onclick = () => {
   hm.shown = null; hmEl('Detail').innerHTML = '<p class="dim">Click a collection to see what it does.</p>';
   hmEl('Name').value = `${huntName(r)}_rerun`;
   hmRenderTargets(); hmRenderCollections(); hmSummary(); hmSetRecurring(false);
+  if (typeof r.sendElastic === 'boolean') hmSetElastic(r.sendElastic);
   const gone = [lostH && `${lostH} host${lostH === 1 ? ' is' : 's are'}`, lostC && `${lostC} collection${lostC === 1 ? ' is' : 's are'}`].filter(Boolean).join(' and ');
   const needs = hmParams.any(); // parameter values are never kept, so they are set again
   hmEl('Msg').textContent = [gone && `${gone} no longer available and left out.`, needs && 'Set the parameters again on the Parameters tab.'].filter(Boolean).join(' '); hmEl('Msg').className = gone ? 'bad' : '';
@@ -1694,13 +1784,15 @@ hmEl('Run').onclick = async () => {
   if (!hm.selC.size) { hmTab('coll'); return msg('Select at least one collection.', 'bad'); }
   const unset = hmParams.problem();
   if (unset) { hmTab('params'); hmParams.show(unset.id); return msg(`${unset.name}: its parameters are not set. Fill them in and press Set parameters.`, 'bad'); }
+  const wfPick = (hm.workflows || []).find((x) => x.id === hmEl('Workflow').value);
+  if (wfPick && wfPick.problems.length) { hmTab('opts'); return msg(`The workflow "${wfPick.name}" cannot run: ${wfPick.problems.join('; ')}.`, 'bad'); }
   if (!hmEl('Name').value.trim()) { hmTab('name'); return msg('Give the hunt a name.', 'bad'); }
   const rec = hm.recurring ? recRead('hm') : null;
   if (rec?.error) { hmTab('name'); return msg(rec.error, 'bad'); }
   hmEl('Run').disabled = true;
   try {
     const run = await api('POST', '/api/hunts', {
-      name: hmEl('Name').value.trim(), collectionIds: [...hm.selC], hostIds: [...hm.selH], listIds: [...hm.selL], params: hmParams.values(), schedule: rec?.schedule, quick: !!hm.quick,
+      name: hmEl('Name').value.trim(), collectionIds: [...hm.selC], hostIds: [...hm.selH], listIds: [...hm.selL], params: hmParams.values(), schedule: rec?.schedule, quick: !!hm.quick, workflowId: hmEl('Workflow').value || undefined, sendElastic: hm.elastic.configured ? hm.sendElastic : undefined,
     });
     closeHuntModal();
     toast(`Hunt "${run.name}" started${rec ? ` and scheduled: ${rec.text.replace(/^Runs now, then /, '')}` : `. Results go to ${run.outputPath}`}`);
@@ -2218,8 +2310,8 @@ async function loadElastic() {
   const s = r.settings; el.st = s;
   const editable = can('system.manage');
   setSwitch('elEnabled', s.enabled);
-  $('elEnabledLabel').textContent = `Forwarding: ${s.enabled ? 'On' : 'Off'}`;
-  $('elEnabledNote').textContent = s.enabled ? 'New hunt results are sent as they arrive.' : 'Off: nothing is sent unless you send a hunt below.';
+  $('elEnabledLabel').textContent = `Send hunts by default: ${s.enabled ? 'On' : 'Off'}`;
+  $('elEnabledNote').textContent = s.enabled ? 'New hunts start with Send results to Elastic on. Each hunt can change it.' : 'New hunts start with it off. Each hunt can turn it on.';
   $('elUrl').value = s.url; $('elAuth').value = s.auth; $('elIndex').value = s.index; $('elInsecure').checked = s.insecure; $('elCa').value = s.ca; $('elUser').value = s.username;
   $('elKey').value = ''; $('elPass').value = '';
   $('elKey').placeholder = s.hasApiKey ? '(saved: type to replace)' : 'Paste the key (encoded or id:key)';
@@ -2240,7 +2332,7 @@ $('elEnabled').onclick = async () => {
   if (!can('system.manage')) return;
   const to = $('elEnabled').getAttribute('aria-checked') !== 'true';
   try { await api('PUT', '/api/settings/elastic', { ...elBody(), enabled: to }); } catch (e) { elMsg(e.message, 'bad'); return; }
-  await loadElastic(); elMsg(to ? 'Forwarding turned on' : 'Forwarding turned off', 'ok');
+  await loadElastic(); elMsg(to ? 'New hunts will send by default' : 'New hunts will not send by default', 'ok');
 };
 $('elSave').onclick = async () => {
   elMsg('Saving\u2026', 'dim');
@@ -2871,22 +2963,62 @@ function highlight(code, type) {
   return out + esc(code.slice(pos));
 }
 
+// ---- Settings: Server Dependencies ----
+function depHtml(d) {
+  return `<div class="sdep">
+    <div style="display:flex; align-items:center; gap:8px"><b>${esc(d.name)}</b><span class="${d.found ? 'ok' : 'bad'}">${d.found ? `Found ${esc(d.version)}` : 'Not found'}</span></div>
+    <div class="dim">Needed for: ${esc(d.needed)}</div>
+    ${d.found ? `<div class="dim">${esc(d.path)}</div>` : `<div style="margin-top:6px">Install it on the server:</div><ul class="dep-install">${d.install.map((x) => `<li>${esc(x)}</li>`).join('')}</ul><div class="dim">${esc(d.after)}</div>`}
+  </div>`;
+}
+async function loadDependencies() {
+  const box = $('depList');
+  try { box.innerHTML = (await api('GET', '/api/dependencies')).map(depHtml).join(''); } catch (e) { box.innerHTML = `<div class="bad">${esc(e.message)}</div>`; }
+}
+$('depRecheck').addEventListener('click', async () => {
+  const b = $('depRecheck'); b.disabled = true; b.textContent = 'Checking…';
+  try { $('depList').innerHTML = (await api('POST', '/api/dependencies/recheck')).map(depHtml).join(''); } catch (e) { $('depList').innerHTML = `<div class="bad">${esc(e.message)}</div>`; }
+  b.disabled = false; b.textContent = 'Re-check';
+});
+
 // ---- Settings: Binaries ----
 // One row per binary that a collection declares in $Dependencies. Red until the hunter uploads it.
 const fmtSize = (n) => (n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+const bin = { list: [], kind: 'all', state: 'all', q: '' };
+const KIND_LABEL = { hunt: 'Hunts', action: 'Actions', processing: 'Processing' };
 async function loadBinaries() {
-  const list = await api('GET', '/api/binaries');
-  $('binTable').tBodies[0].innerHTML = list.map((b) => `<tr class="${b.present ? 'ready' : 'missing'}">
-    <td><b>${esc(b.name)}</b></td>
-    <td>${b.usedBy.map((h) => esc(h.name)).join('<br>') || '<span class="dim">Nothing uses this</span>'}</td>
-    <td><div class="binfield" title="${b.present ? `SHA-256 ${esc(b.sha256)}` : ''}">${b.present
-      ? `${esc(b.name)} <span class="dim" style="margin-left:8px">${fmtSize(b.size)} · ${esc(b.sha256.slice(0, 12))}…</span>`
-      : 'No file uploaded'}</div></td>
-    <td><div class="binactions">
-      <button class="act ${b.present ? 'sec' : ''}" data-upload="${esc(b.name)}" ${b.usedBy.length ? '' : 'disabled'}>${b.present ? 'Replace…' : 'Upload…'}</button>
-      <button class="del" data-remove="${esc(b.name)}" ${b.present ? '' : 'disabled'}>Remove</button>
-    </div></td></tr>`).join('') || '<tr><td colspan="4" class="dim">No collection declares a binary dependency</td></tr>';
+  bin.list = await api('GET', '/api/binaries');
+  renderBinaries();
 }
+function renderBinaries() {
+  const all = bin.list, q = bin.q.trim().toLowerCase();
+  const inKind = (x) => bin.kind === 'all' || x.kinds.includes(bin.kind);
+  const shown = all.filter((x) => inKind(x) && (bin.state === 'all' || (bin.state === 'up') === x.present)
+    && (!q || x.name.toLowerCase().includes(q) || x.usedBy.some((u) => u.name.toLowerCase().includes(q))));
+  const count = (k) => all.filter((x) => k === 'all' || x.kinds.includes(k)).length;
+  document.querySelectorAll('#binKind button').forEach((btn) => {
+    btn.classList.toggle('on', btn.dataset.k === bin.kind);
+    btn.querySelector('.bn').textContent = count(btn.dataset.k);
+  });
+  const up = all.filter((x) => x.present).length;
+  $('binCount').textContent = `${shown.length} of ${all.length} shown · ${up} uploaded · ${all.length - up} not uploaded`;
+  const chips = (x) => {
+    const names = x.usedBy.slice(0, 2).map((u) => `<span class="bchip ${u.kind}" title="${KIND_LABEL[u.kind]}">${esc(u.name)}</span>`).join('');
+    return (names + (x.usedBy.length > 2 ? `<span class="bchip more" title="${esc(x.usedBy.slice(2).map((u) => u.name).join(', '))}">+${x.usedBy.length - 2}</span>` : '')) || '<span class="dim">Nothing uses this</span>';
+  };
+  $('binTable').tBodies[0].innerHTML = shown.map((x) => `<tr class="${x.present ? 'ready' : 'missing'}">
+    <td class="bin-name">${esc(x.name)}</td>
+    <td><div class="bin-used">${chips(x)}</div></td>
+    <td class="bin-st"><span class="bpill ${x.present ? 'up' : 'no'}">${x.present ? 'Uploaded' : 'Not uploaded'}</span>${x.needsSystem.length ? `<span class="bin-sys" title="Install it under External > Dependencies">Needs ${x.needsSystem.map(esc).join(', ')}</span>` : ''}</td>
+    <td class="bin-file" title="${x.present ? `SHA-256 ${esc(x.sha256)}` : ''}">${x.present ? `${fmtSize(x.size)} <span class="dim">· ${esc(x.sha256.slice(0, 12))}…</span>` : '<span class="dim">—</span>'}</td>
+    <td><div class="binactions">
+      <button class="act ${x.present ? 'sec' : ''}" data-upload="${esc(x.name)}" ${x.usedBy.length ? '' : 'disabled'}>${x.present ? 'Replace…' : 'Upload…'}</button>
+      <button class="del" data-remove="${esc(x.name)}" ${x.present ? '' : 'disabled'}>Remove</button>
+    </div></td></tr>`).join('') || `<tr><td colspan="5" class="dim">${all.length ? 'No binaries match these filters' : 'Nothing declares a binary dependency'}</td></tr>`;
+}
+$('binKind').onclick = (e) => { const k = e.target.closest('button')?.dataset.k; if (k) { bin.kind = k; renderBinaries(); } };
+$('binState').onchange = () => { bin.state = $('binState').value; renderBinaries(); };
+$('binSearch').oninput = () => { bin.q = $('binSearch').value; renderBinaries(); };
 let uploadSlot = null;
 // ---- Upload from server ----
 // Point the server at an external location (a folder, an SMB share, Nextcloud / WebDAV or SFTP); it searches below it for the binaries the

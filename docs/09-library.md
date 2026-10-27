@@ -56,6 +56,7 @@ Every collection starts with metadata variables that the platform **reads as tex
 | `$Returns` | `RETURNS` | no | `records` (rows), `files` (raw artefacts) or `both` |
 | `$Type` | `TYPE` | no | `command`, `artefact` (collects existing files) or `tool` (deploys a dependency and returns its output) |
 | `$Transfer = 'large'` | `TRANSFER='large'` | no | The script leaves files in `$OutDir` / `$OUT_DIR` for the server to pull back |
+| `$Produces = @('evtx')` | `PRODUCES=(evtx)` | no | The kind of raw files it leaves in `raw/`. A [workflow processor](07-workflows-and-recurring.md#processors) that accepts that kind can run on them. Kinds in use: `evtx` (Event Logs - Export, Triage - Windows Core, KAPE), `prefetch` (Prefetch - Collect, Triage, KAPE), `registry` (Registry - Collect Hives, Triage, KAPE), `jumplists`, `lnk`, `recyclebin` (Recycle Bin - Collect), `srum`, `timeline` (Windows Timeline - Collect), `pcap` (Network - Packet Capture, Windows and Linux), and for KAPE also `mft` |
 
 When left out, `Footprint`, `Returns` and `Type` are worked out: a script with dependencies is a *tool* with a *transient* footprint; one that returns only files is an *artefact* pull; an action is *persistent*. Use single quotes and write a literal apostrophe as two (`''`) in PowerShell.
 
@@ -72,7 +73,7 @@ Event log collections take `LastMinutes`, or `StartTime` and `EndTime` (`yyyy-MM
 
 A dependency is an external binary a script needs that is **not** part of a standard Windows or Linux install. It must be **one standalone file** (an `.exe`, a `.deb`, a `.zip`...).
 
-- You upload it once under [Settings > Upload Binaries](08-settings.md#upload-binaries); it is matched by **file name**.
+- You upload it once under [Settings > External > Binaries](08-settings.md#binaries); it is matched by **file name**.
 - On every run the platform copies it to a temporary folder on the target and sets `$BinDir` (`BIN_DIR` in bash) to that folder before the script starts, then deletes the folder.
 - A collection whose binaries are not uploaded is greyed out in the New Hunt dialog.
 - Standard cmdlets and modules do not count as dependencies.

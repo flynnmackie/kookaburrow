@@ -9,6 +9,7 @@ const winrm = require('./src/remote/winrm');
 const ssh = require('./src/remote/ssh');
 const collections = require('./src/collections');
 const binaries = require('./src/binaries');
+const dependencies = require('./src/dependencies');
 const collectionFiles = require('./src/collection-files');
 const audit = require('./src/audit');
 const browse = require('./src/browse');
@@ -632,6 +633,7 @@ app.get('/api/about', (req, res) => {
   res.json({
     version: require('./package.json').version, node: process.version, winrm: require('./src/remote/winrm').engine(),
     hostname: os.hostname(), dnsDomain: process.env.USERDNSDOMAIN || '',
+    elastic: { configured: require('./src/elastic').configured(), default: require('./src/elastic').defaultOn(), target: require('./src/elastic').target() },
     bind: `${running.host}:${running.port}`, bindHost: running.host, addresses,
     os: `${os.version()} ${os.release()} (${os.arch()})`,
     uptimeSec: Math.round(process.uptime()), started: new Date(Date.now() - process.uptime() * 1000).toISOString(),
@@ -664,8 +666,20 @@ app.post('/api/hunts', wrap((req, res) => {
   const hosts = [...new Set(hostIds)].map((hid) => db.hosts.find((h) => h.id === hid)).filter(Boolean);
   const collectionIds = Array.isArray(b.collectionIds) ? b.collectionIds : [];
   if (b.quick && (b.schedule || (b.listIds || []).length || hosts.length !== 1)) throw new Error('A quick hunt runs once, on exactly one host');
-  const sched = b.schedule ? scheduler.prepare({ kind: 'hunt', name: b.name, hostIds: Array.isArray(b.hostIds) ? b.hostIds : [], listIds: Array.isArray(b.listIds) ? b.listIds : [], itemIds: collectionIds, params: b.params, schedule: b.schedule, createdBy: req.user }) : null;
-  const run = huntRunner.startHunt({ name: b.name, collectionIds, hosts, params: b.params, startedBy: req.user, scheduleId: sched?.id, quick: !!b.quick });
+  const elasticMod = require('./src/elastic');
+  const sendElastic = typeof b.sendElastic === 'boolean' ? b.sendElastic : elasticMod.defaultOn();
+  if (sendElastic && !elasticMod.configured()) throw new Error('Elastic is not set up (Settings > System > Elastic)');
+  const workflowId = b.workflowId ? String(b.workflowId) : null;
+  if (workflowId) {
+    const wfDef = require('./src/workflows').find(workflowId);
+    if (!wfDef) throw new Error('Unknown workflow');
+    require('./src/workflows').assertReady(wfDef);
+    const a = access(caller(req));
+    if (!a.all && !a.permissions.includes('workflows.run')) return res.status(403).json({ error: 'Permission denied', needed: ['Run workflows'] });
+    if (b.quick) throw new Error('A quick hunt cannot have a workflow');
+  }
+  const sched = b.schedule ? scheduler.prepare({ kind: 'hunt', name: b.name, hostIds: Array.isArray(b.hostIds) ? b.hostIds : [], listIds: Array.isArray(b.listIds) ? b.listIds : [], itemIds: collectionIds, params: b.params, schedule: b.schedule, createdBy: req.user, workflowId, sendElastic }) : null;
+  const run = huntRunner.startHunt({ name: b.name, collectionIds, hosts, params: b.params, startedBy: req.user, scheduleId: sched?.id, quick: !!b.quick, workflowId, sendElastic });
   if (sched) scheduler.activate(sched, run);
   res.json(run);
 }));
@@ -916,12 +930,16 @@ app.put('/api/settings/runs', wrap((req, res) => { runSettings.setSettings(req.b
 
 // ---- Workflows (Burrow > Workflow): skeleton, see src/workflows.js ----
 const workflows = require('./src/workflows');
-app.get('/api/workflows', (req, res) => res.json({ workflows: workflows.list() }));
-app.post('/api/workflows', wrap((req, res) => res.status(201).json(workflows.create({ ...(req.body || {}), createdBy: req.user }))));
+const processors = require('./src/processors');
+app.get('/api/workflows', (req, res) => res.json({ workflows: workflows.list(), processors: processors.list() }));
+app.post('/api/workflows', wrap((req, res) => res.status(201).json(workflows.create(req.body || {}, req.user))));
+app.put('/api/workflows/:id', wrap((req, res) => res.json(workflows.update(req.params.id, req.body || {}))));
 app.delete('/api/workflows/:id', wrap((req, res) => { workflows.remove(req.params.id); res.json({ ok: true }); }));
 
 // ---- Elastic: forward hunt rows to Elasticsearch (Settings > System > Elastic) ----
 const elastic = require('./src/elastic');
+app.get('/api/dependencies', wrap(async (req, res) => res.json(await Promise.all(dependencies.CATALOG.map((d) => dependencies.status(d.id))))));
+app.post('/api/dependencies/recheck', wrap(async (req, res) => res.json(await dependencies.checkAll())));
 app.get('/api/settings/elastic', (req, res) => res.json({ settings: elastic.settings(), status: elastic.status() }));
 app.put('/api/settings/elastic', wrap((req, res) => { elastic.setSettings(req.body || {}); res.json({ settings: elastic.settings(), status: elastic.status() }); }));
 app.post('/api/settings/elastic/test', wrap(async (req, res) => res.json(await elastic.test(req.body || {}))));
@@ -1026,6 +1044,7 @@ function makeServer() {
   mux.closeAllConnections = () => { for (const x of [secure, local, redirect]) x.closeAllConnections?.(); };
   return mux;
 }
+dependencies.checkAll().catch(() => {}); // what is installed on this server, for the workflows that need it
 const listenOn = (cfg) => new Promise((resolve, reject) => {
   const s = makeServer().listen(cfg.port, cfg.host);
   s.once('listening', () => { servers.push(s); resolve(s); });

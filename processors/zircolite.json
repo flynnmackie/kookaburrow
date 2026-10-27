@@ -1,0 +1,50 @@
+{
+  "id": "zircolite",
+  "name": "Zircolite - Sigma Timeline",
+  "description": "Runs Zircolite over collected .evtx files with its bundled Sigma rules and writes a CSV timeline of detections in time order. Upload the Windows zip as zircolite.zip, or the Linux zip as zircolite-linux.zip. No runtime needed.",
+  "homepage": "https://github.com/wagga40/Zircolite",
+  "accepts": [
+    "evtx"
+  ],
+  "tool": {
+    "win32": {
+      "archive": "zircolite.zip",
+      "exe": "Zircolite.exe"
+    },
+    "linux": {
+      "archive": "zircolite-linux.zip",
+      "exe": "Zircolite"
+    }
+  },
+  "parameters": [
+    {
+      "name": "Rules",
+      "label": "Rule set",
+      "default": "rules_dragon_windows_merged.json",
+      "options": [
+        "rules_dragon_windows_merged.json",
+        "rules_dragon_windows_generic.json",
+        "rules_dragon_windows_sysmon.json",
+        "rules_hatchepsoute_windows_merged.json"
+      ]
+    }
+  ],
+  "command": [
+    "-e",
+    "{input}",
+    "-r",
+    "rules/{Rules}",
+    "--timeline",
+    "{output}/zircolite-timeline.csv",
+    "-q",
+    "-n"
+  ],
+  "outputs": [
+    {
+      "file": "zircolite-timeline.csv",
+      "format": "csv",
+      "timeColumn": "Timestamp"
+    }
+  ],
+  "timeoutMinutes": 120
+}

@@ -1,0 +1,47 @@
+{
+  "id": "appcompatcacheparser",
+  "name": "AppCompatCacheParser - Shimcache Parser",
+  "description": "Runs Eric Zimmerman's AppCompatCacheParser over a collected SYSTEM hive: the Shimcache list of programs seen by Windows, with file modified times. Needs the .NET 10 runtime on the server.",
+  "accepts": [
+    "registry"
+  ],
+  "homepage": "https://ericzimmerman.github.io/",
+  "requires": [
+    "dotnet10"
+  ],
+  "launcher": "dotnet",
+  "tool": {
+    "win32": {
+      "archive": "AppCompatCacheParser.zip",
+      "exe": "AppCompatCacheParser.dll"
+    },
+    "linux": {
+      "archive": "AppCompatCacheParser.zip",
+      "exe": "AppCompatCacheParser.dll"
+    }
+  },
+  "parameters": [],
+  "each": [
+    "SYSTEM"
+  ],
+  "command": [
+    "-f",
+    "{file}",
+    "--csv",
+    "{output}",
+    "--csvf",
+    "shimcache-{n}.csv",
+    "--nl",
+    "--co",
+    "false"
+  ],
+  "outputs": [
+    {
+      "file": "shimcache-*.csv",
+      "format": "csv",
+      "timeUtc": true,
+      "timeColumn": "LastModifiedTimeUTC"
+    }
+  ],
+  "timeoutMinutes": 30
+}

@@ -1,0 +1,46 @@
+{
+  "id": "amcacheparser",
+  "name": "AmcacheParser - Amcache Parser",
+  "description": "Runs Eric Zimmerman's AmcacheParser over a collected Amcache.hve: programs and drivers that ran, with SHA-1 and first-run times. Needs the .NET 10 runtime on the server.",
+  "accepts": [
+    "registry"
+  ],
+  "homepage": "https://ericzimmerman.github.io/",
+  "requires": [
+    "dotnet10"
+  ],
+  "launcher": "dotnet",
+  "tool": {
+    "win32": {
+      "archive": "AmcacheParser.zip",
+      "exe": "AmcacheParser.dll"
+    },
+    "linux": {
+      "archive": "AmcacheParser.zip",
+      "exe": "AmcacheParser.dll"
+    }
+  },
+  "parameters": [],
+  "each": [
+    "Amcache.hve"
+  ],
+  "command": [
+    "-f",
+    "{file}",
+    "-i",
+    "--csv",
+    "{output}",
+    "--csvf",
+    "amcache-{n}.csv",
+    "--nl",
+    "--co",
+    "false"
+  ],
+  "outputs": [
+    {
+      "file": "amcache-*.csv",
+      "format": "csv"
+    }
+  ],
+  "timeoutMinutes": 30
+}

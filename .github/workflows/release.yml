@@ -17,7 +17,16 @@ jobs:
         with:
           node-version: 24
       - run: npm ci            # also builds the bundled WinRM engine (vendor/winrm-runtime)
-      - run: node scripts/build-msi.js
+      - name: Build the installer (signed when the signing secrets exist)
+        shell: pwsh
+        env:
+          SIGNING_PFX_BASE64: ${{ secrets.SIGNING_PFX_BASE64 }}
+          KB_SIGN_PFX_PASSWORD: ${{ secrets.SIGNING_PFX_PASSWORD }}
+        run: |
+          if ($env:SIGNING_PFX_BASE64) {
+            [IO.File]::WriteAllBytes("$env:RUNNER_TEMP\sign.pfx", [Convert]::FromBase64String($env:SIGNING_PFX_BASE64))
+            node scripts/build-msi.js "--sign-pfx=$env:RUNNER_TEMP\sign.pfx"
+          } else { node scripts/build-msi.js }
       - uses: actions/upload-artifact@v4
         with:
           name: Kookaburrow-msi

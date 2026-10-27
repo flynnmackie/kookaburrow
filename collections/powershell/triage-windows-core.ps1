@@ -7,6 +7,7 @@ $Footprint = 'transient'
 $Returns = 'both'
 $Type = 'artefact'
 $Transfer = 'large'
+$Produces = @('evtx', 'prefetch', 'registry')
 
 $ErrorActionPreference = 'SilentlyContinue'
 function Copy-File($src, $dst) {

@@ -37,7 +37,8 @@ Find the symptom, check the cause, apply the fix.
 | The service does not start | Read `data\server.log`. Usually the port is in use (the server then falls back to `127.0.0.1:46200`, then says so in Server Settings), or `db.json` is damaged |
 | The service keeps restarting | Same log: the server exits at start. The wrapper retries every 10 seconds while it dies immediately |
 | After uninstall the old data is still there | By design. Delete `C:\ProgramData\Kookaburrow` for a complete removal |
-| Windows warns about an unknown publisher | The MSI is not code-signed. Verify its SHA-256 against the release notes before running |
+| Windows warns about an unknown publisher | The MSI is not code-signed (or its certificate is not trusted on this machine). Verify its SHA-256 against the release notes before running, or see [Signing and trust](01-installation.md#signing-and-trust) |
+| *This installation package could not be opened. Contact the application vendor to verify that this is a valid Windows Installer package* | This is Windows Installer error 1619, and it is **not** about signing: the file is damaged, incomplete or unreadable. Compare `Get-FileHash` with the hash in the release notes (and the size, about 51 MB); download it again (not through a proxy or antivirus that rewrites files); right-click the file, Properties, tick *Unblock* if shown (or `Unblock-File`); copy it to a local folder such as `C:\Temp` rather than running it from a network share or a VM shared folder; then run `msiexec /i Kookaburrow-1.0.0-x64.msi /l*v install.log` and read the log |
 
 ## Reaching and signing in
 
@@ -77,7 +78,7 @@ ode.exe scriptsinstall-setup.js --host=x127.0.0.1x --port=x46200x --allow=xx --u
 
 | Symptom | Cause and fix |
 |---|---|
-| A collection is greyed out in New Hunt | A binary it depends on is not uploaded. Hover it, then upload under [Upload Binaries](08-settings.md#upload-binaries) |
+| A collection is greyed out in New Hunt | A binary it depends on is not uploaded. Hover it, then upload under [Binaries](08-settings.md#binaries) |
 | A collection shows as an error on one host | Open the hunt: the error is the first line of the failure. Typical: not administrator, wrong collection type for the host (PowerShell on a Linux host or the reverse), or a tool missing |
 | PowerShell collection blocked as malicious | Windows AMSI can block a script that mentions attacker tool names. Rephrase patterns in custom scripts |
 | `AD - ...` hunts fail with a double-hop error | Run them against a domain controller directly. From a member server over WinRM the double-hop limit stops the query |

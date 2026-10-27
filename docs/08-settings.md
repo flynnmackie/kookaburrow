@@ -14,7 +14,8 @@
 - [Certificate](#certificate)
 - [Elastic](#elastic)
 - [Collections and Actions](#collections-and-actions)
-- [Upload Binaries](#upload-binaries)
+- [Dependencies](#dependencies)
+- [Binaries](#binaries)
 - [Permission reference](#permission-reference)
 
 ## Users and roles
@@ -135,11 +136,23 @@ Forwards hunt rows to Elasticsearch. Fully documented in [Elastic](10-elastic.md
 - **Add Collections** and **Add Actions** create custom ones: choose PowerShell or Linux, a file name, a name, description, tags, the footprint, what it returns, its type and dependencies, and paste or **upload** the script. Needs `collections.manage` or `actions.manage`.
 - Custom ones show as *custom* (not verified). Writing them is covered in [The library](09-library.md#writing-your-own).
 
-## Upload Binaries
+## Dependencies
+
+Settings > External > **Dependencies** lists software that must be **installed on the server** (not uploaded) for some [workflow tools](07-workflows-and-recurring.md#writing-a-processor). Kookaburrow only checks; installing needs administrator or root rights.
+
+- The first entry is the **.NET 10 runtime** (or later), needed by Eric Zimmerman's tools. It runs `dotnet --list-runtimes` from the PATH and the usual install folders (`C:\Program Files\dotnet`, `/usr/share/dotnet`, `/usr/lib/dotnet`, `~/.dotnet`) and shows the version and path found. Not found shows the install command for this server's operating system.
+- The second entry is **Zeek**, needed by the Zeek workflow. It is Linux only: checked on the PATH and in `/opt/zeek/bin`; on Windows the page says Zeek has no Windows build.
+- **Re-check** runs the checks again, for example right after you install something. The check also runs when the server starts. Restart the service if a newly installed program is only on a PATH the service has not seen.
+- A tool that needs a missing dependency cannot run: its workflow shows *Cannot run*, a hunt with that workflow is refused before it starts, and its archive on **Binaries** is marked *needs … on the server*.
+- Needs `system.view`.
+
+## Binaries
 
 Some collections and actions need an external tool. Tools are **not shipped**: upload each one here. A run stages the file in a temporary folder on the target, uses it, and deletes the folder.
 
-- The table lists every binary any collection or action declares: *Binary*, *Used by*, *File* (uploaded or not, size, hash). A collection that needs a missing binary is greyed out in the hunt dialog.
+- Settings > **External** holds two pages: **Binaries** (this one) and [Dependencies](#dependencies).
+- **All / Hunts / Actions / Processing** switch between every binary, those used by collections (staged on a target for a hunt), those used by actions such as the deploy installers (staged for a response), and those used by workflow processors (run on the server); each shows how many it holds. A second filter shows **All**, **Uploaded** or **Not uploaded** binaries, and **Search** matches file names and the names of what uses them.
+- The table lists every binary any collection, action or [workflow processor](07-workflows-and-recurring.md#processors) declares (for example `hayabusa.zip`, which is unpacked on the server rather than staged on a target): *Binary*, *Used by*, *File* (uploaded or not, size, hash). A collection that needs a missing binary is greyed out in the hunt dialog.
 - Only names a collection or action asks for can be uploaded, so the folder cannot be filled with arbitrary files. The limit is 500 MB per file.
 - **Upload from server** imports instead of uploading from your own computer. Point the server at a folder, an SMB share, Nextcloud/WebDAV (a folder address, a WebDAV address or a public share link) or an SFTP server. It searches below that location for the wanted file names (exact name, any case; the newest copy first), and you import the ones you want, optionally checking each against an expected SHA-256. A binary already uploaded is only replaced if you tick **Overwrite**. Nothing about the location is saved, and the server will not connect to its own machine or link-local addresses. SMB from a Linux server needs `smbclient` and is untested.
 - Needs `collections.manage`.

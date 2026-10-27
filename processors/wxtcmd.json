@@ -1,0 +1,42 @@
+{
+  "id": "wxtcmd",
+  "name": "WxTCmd - Windows Timeline Parser",
+  "description": "Runs Eric Zimmerman's WxTCmd over each collected ActivitiesCache.db: the applications, files and web pages a user used, with start and end times. Needs the .NET 10 runtime on the server.",
+  "accepts": [
+    "timeline"
+  ],
+  "homepage": "https://ericzimmerman.github.io/",
+  "requires": [
+    "dotnet10"
+  ],
+  "launcher": "dotnet",
+  "tool": {
+    "win32": {
+      "archive": "WxTCmd.zip",
+      "exe": "WxTCmd.dll"
+    },
+    "linux": {
+      "archive": "WxTCmd.zip",
+      "exe": "WxTCmd.dll"
+    }
+  },
+  "parameters": [],
+  "each": [
+    "ActivitiesCache.db"
+  ],
+  "command": [
+    "-f",
+    "{file}",
+    "--csv",
+    "{output}/user{n}",
+    "--co",
+    "false"
+  ],
+  "outputs": [
+    {
+      "file": "user*/*.csv",
+      "format": "csv"
+    }
+  ],
+  "timeoutMinutes": 30
+}

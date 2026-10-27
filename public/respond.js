@@ -27,13 +27,14 @@ function renderRespList() {
 async function showResponse(id) {
   br.sel = id; renderRespList();
   const r = br.runs.find((x) => x.id === id), box = $('brDetail'); if (!r) return;
-  let events, files, notebook = '';
+  let events, files, notebook = '', schedule = null;
+  if (br.tab === 'about' && r.scheduleId) { try { schedule = (await api('GET', '/api/schedules')).schedules.find((s) => s.id === r.scheduleId) || null; } catch { /* shown as deleted */ } }
   try { [events, files, notebook] = await Promise.all([api('GET', `/api/responses/${id}/events`), api('GET', `/api/responses/${id}/files`), br.tab === 'notebook' ? bdNotebook(`/api/responses/${id}/data`) : '']); } catch (e) { box.innerHTML = `<p class="bad">${esc(e.message)}</p>`; return; }
   if (br.sel !== id) return;
   const rank = (f) => (f.folder === '' ? 0 : 1);
   files.sort((a, b) => rank(a) - rank(b) || a.folder.localeCompare(b.folder, undefined, { numeric: true }) || a.name.localeCompare(b.name));
   const keep = box.querySelector('.bd-json')?.scrollTop;
-  box.innerHTML = bdRender({ kind: 'response', r, events, files, tab: br.tab, notebook });
+  box.innerHTML = bdRender({ kind: 'response', r, events, files, tab: br.tab, notebook, schedule });
   if (keep) box.querySelector('.bd-json').scrollTop = keep;
 }
 $('brList').onclick = async (e) => {

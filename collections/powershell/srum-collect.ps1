@@ -6,6 +6,7 @@ $Footprint = 'transient'
 $Returns = 'both'
 $Type = 'artefact'
 $Transfer = 'large'
+$Produces = @('srum')
 
 $ErrorActionPreference = 'SilentlyContinue'
 $src = "$env:SystemRoot\System32\sru\SRUDB.dat"

@@ -7,6 +7,7 @@ $Footprint = 'transient'
 $Returns = 'both'
 $Type = 'artefact'
 $Transfer = 'large'
+$Produces = @('evtx')
 
 # $OutDir is the temporary folder on the host that Kookaburrow pulls back afterwards and then removes.
 $ErrorActionPreference = 'Stop'

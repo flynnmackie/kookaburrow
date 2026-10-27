@@ -57,7 +57,7 @@ Server Settings warns when you expose the server over plain HTTP, listen on the 
 - Passwords are never sent back to the browser, and never appear in logs, the activity log or error messages.
 - **Hunt and response parameter values are not stored**, except in recurring schedules, where they are kept encrypted.
 - WinRM and SSH credentials are passed to the engine by **environment variable**, not on a command line.
-- The location and sign-in details used for a one-off [binary import](08-settings.md#upload-binaries) (SMB, SFTP, Nextcloud, WebDAV) are not saved.
+- The location and sign-in details used for a one-off [binary import](08-settings.md#binaries) (SMB, SFTP, Nextcloud, WebDAV) are not saved.
 
 ## What runs with which privileges
 

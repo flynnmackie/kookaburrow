@@ -14,6 +14,7 @@ const RULES = [
   ['GET', /^\/api\/(profiles|assignments)$/, ['hosts.view']],
   ['*', /^\/api\/(scans|profiles|assignments|lists|hosts|auth\/test)(\/|$)/, ['hosts.manage']],
 
+  ['*', /^\/api\/dependencies(\/|$)/, ['system.view']],
   ['GET', /^\/api\/binaries$/, ['collections.view']],
   ['*', /^\/api\/binaries(\/|$)/, ['collections.manage']],
   ['GET', /^\/api\/collections\/user$/, ['collections.manage']],

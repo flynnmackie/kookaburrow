@@ -7,6 +7,7 @@ $Footprint = 'transient'
 $Returns = 'both'
 $Type = 'artefact'
 $Transfer = 'large'
+$Produces = @('prefetch')
 
 $ErrorActionPreference = 'SilentlyContinue'
 $since = if ($Days -match '^\d+$') { (Get-Date).AddDays(-[int]$Days) } else { [datetime]::MinValue }

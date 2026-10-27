@@ -1,0 +1,41 @@
+{
+  "id": "srumecmd",
+  "name": "SrumECmd - SRUM Parser",
+  "description": "Runs Eric Zimmerman's SrumECmd over a collected SRUDB.dat (with the SOFTWARE hive when present): per-application network use, CPU and energy use over weeks. Needs the .NET 10 runtime on the server.",
+  "accepts": [
+    "srum"
+  ],
+  "homepage": "https://ericzimmerman.github.io/",
+  "requires": [
+    "dotnet10"
+  ],
+  "launcher": "dotnet",
+  "tool": {
+    "win32": {
+      "archive": "SrumECmd.zip",
+      "exe": "SrumECmd.dll"
+    },
+    "linux": {
+      "archive": "SrumECmd.zip",
+      "exe": "SrumECmd.dll"
+    }
+  },
+  "parameters": [],
+  "command": [
+    "-d",
+    "{input}",
+    "--csv",
+    "{output}",
+    "--co",
+    "false"
+  ],
+  "outputs": [
+    {
+      "file": "*.csv",
+      "format": "csv",
+      "timeUtc": true,
+      "timeColumn": "Timestamp"
+    }
+  ],
+  "timeoutMinutes": 60
+}

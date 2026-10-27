@@ -1,0 +1,19 @@
+{
+  "id": "recmd",
+  "name": "RECmd - Registry Batch Parser",
+  "description": "Runs Eric Zimmerman's RECmd over collected registry hives with one of its batch files (the Kroll batch covers execution, persistence, user activity and system info) and writes a CSV of the keys and values found. Needs the .NET 10 runtime on the server.",
+  "homepage": "https://ericzimmerman.github.io/",
+  "accepts": ["registry"],
+  "requires": ["dotnet10"],
+  "launcher": "dotnet",
+  "tool": {
+    "win32": { "archive": "RECmd.zip", "exe": "RECmd.dll" },
+    "linux": { "archive": "RECmd.zip", "exe": "RECmd.dll" }
+  },
+  "parameters": [
+    { "name": "Batch", "label": "Batch file", "default": "Kroll_Batch.reb", "options": ["Kroll_Batch.reb", "DFIRBatch.reb", "RegistryASEPs.reb", "UserActivity.reb", "BasicSystemInfo.reb", "InstalledSoftware.reb", "AllRegExecutablesFoundOrRun.reb"] }
+  ],
+  "command": ["-d", "{input}", "--bn", "BatchExamples/{Batch}", "--csv", "{output}", "--csvf", "recmd.csv", "--nl", "--co", "false"],
+  "outputs": [{ "file": "*.csv", "format": "csv", "timeUtc": true, "timeColumn": "LastWriteTimestamp" }],
+  "timeoutMinutes": 90
+}

@@ -7,6 +7,7 @@ FOOTPRINT='transient'
 RETURNS='both'
 TYPE='tool'
 TRANSFER='large'
+PRODUCES=(pcap)
 
 SUDO=""; if [ "$(id -u)" != "0" ] && sudo -n true 2>/dev/null; then SUDO="sudo -n"; fi
 command -v tcpdump >/dev/null 2>&1 || { echo "tcpdump is not installed on this host" >&2; exit 1; }

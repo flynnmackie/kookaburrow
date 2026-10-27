@@ -90,8 +90,13 @@
     <section class="page" id="burrow/workflow">
       <div class="card">
         <div class="bh-bar"><h2>Workflows</h2><button class="act" id="wfNew" data-perm="workflows.manage" data-perm-what="create workflows">New Workflow</button></div>
-        <p class="dim hs-sub">A hunt followed by server-side tools and a destination, for example event logs, then Hayabusa, then Elastic.</p>
+        <p class="dim hs-sub">Collect, process on the server, send on. Attach one to a hunt with <b>Workflow</b> on the Automation tab of New Hunt.</p>
         <div id="wfList"></div>
+      </div>
+      <div class="card">
+        <h2>Processors</h2>
+        <p class="dim hs-sub">Server-side tools a workflow can run on what a hunt collected. Upload each tool under <a href="#settings/binaries">External &gt; Binaries</a>.</p>
+        <div id="wfProcs"></div>
       </div>
     </section>
     <section class="page" id="burrow/recurring">
@@ -215,8 +220,8 @@
     <section class="page" id="settings/elastic">
       <div class="card">
         <h2>Elastic</h2>
-        <p class="dim hs-sub">Forward hunt rows to Elasticsearch (also SOF-ELK: use its Elasticsearch port, 9200). One document per row, in an index per collection.</p>
-        <div class="sw-row" data-perm="system.manage" data-perm-what="turn forwarding on or off"><button class="switch" id="elEnabled" type="button" role="switch" aria-checked="false" aria-label="Forward hunt results"></button><b id="elEnabledLabel">Forwarding: Off</b><span class="dim" id="elEnabledNote"></span></div>
+        <p class="dim hs-sub">Connection to Elasticsearch (also SOF-ELK: use its Elasticsearch port, 9200). Each hunt chooses whether to send on its Automation tab; this sets the default.</p>
+        <div class="sw-row" data-perm="system.manage" data-perm-what="change whether hunts send by default"><button class="switch" id="elEnabled" type="button" role="switch" aria-checked="false" aria-label="Send hunts to Elastic by default"></button><b id="elEnabledLabel">Send hunts by default: Off</b><span class="dim" id="elEnabledNote"></span></div>
         <div class="hs-block">
           <span class="fl">Elasticsearch address</span>
           <div class="hs-row"><input id="elUrl" type="text" spellcheck="false" placeholder="https://elastic.lab.local:9200" style="width:380px;max-width:100%"></div>
@@ -280,12 +285,25 @@
         </div>
       </div>
     </section>
+    <section class="page" id="settings/dependencies">
+      <div class="card">
+        <div style="display:flex; align-items:center; gap:10px"><h2 style="margin:0">Server Dependencies</h2><button class="act sec" id="depRecheck" type="button" style="margin-left:auto">Re-check</button></div>
+        <p class="dim hs-sub">Software that must be installed on this server for some workflow tools. Kookaburrow only checks; it does not install anything.</p>
+        <div id="depList"></div>
+      </div>
+    </section>
     <section class="page" id="settings/binaries">
       <div class="card">
         <div style="display:flex; align-items:center; gap:10px"><h2 style="margin:0">Binaries</h2><button class="act sec" id="binFromServer" type="button" style="margin-left:auto" data-perm="collections.manage" data-perm-what="upload binaries">Upload from server</button></div>
-        <p class="dim">Tools that collections depend on. Upload each one here; it is staged on the target for the run and removed afterwards.</p>
+        <p class="dim hs-sub">Tools that hunts, actions and workflows depend on. Upload each one here.</p>
+        <div class="bin-bar">
+          <div class="toggle" id="binKind"><button type="button" data-k="all" class="on">All <span class="bn"></span></button><button type="button" data-k="hunt" title="Used by collections: staged on the target for a hunt">Hunts <span class="bn"></span></button><button type="button" data-k="action" title="Used by actions, such as the deploy installers: staged on the target for a response">Actions <span class="bn"></span></button><button type="button" data-k="processing" title="Used by workflow processors: unpacked and run on the server">Processing <span class="bn"></span></button></div>
+          <select id="binState" aria-label="Filter by upload status"><option value="all">All binaries</option><option value="up">Uploaded</option><option value="missing">Not uploaded</option></select>
+          <input id="binSearch" type="search" placeholder="Search" spellcheck="false" autocomplete="off">
+          <span class="dim" id="binCount"></span>
+        </div>
         <div id="binMsg" class="bad" style="margin-bottom:8px"></div>
-        <table id="binTable"><thead><tr><th>Binary</th><th>Used by</th><th>File</th><th></th></tr></thead><tbody></tbody></table>
+        <table id="binTable"><thead><tr><th>Binary</th><th>Used by</th><th>Status</th><th>File</th><th></th></tr></thead><tbody></tbody></table>
         <input type="file" id="binFile" hidden>
       </div>
     </section>
@@ -540,7 +558,7 @@
 <div class="modal" id="huntModal" hidden role="dialog" aria-modal="true" aria-labelledby="hmTitle">
   <div class="dlg hunt">
     <div class="dlg-head"><div class="hm-title"><h2 id="hmTitle">New hunt</h2><button class="act sec" id="hmRerun" type="button" title="Start from a hunt you have run before">Rerun past hunt</button></div><button class="dlg-x" id="hmClose" aria-label="Close">×</button></div>
-    <div class="dlg-tabs" id="hmTabs"><button type="button" class="on" data-pane="who" id="hmTabWho"><span class="hnum">1</span>Who</button><button type="button" data-pane="coll" id="hmTabColl"><span class="hnum">2</span>Collections</button><button type="button" data-pane="params" id="hmTabParams"><span class="hnum">3</span>Parameters</button><button type="button" data-pane="name" id="hmTabName"><span class="hnum">4</span>Overview</button></div>
+    <div class="dlg-tabs" id="hmTabs"><button type="button" class="on" data-pane="who" id="hmTabWho"><span class="hnum">1</span>Who</button><button type="button" data-pane="coll" id="hmTabColl"><span class="hnum">2</span>Collections</button><button type="button" data-pane="params" id="hmTabParams"><span class="hnum">3</span>Parameters</button><button type="button" data-pane="opts" id="hmTabOpts"><span class="hnum">4</span>Automation</button><button type="button" data-pane="name" id="hmTabName"><span class="hnum">5</span>Overview</button></div>
     <div class="dlg-body hunt-body">
       <section class="hsec" data-pane="who">
         <h3>Who to run it against</h3>
@@ -569,6 +587,14 @@
           <div class="coll-detail" id="hmPDetail"></div>
         </div>
       </section>
+      <section class="hsec" data-pane="opts" hidden>
+        <h3>Automation</h3>
+        <p class="dim" style="margin:0 0 8px">What happens after the hunt, and whether it repeats.</p>
+        <div id="hmWfRow" class="hm-wf" hidden><span class="fl">Workflow</span><div class="hs-row"><select id="hmWorkflow"><option value="">Nothing</option></select></div><p class="dim" id="hmWfNote" style="margin:2px 0 8px"></p></div>
+        <div id="hmElRow"><div class="sw-row"><button class="switch" id="hmElastic" type="button" role="switch" aria-checked="false" aria-label="Send results to Elastic"></button><b id="hmElasticLabel">Send results to Elastic: Off</b></div><p class="dim" id="hmElNote" style="margin:2px 0 8px"></p></div>
+        <div class="sw-row"><button class="switch" id="hmRecurring" type="button" role="switch" aria-checked="false" aria-label="Recurring hunt"></button><b id="hmRecurringLabel">Recurring hunt: Off</b></div>
+        <div class="rec-box" id="hmRecBox" hidden></div>
+      </section>
       <section class="hsec" data-pane="name" hidden>
         <h3>Overview</h3>
         <span class="fl">Hunt name</span>
@@ -576,8 +602,7 @@
         <div class="ov-cols"><div><span class="fl" id="hmTargetsHead">Will run against</span><div class="pickbox hm-tlist" id="hmTargets"></div></div>
           <div><span class="fl" id="hmItemsHead">Collections to run</span><div class="pickbox hm-tlist" id="hmItems"></div></div></div>
         <div class="smb-warn" id="hmSmbWarn" hidden></div>
-        <div class="sw-row"><button class="switch" id="hmRecurring" type="button" role="switch" aria-checked="false" aria-label="Recurring hunt"></button><b id="hmRecurringLabel">Recurring hunt: Off</b></div>
-        <div class="rec-box" id="hmRecBox" hidden></div>
+        <div id="hmOvOpts" class="ov-opts"></div>
       </section>
     </div>
     <div class="dlg-foot"><button class="act" id="hmNext" type="button">Next</button><button class="act" id="hmRun" hidden data-perm="hunts.run" data-perm-what="run hunts">Run Hunt</button><button class="act sec" id="hmCancel">Cancel</button><span id="hmMsg"></span><span class="sum" id="hmSummary"></span></div>
@@ -654,12 +679,17 @@
   </div>
 </div>
 <div class="modal" id="wfModal" hidden role="dialog" aria-modal="true" aria-labelledby="wfTitle">
-  <div class="dlg pwdlg">
+  <div class="dlg wfdlg">
     <div class="dlg-head"><h2 id="wfTitle">New workflow</h2><button class="dlg-x" id="wfX" type="button" aria-label="Close">×</button></div>
     <div class="dlg-body pw-body">
       <span class="fl">Name</span><input id="wfName" type="text" maxlength="80" autocomplete="off">
       <span class="fl">Description <span class="dim">(optional)</span></span><input id="wfDesc" type="text" maxlength="500" autocomplete="off">
-      <p class="dim" style="margin:10px 0 0">Collections, processing steps and destinations are added in a later version.</p>
+      <span class="fl">Collections <span class="dim">(chosen for you when the workflow is picked on a hunt)</span></span>
+      <div class="pickbox wf-colls" id="wfColls"></div>
+      <span class="fl">Steps <span class="dim">(run on the server, in order, over the files the collections pull back)</span></span>
+      <div id="wfSteps"></div>
+      <div style="margin-top:6px"><button class="act sec" id="wfAddStep" type="button" style="width:auto">Add step</button></div>
+      <div id="wfWarn"></div>
       <div class="um-msg" id="wfMsg" style="margin-top:8px"></div>
     </div>
     <div class="dlg-foot"><button class="act" id="wfSave" type="button">Create</button><button class="act sec" id="wfCancel" type="button">Cancel</button></div>

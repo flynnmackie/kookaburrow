@@ -7,7 +7,8 @@ const { db, save } = require('./store');
 const { encrypt, decrypt } = require('./crypto');
 const { parseCsv, runDir } = require('./output');
 
-// Forwarding hunt results to Elasticsearch (Settings > System > Elastic, kept in db.settings.elastic).
+// Forwarding hunt results to Elasticsearch (Settings > System > Elastic, kept in db.settings.elastic). Each hunt decides for itself whether
+// it sends (run.sendElastic, set in the New Hunt dialog); the settings page holds the connection and whether new hunts send by default.
 // Every row of every collection's CSV becomes one document, sent with the _bulk API as results arrive:
 //   index       <prefix>-<collection>      one index per collection (so columns of different collections never share a mapping)
 //   _id         hash of run + file + row   sending a run again overwrites its documents instead of duplicating them
@@ -56,8 +57,7 @@ function normalise(b, cur) {
 function setSettings(b) {
   db.settings = { ...(db.settings || {}), elastic: normalise(b || {}, raw()) };
   save();
-  if (!raw().enabled) { queue.length = 0; }
-  else kick();
+  if (queue.length) kick();
 }
 
 // ---- talking to Elasticsearch ----
@@ -138,17 +138,25 @@ function rowsToDocs(csv, ctx) {
   table[0].forEach((c, i) => { let n = colName(c, i); while (names.includes(n)) n += '_'; names.push(n); });
   const s = raw(), index = `${s.index}-${slug(ctx.collection.name)}`;
   const when = ctx.when || new Date().toISOString();
+  const tcol = ctx.timeColumn ? names.indexOf(colName(ctx.timeColumn, 0)) : -1;
   return table.slice(1).map((r, i) => {
     const data = {};
     names.forEach((n, j) => { if (r[j] !== undefined && r[j] !== '') data[n] = r[j]; });
+    // a column the processor says holds the event time becomes @timestamp (the collection time is the fallback)
+    let at = when;
+    if (tcol >= 0 && r[tcol]) {
+      let v = String(r[tcol]).replace(' +', '+').replace(' -', '-');
+      if (ctx.timeEpoch && /^\d+(\.\d+)?$/.test(v)) v = new Date(Number(v) * 1000).toISOString(); // seconds since 1970 (Zeek)
+      if (ctx.timeUtc && !/(Z|[+-]\d\d:?\d\d)$/i.test(v)) v = v.replace(' ', 'T') + 'Z'; // the tool writes UTC without saying so
+      const t = Date.parse(v); if (!Number.isNaN(t)) at = new Date(t).toISOString(); }
     const id = crypto.createHash('sha1').update(`${ctx.run.id}|${ctx.file || ctx.collection.id}|${ctx.host.address}|${i}`).digest('hex');
     return {
       index, id, run: ctx.run,
       doc: {
-        '@timestamp': when,
+        '@timestamp': at,
         event: { module: 'kookaburrow', dataset: `kookaburrow.${slug(ctx.collection.name)}`, kind: 'event' },
         host: { name: ctx.host.hostLabel || ctx.host.name || ctx.host.address, ip: [ctx.host.address] },
-        kookaburrow: { run_id: ctx.run.id, hunt: ctx.run.name, run_by: ctx.run.startedBy || 'unknown', ...(ctx.run.scheduleId ? { scheduled: true } : {}), collection: ctx.collection.name, collection_id: ctx.collection.id, data },
+        kookaburrow: { ...(ctx.workflow ? { workflow: ctx.workflow.name, processor: ctx.workflow.processor } : {}), run_id: ctx.run.id, hunt: ctx.run.name, run_by: ctx.run.startedBy || 'unknown', ...(ctx.run.scheduleId ? { scheduled: true } : {}), collection: ctx.collection.name, collection_id: ctx.collection.id, data },
       },
     };
   });
@@ -174,7 +182,6 @@ async function work() {
   try {
     while (queue.length) {
       const s = raw();
-      if (!s.enabled && !forced) { queue.length = 0; break; }
       const batch = []; let bytes = 0;
       while (queue.length && batch.length < BATCH_DOCS && bytes < BATCH_BYTES) { const it = queue.shift(); it.line = JSON.stringify({ index: { _index: it.index, _id: it.id } }) + '\n' + JSON.stringify(it.doc) + '\n'; bytes += it.line.length; batch.push(it); }
       let attempt = 0, done = false;
@@ -203,9 +210,8 @@ async function work() {
       }
       save();
     }
-  } finally { working = false; forced = false; }
+  } finally { working = false; }
 }
-let forced = false; // a manual "send this run" works even when automatic forwarding is off
 
 function enqueue(items) {
   if (queue.length + items.length > MAX_QUEUE) { stats.lastError = `The send queue is full (${MAX_QUEUE} documents); rows were dropped`; stats.lastErrorAt = new Date().toISOString(); return false; }
@@ -218,9 +224,36 @@ function enqueue(items) {
 function forwardResult({ run, collection, host, csv }) {
   try {
     const s = raw();
-    if (!s.enabled || !s.url || !csv) return;
+    if (!run.sendElastic || !s.url || !csv) return;
     enqueue(rowsToDocs(csv, { run, collection, host, file: `${collection.id}`, when: new Date().toISOString() }));
   } catch (e) { stats.lastError = e.message; stats.lastErrorAt = new Date().toISOString(); }
+}
+
+// A processor's output (a CSV a workflow produced) as documents. The hunt decides whether it is sent (run.sendElastic). Returns { queued } or { skipped: reason }.
+const MAX_FILE = 300 * 1024 * 1024;
+// A Zeek log (tab separated, with #fields and other # header lines) as CSV text. "-" (unset) and "(empty)" become empty cells.
+function zeekToCsv(text) {
+  const cell = (v) => (v === '-' || v === '(empty)' ? '' : /[",\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v);
+  let header = null;
+  const out = [];
+  for (const line of text.split('\n')) {
+    if (!line) continue;
+    if (line.startsWith('#fields')) { header = line.split('\t').slice(1); out.push(header.map(cell).join(',')); continue; }
+    if (line[0] === '#') continue;
+    if (header) out.push(line.replace(/\r$/, '').split('\t').map(cell).join(','));
+  }
+  return out.join('\n') + '\n';
+}
+
+function forwardFile({ run, collection, host, file, relName, timeColumn, timeUtc, timeEpoch, format, workflow }) {
+  const s = raw();
+  if (!s.url) return { skipped: 'Elastic is not set up (Settings > System > Elastic)' };
+  const size = fs.statSync(file).size;
+  if (size > MAX_FILE) return { skipped: `the output is ${(size / 1048576).toFixed(0)} MB, over the ${MAX_FILE / 1048576} MB limit for sending` };
+  const text = fs.readFileSync(file, 'utf8');
+  const items = rowsToDocs(format === 'zeek' ? zeekToCsv(text) : text, { run, collection, host, file: relName, timeColumn, timeUtc, timeEpoch, workflow, when: new Date().toISOString() });
+  if (!enqueue(items)) return { skipped: 'the send queue is full' };
+  return { queued: items.length };
 }
 
 // Send (or send again) everything a finished hunt saved. Documents have fixed ids, so nothing is duplicated.
@@ -241,11 +274,17 @@ function forwardRun(runId) {
     docs += items.length;
     if (!enqueue(items)) throw err('The send queue is full');
   }
-  forced = true; kick();
+  kick();
   save();
   return { queued: docs };
 }
 
+// Is Elastic set up, and should a new hunt send to it unless told otherwise (Settings > System > Elastic, "send hunts by default")?
+const configured = () => !!raw().url;
+const defaultOn = () => !!raw().enabled && configured();
+const target = () => { try { return new URL(raw().url).host; } catch { return ''; } };
+
 function status() { return { ...stats, queued: queue.length, working }; }
 
-module.exports = { settings, setSettings, test, forwardResult, forwardRun, status, DEFAULTS, rowsToDocs };
+module.exports = {
+  zeekToCsv, settings, setSettings, test, forwardResult, forwardRun, forwardFile, status, configured, defaultOn, target, DEFAULTS, rowsToDocs };

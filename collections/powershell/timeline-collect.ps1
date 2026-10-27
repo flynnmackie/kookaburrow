@@ -6,6 +6,7 @@ $Footprint = 'transient'
 $Returns = 'both'
 $Type = 'artefact'
 $Transfer = 'large'
+$Produces = @('timeline')
 
 $ErrorActionPreference = 'SilentlyContinue'
 foreach ($p in (Get-CimInstance Win32_UserProfile | Where-Object { $_.LocalPath -and -not $_.Special })) {

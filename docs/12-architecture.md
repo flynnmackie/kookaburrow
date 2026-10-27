@@ -48,6 +48,7 @@ Browser ──HTTP(S)──▶ Express server (Node.js)
 | `data/monitor-log.jsonl` (+ `.1`) | Health checks, trimmed at 20 MB |
 | `data/baselines/` | Uploaded baseline files |
 | `data/server.log`, `server.err` | Server output (under the service, `server.log`) |
+| `data/tools/` | Processor tool archives unpacked on the server, one folder per version |
 | `output/` | Hunt and response results, reports, pulled files, see [output layout](04-hunts.md#output-layout) |
 | `binaries/` | Uploaded tools |
 
@@ -60,10 +61,11 @@ Runs that were `running` when the server stopped are marked `interrupted` at the
 1. The browser posts `/api/hunts` with a name, collection ids, hosts or groups, parameters and an optional schedule. The route needs `hunts.run`.
 2. `hunt-runner.startHunt` resolves each collection, writes a temporary copy with parameter values for those that take them, creates the run folder, records the run and starts the audit log.
 3. Up to *Hosts at once* workers each take a host and run its collections in order. Each collection is executed through the remote layer, honouring a cancel signal.
-4. Output becomes a CSV saved per host; the row count and a SHA-256 go to the audit log; the rows are queued to Elastic when forwarding is on.
+4. Output becomes a CSV saved per host; the row count and a SHA-256 go to the audit log; the rows are queued to Elastic when the hunt is set to send.
 5. For `$Transfer = 'large'` collections, `large-transfer` opens SMB (or uses SFTP), waits for a free slot, pulls and hashes the files and restores the host.
-6. At the end the server writes `All_Hosts.csv` and `.json`, sets the final status, and removes its temporary files.
-7. The browser polls `/api/runs` while a hunt is running to draw progress.
+6. If a workflow is attached, `workflow-runner` runs each step's processor over the matching raw folders, saves the output under `processed/`, and sends it to Elastic when asked.
+7. At the end the server writes `All_Hosts.csv` and `.json`, sets the final status, and removes its temporary files.
+8. The browser polls `/api/runs` while a hunt is running to draw progress.
 
 Responses follow the same path through `response-runner`. Cancelling aborts a per-run `AbortController` (`cancel.js`), which kills the engine process or SSH exec for the host in progress.
 
@@ -168,7 +170,9 @@ Generated from `src/route-perms.js`, in the order the rules are evaluated.
 | `src/report.js`, `diff.js`, `compare.js`, `iocs.js`, `browse.js` | Analysis |
 | `src/scanner.js`, `monitor.js`, `quarantine.js`, `shell.js` | Discovery, health, containment, shells |
 | `src/server-settings.js`, `tls.js`, `tls_gen.py` | Listening, allow-list, HTTPS |
-| `src/elastic.js`, `workflows.js` | Elastic forwarding; workflow skeleton |
+| `src/elastic.js` | Elastic forwarding (rows, and processor output files) |
+| `src/workflows.js`, `processors.js`, `workflow-runner.js` | Workflow definitions and the shipped default, processor manifests and running tools, post-processing of a hunt |
+| `processors/*.json` | Processor manifests (shipped: Hayabusa) |
 | `public/` | The interface: `index.html`, `app.js` and per-area scripts, `tokens.css`, `app.css`, `polish.css` |
 | `scripts/` | `setup-winrm.js`, `verify-collections.js`, `build-msi.js`, `install-setup.js` |
 | `installer/` | WiX source, service wrapper, installer actions, images |

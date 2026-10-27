@@ -24,7 +24,7 @@ A **response** runs **actions** on hosts. Unlike collections, actions **change**
 - **Rerun past response** reuses an earlier response's hosts and actions (parameters are entered again).
 - Running needs `actions.run`; viewing needs `actions.view`.
 - Parameter values are not stored with the response or logged.
-- Actions that deploy software need their installers uploaded first, see [Upload Binaries](08-settings.md#upload-binaries).
+- Actions that deploy software need their installers uploaded first, see [Binaries](08-settings.md#binaries).
 
 Hosts are processed several at once and each host's actions run one after another, the same as hunts. Responses use the **Respond** history list, with the same per-host progress.
 
@@ -67,7 +67,7 @@ The [Quarantine](03-hosts.md#quarantine) button on Health > Monitor uses Host - 
 
 For rolling out monitoring agents. They share these behaviours:
 
-- The installer is a [dependency](09-library.md#dependencies): upload it under Settings > Upload Binaries first. It is staged in a temporary folder on the host and removed afterwards.
+- The installer is a [dependency](09-library.md#dependencies): upload it under Settings > External > Binaries first. It is staged in a temporary folder on the host and removed afterwards.
 - They check for administrator rights (Windows) or root (Linux), skip the install if the service already exists, and verify the service is running afterwards.
 
 | Action | Installer(s) to upload | Parameters |
@@ -91,7 +91,7 @@ The Elastic enrolment token is used for that run only, is never stored by Kookab
 
 ## Following a response
 
-**Burrow! > Respond** lists **Previous responses** with the same *Progress by host* table as hunts. Output for each action is saved as a CSV (what the action printed, one row per line, with a `Stream` column of `stdout` or `stderr`) in `output/responses/R_<name>_<date>/`, with an [activity log](06-results.md#activity-log). Responses can be [reported on](06-results.md#report) the same way as hunts.
+**Burrow! > Respond** lists **Previous responses** with the same *Progress by host* table as hunts. Output for each action is saved as a CSV (what the action printed, one row per line, with a `Stream` column of `stdout` or `stderr`) in `output/responses/R_<name>_<date>/`, with an [activity log](06-results.md#activity-log). Responses can be [reported on](06-results.md#report) the same way as hunts. Selecting a response opens the same About, Details, Files and Notebook tabs as a hunt ([Following a hunt](04-hunts.md#following-a-hunt)); About shows how it was set up (who ran it, the actions and their parameter names, the hosts, any recurring schedule).
 
 ## Recurring responses
 

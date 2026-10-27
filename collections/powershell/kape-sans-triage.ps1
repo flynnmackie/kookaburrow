@@ -6,6 +6,7 @@ $Footprint = 'transient'
 $Returns = 'both'
 $Type = 'tool'
 $Transfer = 'large'
+$Produces = @('evtx', 'prefetch', 'registry', 'mft', 'jumplists', 'lnk', 'srum', 'timeline', 'recyclebin')
 
 # $BinDir holds kape.zip (staged by Kookaburrow); $OutDir is the folder that is pulled back afterwards and then removed.
 $ErrorActionPreference = 'Stop'

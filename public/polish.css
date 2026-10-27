@@ -124,7 +124,7 @@ table.lg td.warnc { color:var(--text); }
 .tagchip:hover { background:var(--hover); color:var(--text); }
 .tagchip.on, .htag.on { background:var(--hover); color:#fff; box-shadow:inset 0 0 0 1px var(--blue-line); }
 .um-chip { background:var(--panel2); color:var(--text); border:0; border-radius:var(--r-s); padding:1px 8px; font-weight:500; }
-.qtag, .rtag { border:0; background:none; padding:0 3px; margin-left:5px; font:700 11px var(--f-ui); } .qtag { color:var(--accent-text); } .rtag { color:var(--ok-text); }
+.qtag, .rtag, .wtag { border:0; background:none; padding:0 3px; margin-left:5px; font:700 11px var(--f-ui); } .qtag { color:var(--accent-text); } .rtag { color:var(--ok-text); } .wtag { color:var(--orange); }
 .bb-n { border:0; background:none; padding:0; color:var(--faint); font-weight:500; } .bb-n.alt { color:var(--faint); }
 .lg-hash { border:0; background:var(--panel2); }
 .grp-count, .hcount { background:none; color:var(--faint); font-weight:500; padding:0; }

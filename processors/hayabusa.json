@@ -1,0 +1,17 @@
+{
+  "id": "hayabusa",
+  "name": "Hayabusa - Event Log Timeline",
+  "description": "Runs Hayabusa 4 (Yamato Security, AGPL-3.0; not shipped: you upload it) over collected .evtx files with its Sigma-based detection rules and writes a CSV timeline of detections.",
+  "homepage": "https://github.com/Yamato-Security/hayabusa",
+  "accepts": ["evtx"],
+  "tool": {
+    "win32": { "archive": "hayabusa.zip", "exe": "hayabusa-*-win-x64.exe" },
+    "linux": { "archive": "hayabusa-linux.zip", "exe": "hayabusa-*-lin-x64-gnu" }
+  },
+  "parameters": [
+    { "name": "MinLevel", "label": "Minimum alert level", "default": "informational", "options": ["informational", "low", "medium", "high", "critical"] }
+  ],
+  "command": ["dfir-timeline", "-d", "{input}", "-o", "{output}/hayabusa-timeline.csv", "-t", "csv", "-w", "-q", "-C", "-U", "-m", "{MinLevel}"],
+  "outputs": [{ "file": "hayabusa-timeline.csv", "format": "csv", "timeColumn": "Timestamp" }],
+  "timeoutMinutes": 60
+}

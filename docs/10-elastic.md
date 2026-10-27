@@ -19,10 +19,10 @@ Kookaburrow can forward every row a hunt collects to **Elasticsearch**, so hunts
 
 ## How it works
 
-- Each CSV row of each collection becomes **one document**, sent with the Elasticsearch `_bulk` API **as results arrive** from each host (when forwarding is on).
+- Each CSV row of each collection becomes **one document**, sent with the Elasticsearch `_bulk` API **as results arrive** from each host (for hunts set to send).
 - No agent, Logstash or extra software is needed: Kookaburrow talks to Elasticsearch directly over HTTP or HTTPS.
 - **Hunts only** for now; responses are not forwarded.
-- Forwarding is **off by default**. Turn it on in **Settings > System > Elastic**.
+- Sending is decided **per hunt**: **Send results to Elastic** on the Automation step of the New Hunt dialog. **Settings > System > Elastic** holds the connection and whether new hunts send **by default** (off until you turn it on).
 
 ## Setting up Elasticsearch on Ubuntu
 
@@ -76,7 +76,7 @@ Copy the `encoded` value from the response.
 
 | Field | Meaning |
 |---|---|
-| Forwarding switch | On: new hunt results are sent as they arrive. Off: nothing is sent unless you use *Send a past hunt* |
+| Send hunts by default | On: New Hunt starts with *Send results to Elastic* on. Off: it starts off. Each hunt can change it. Needs an address to be set |
 | Elasticsearch address | `https://host:9200`. Without a scheme `http://` is assumed |
 | Sign-in | **None** (security off), **API key**, or **User name and password** |
 | API key | The `encoded` value, or `id:key`. Stored **encrypted**; never shown again (the field says *saved: type to replace*) |
@@ -92,7 +92,7 @@ Copy the `encoded` value from the response.
 
 Messages say plainly what is wrong: connection refused, host not found, timed out, certificate not trusted, the server is not speaking TLS on that port, sign-in refused, or which privileges are missing.
 
-**Send a past hunt** queues every row of a finished hunt (choose it from the list). Use it to test, to backfill hunts from before forwarding was on, and to resend after a failure.
+**Send a past hunt** queues every row of a finished hunt (choose it from the list). Use it to test, to backfill hunts that did not send, and to resend after a failure.
 
 The status line shows rows sent and failed since the server started, rows waiting, the time of the last send and the last error. Each hunt also records how many rows were sent and failed.
 
@@ -136,6 +136,10 @@ Changing these settings needs `system.manage`; viewing needs `system.view`.
 
 Values are text so mappings cannot clash between hosts. Dates in the data are not parsed into date fields.
 
+### Workflow output
+
+When a hunt that has a [workflow](07-workflows-and-recurring.md) attached is set to send to Elastic, the processor's output is sent the same way. Those documents also carry `kookaburrow.workflow` and `kookaburrow.processor`, go to an index named after the processor (for example `kookaburrow-hayabusa-event-log-timeline`), and use the tool's own time column as `@timestamp` when the processor names one (Hayabusa: `Timestamp`). The CSV columns are under `kookaburrow.data.*`.
+
 ## Reliability
 
 - Rows are queued in memory and sent in batches of up to 500 documents or 5 MB.
@@ -143,7 +147,6 @@ Values are text so mappings cannot clash between hosts. Dates in the data are no
 - Rows Elasticsearch rejects individually are counted as failed with the first reason shown.
 - The queue holds up to 500,000 documents; beyond that rows are dropped and the status line says so.
 - The queue is **in memory**: a server restart drops anything not yet sent. Use *Send a past hunt* to recover; resending is safe.
-- Turning forwarding off clears what is waiting.
 
 ## Using the data in Kibana
 
@@ -164,8 +167,8 @@ SOF-ELK contains Elasticsearch, so the direct method above works against it by p
 
 ## Limits
 
-- Hunts only; responses are not forwarded.
+- Hunts and workflow output only; responses are not forwarded.
 - Row data is text; no field type mapping or ECS mapping of the CSV columns.
 - The send queue is not persistent.
-- Forwarding is global (not per hunt or collection).
+- The choice is per hunt, not per collection.
 - Tested against a mock server; real Elasticsearch and SOF-ELK behaviour is yet to be confirmed.

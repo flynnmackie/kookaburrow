@@ -1,0 +1,17 @@
+{
+  "id": "pecmd",
+  "name": "PECmd - Prefetch Parser",
+  "description": "Runs Eric Zimmerman's PECmd over collected Prefetch (.pf) files: what ran, how often, the last eight run times, the files and folders each program loaded, plus a timeline of runs. Needs the .NET 10 runtime on the server.",
+  "homepage": "https://ericzimmerman.github.io/",
+  "accepts": ["prefetch"],
+  "requires": ["dotnet10"],
+  "launcher": "dotnet",
+  "tool": {
+    "win32": { "archive": "PECmd.zip", "exe": "PECmd.dll" },
+    "linux": { "archive": "PECmd.zip", "exe": "PECmd.dll" }
+  },
+  "parameters": [],
+  "command": ["-d", "{input}", "--csv", "{output}", "--csvf", "pecmd.csv", "-q", "--co", "false"],
+  "outputs": [{ "file": "pecmd*.csv", "format": "csv", "timeUtc": true, "timeColumn": "RunTime" }],
+  "timeoutMinutes": 60
+}

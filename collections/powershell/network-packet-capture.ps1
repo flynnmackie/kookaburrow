@@ -7,6 +7,7 @@ $Footprint = 'transient'
 $Returns = 'both'
 $Type = 'tool'
 $Transfer = 'large'
+$Produces = @('pcap')
 
 $ErrorActionPreference = 'Continue' # pktmon prints to stderr when nothing is running; failures are checked explicitly below
 $secs = if ($Seconds -match '^\d+$') { [math]::Min([int]$Seconds, 600) } else { 30 }

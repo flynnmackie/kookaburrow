@@ -1,0 +1,44 @@
+{
+  "id": "lecmd",
+  "name": "LECmd - Shortcut (LNK) Parser",
+  "description": "Runs Eric Zimmerman's LECmd over collected .lnk files: the target path, volume and timestamps of files and folders users opened. Needs the .NET 10 runtime on the server.",
+  "accepts": [
+    "lnk"
+  ],
+  "homepage": "https://ericzimmerman.github.io/",
+  "requires": [
+    "dotnet10"
+  ],
+  "launcher": "dotnet",
+  "tool": {
+    "win32": {
+      "archive": "LECmd.zip",
+      "exe": "LECmd.dll"
+    },
+    "linux": {
+      "archive": "LECmd.zip",
+      "exe": "LECmd.dll"
+    }
+  },
+  "parameters": [],
+  "command": [
+    "-d",
+    "{input}",
+    "--csv",
+    "{output}",
+    "--csvf",
+    "lecmd.csv",
+    "-q",
+    "--co",
+    "false"
+  ],
+  "outputs": [
+    {
+      "file": "lecmd*.csv",
+      "format": "csv",
+      "timeUtc": true,
+      "timeColumn": "SourceModified"
+    }
+  ],
+  "timeoutMinutes": 60
+}

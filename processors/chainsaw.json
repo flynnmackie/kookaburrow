@@ -1,0 +1,43 @@
+{
+  "id": "chainsaw",
+  "name": "Chainsaw - Event Log Hunt",
+  "description": "Runs Chainsaw (WithSecure) over collected .evtx files with its bundled Sigma rules and Chainsaw rules, and writes CSV detections. Upload the all_platforms+rules zip as chainsaw.zip (it holds both programs, the rules and the Sigma rules). No runtime needed.",
+  "homepage": "https://github.com/WithSecureLabs/chainsaw",
+  "accepts": [
+    "evtx"
+  ],
+  "tool": {
+    "win32": {
+      "archive": "chainsaw.zip",
+      "exe": "chainsaw_x86_64-pc-windows-msvc.exe"
+    },
+    "linux": {
+      "archive": "chainsaw.zip",
+      "exe": "chainsaw_x86_64-unknown-linux-gnu"
+    }
+  },
+  "parameters": [],
+  "command": [
+    "hunt",
+    "{input}",
+    "-s",
+    "sigma",
+    "--mapping",
+    "mappings/sigma-event-logs-all.yml",
+    "-r",
+    "rules",
+    "--csv",
+    "--output",
+    "{output}",
+    "--skip-errors",
+    "-q"
+  ],
+  "outputs": [
+    {
+      "file": "*.csv",
+      "format": "csv",
+      "timeColumn": "timestamp"
+    }
+  ],
+  "timeoutMinutes": 120
+}

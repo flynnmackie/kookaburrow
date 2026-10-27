@@ -34,10 +34,10 @@ function nextAfter(s, from, now = Date.now()) {
   return s.until.type === 'time' && t > Date.parse(s.until.at) ? null : new Date(t).toISOString();
 }
 
-function prepare({ kind, name, hostIds, listIds, itemIds, params, schedule, createdBy }) {
+function prepare({ kind, name, hostIds, listIds, itemIds, params, schedule, createdBy, workflowId = null, sendElastic }) {
   const sched = parseSchedule(schedule);
   return {
-    id: id(), kind, name: String(name || '').trim(), hostIds: [...hostIds], listIds: [...listIds], itemIds: [...itemIds],
+    id: id(), kind, ...(workflowId ? { workflowId } : {}), ...(typeof sendElastic === 'boolean' ? { sendElastic } : {}), name: String(name || '').trim(), hostIds: [...hostIds], listIds: [...listIds], itemIds: [...itemIds],
     params: params && Object.keys(params).length ? encrypt(JSON.stringify(params)) : '',
     ...sched, createdBy: createdBy || null, createdAt: new Date().toISOString(),
     nextRun: null, lastRun: null, runCount: 0, runIds: [], status: 'active', lastError: '',
@@ -74,7 +74,7 @@ function hostsOf(s) {
 function startRun(s) {
   const hosts = hostsOf(s);
   if (!hosts.length) throw new Error('None of its hosts exist any more');
-  if (s.kind === 'hunt') return huntRunner.startHunt({ name: s.name, collectionIds: s.itemIds, hosts, params: s.params ? JSON.parse(decrypt(s.params)) : {}, startedBy: s.createdBy, scheduleId: s.id });
+  if (s.kind === 'hunt') return huntRunner.startHunt({ name: s.name, collectionIds: s.itemIds, hosts, params: s.params ? JSON.parse(decrypt(s.params)) : {}, startedBy: s.createdBy, scheduleId: s.id, workflowId: s.workflowId || null, sendElastic: s.sendElastic });
   return responseRunner.startResponse({ name: s.name, actionIds: s.itemIds, hosts, params: s.params ? JSON.parse(decrypt(s.params)) : {}, startedBy: s.createdBy, scheduleId: s.id });
 }
 
@@ -100,7 +100,7 @@ const start = () => { tick(); setInterval(tick, TICK_MS).unref?.(); };
 function view(s) {
   const lib = s.kind === 'hunt' ? (x) => collections.resolveCollection(x) : (x) => collections.resolveAction(x);
   return {
-    id: s.id, kind: s.kind, name: s.name, everyMinutes: s.everyMinutes, until: s.until, createdBy: s.createdBy, createdAt: s.createdAt,
+    id: s.id, kind: s.kind, name: s.name, sendElastic: typeof s.sendElastic === 'boolean' ? s.sendElastic : null, workflow: s.workflowId ? (require('./workflows').find(s.workflowId)?.name || 'a deleted workflow') : null, everyMinutes: s.everyMinutes, until: s.until, createdBy: s.createdBy, createdAt: s.createdAt,
     nextRun: s.nextRun, lastRun: s.lastRun, runCount: s.runCount, status: s.status, lastError: s.lastError,
     totalRuns: totalRuns({ ...s }, Date.parse(s.createdAt)),
     hosts: hostsOf({ hostIds: s.hostIds, listIds: [] }).map((h) => ({ name: h.name || h.hostname || h.address, address: h.address })),
