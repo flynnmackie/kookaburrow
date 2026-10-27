@@ -1,5 +1,5 @@
 $Name = 'Deploy - Sysmon (Windows)'
-$Description = 'Installs Sysmon on the host as a service with your own configuration file (Sysmon64.exe -accepteula -i config). Both files are copied to a temporary folder that is removed afterwards; Sysmon copies itself into the Windows folder. The configuration is checked to be well-formed XML first. Nothing is changed if a Sysmon service is already installed (to change its configuration, run Sysmon with -c from the Shell). Needs Sysmon64.exe and sysmon-config.xml uploaded under Settings, Binaries, and administrator rights on a 64-bit host. Sysmon stays installed and keeps running.'
+$Description = 'Installs Sysmon on the host as a service with your own configuration file (Sysmon64.exe -accepteula -i config). Needs administrator rights.'
 $Dependencies = @('Sysmon64.exe', 'sysmon-config.xml')
 $Parameters = @()
 $Tags = @('deploy', 'sysmon', 'logging', 'persistence')

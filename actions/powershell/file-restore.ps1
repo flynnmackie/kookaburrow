@@ -1,5 +1,5 @@
 $Name = 'Files - Restore Quarantined'
-$Description = 'Moves a file out of C:\ProgramData\Kookaburrow\Quarantine back to a location you choose. QuarantinedName is the file name in the quarantine folder (for example 20261022-101500_invoice.exe.quarantined) and RestorePath the full path to put it at. Refuses to overwrite an existing file.'
+$Description = 'Moves a file out of C:\ProgramData\Kookaburrow\Quarantine back to a location you choose.'
 $Dependencies = @()
 $Parameters = @('QuarantinedName', 'RestorePath')
 $Tags = @('filesystem', 'recovery')

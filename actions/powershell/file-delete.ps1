@@ -1,5 +1,5 @@
 $Name = 'Files - Delete'
-$Description = 'Permanently deletes one file after recording its SHA-256 and size. There is no copy kept: use Files - Quarantine instead when you may need the file again. FilePath must be a single file, with no wildcards.'
+$Description = 'Permanently deletes one file after recording its SHA-256 and size.'
 $Dependencies = @()
 $Parameters = @('FilePath')
 $Tags = @('filesystem', 'malware', 'remediation')

@@ -1,5 +1,5 @@
 NAME='Cron - Disable File'
-DESCRIPTION='Disables a file in /etc/cron.d (or a script in /etc/cron.hourly, daily, weekly or monthly) by moving it to /var/quarantine-kookaburrow, so it stops running. CRON_FILE is the file name only (for example sysupdate); FOLDER is cron.d (default), cron.hourly, cron.daily, cron.weekly or cron.monthly.'
+DESCRIPTION='Disables a file in /etc/cron.d (or a script in /etc/cron.hourly, daily, weekly or monthly) by moving it to /var/quarantine-kookaburrow, so it stops running.'
 DEPENDENCIES=()
 PARAMETERS=(CRON_FILE FOLDER?)
 TAGS=(persistence cron remediation)

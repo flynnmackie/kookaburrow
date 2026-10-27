@@ -1,5 +1,5 @@
 NAME='Containers - Stop'
-DESCRIPTION='Stops a running container (docker or podman) by name or ID, giving it 10 seconds before it is killed. The container and its data are kept for investigation. Use Containers - Docker and Podman to list them.'
+DESCRIPTION='Stops a running container (docker or podman) by name or ID, giving it 10 seconds before it is killed.'
 DEPENDENCIES=()
 PARAMETERS=(CONTAINER)
 TAGS=(containers containment)

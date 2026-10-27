@@ -1,5 +1,5 @@
 $Name = 'Services - Unusual'
-$Description = 'Lists services whose binary is outside the Windows and Program Files folders, uses an unquoted path containing spaces, or runs from a user-writable location. Services are a common persistence and privilege escalation route.'
+$Description = 'Lists services whose binary is outside the Windows and Program Files folders, uses an unquoted path containing spaces, or runs from a user-writable location.'
 $Dependencies = @()
 $Tags = @('persistence', 'services', 'privilege-escalation')
 

@@ -1,5 +1,5 @@
 $Name = 'Persistence - System Hooks'
-$Description = 'Lesser-known registry persistence points in one list: Winlogon Shell and Userinit, AppInit_DLLs, AppCertDLLs, LSA authentication, security and notification packages, Netsh helper DLLs, Time Provider DLLs, Print Monitors, screensaver, boot execute, Terminal Server initial program and Explorer shell extensions (Windows.Persistence.* and Sysinternals Autoruns locations).'
+$Description = 'Lesser-known registry persistence points in one list.'
 $Dependencies = @()
 $Tags = @('persistence', 'registry', 'privilege-escalation')
 

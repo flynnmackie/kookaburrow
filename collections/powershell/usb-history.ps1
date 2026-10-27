@@ -1,5 +1,5 @@
 $Name = 'USB - History'
-$Description = 'USB storage devices ever connected: vendor, product, serial number, first install and last connected / removed times (from the USBSTOR registry properties), plus drive letters in MountedDevices and the USB lines in setupapi.dev.log. Shows data theft and malware delivery via removable media (like Windows.Forensics.USBHistory).'
+$Description = 'USB storage devices ever connected.'
 $Dependencies = @()
 $Tags = @('forensics', 'inventory', 'lateral-movement')
 

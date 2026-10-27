@@ -1,5 +1,5 @@
 $Name = 'Persistence - BITS Jobs'
-$Description = 'Background Intelligent Transfer Service jobs for all users, with source URL, destination file and any command that runs on completion. BITS is used to download payloads quietly and the notify command gives persistence (like Windows.System.BitsJobs).'
+$Description = 'Background Intelligent Transfer Service jobs for all users, with source URL, destination file and any command that runs on completion.'
 $Dependencies = @()
 $Tags = @('persistence', 'c2', 'execution')
 

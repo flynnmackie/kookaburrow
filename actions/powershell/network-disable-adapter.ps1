@@ -1,5 +1,5 @@
 $Name = 'Network - Disable Adapter'
-$Description = 'Disables one network adapter by name (as shown by Network - Interfaces), cutting the host off from that network. Disabling the adapter this host is managed over will end your contact with it; use Host - Isolate to keep access from your server.'
+$Description = 'Disables one network adapter by name (as shown by Network - Interfaces), cutting the host off from that network.'
 $Dependencies = @()
 $Parameters = @('AdapterName')
 $Tags = @('containment', 'network')

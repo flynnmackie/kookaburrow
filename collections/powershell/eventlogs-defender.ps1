@@ -1,5 +1,5 @@
 $Name = 'Event Logs - Defender'
-$Description = 'Microsoft Defender detections and actions: malware detected (1116, 1006), action taken (1117, 1007), remediation failed (1118, 1119, 1008), real-time protection turned off (5001), configuration changed (5007) and exclusion added (5007 with an Exclusions path). Set LastMinutes for the last N minutes or StartTime and EndTime (yyyy-MM-dd HH:mm) for a range; default is 24 hours.'
+$Description = 'Microsoft Defender detections and actions.'
 $Dependencies = @()
 $Parameters = @('LastMinutes?', 'StartTime?', 'EndTime?', 'MaxEvents?')
 $Tags = @('event-logs', 'antivirus', 'malware', 'defense-evasion')

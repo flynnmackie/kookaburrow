@@ -1,5 +1,5 @@
 $Name = 'Accounts - Local Groups'
-$Description = 'Every local group with its members (users, domain accounts and nested groups). Unexpected members of Administrators, Remote Desktop Users, Backup Operators or Remote Management Users are a standard persistence and lateral movement step.'
+$Description = 'Every local group with its members (users, domain accounts and nested groups).'
 $Dependencies = @()
 $Tags = @('accounts', 'privilege-escalation', 'persistence')
 

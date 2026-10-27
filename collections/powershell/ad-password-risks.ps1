@@ -1,5 +1,5 @@
 $Name = 'AD - Account Weaknesses'
-$Description = 'Enabled accounts with risky settings: password never expires, password not required, pre-authentication not required (AS-REP roastable), reversible password encryption, unconstrained or constrained delegation, and Kerberos DES only. Each finding is one row with the account, the weakness and when the password last changed. These are the settings attackers look for to take over accounts. Run it against a domain controller (uses built-in ADSI, no modules needed; from a member server the WinRM double-hop limit blocks the query).'
+$Description = 'Enabled accounts with risky settings.'
 $Dependencies = @()
 $Tags = @('accounts', 'privilege-escalation', 'persistence', 'active-directory')
 

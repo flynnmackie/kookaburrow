@@ -1,5 +1,5 @@
 NAME='Systemd - Remove Unit'
-DESCRIPTION='Stops and disables a systemd unit and moves its unit file to /var/quarantine-kookaburrow, then reloads systemd. UNIT_NAME is the unit including its type (for example update-helper.service or backup.timer). Only unit files in /etc/systemd/system, /run/systemd/system or /usr/local/lib/systemd/system are touched, never packaged units. Use it to remove malicious persistence.'
+DESCRIPTION='Stops and disables a systemd unit and moves its unit file to /var/quarantine-kookaburrow, then reloads systemd.'
 DEPENDENCIES=()
 PARAMETERS=(UNIT_NAME)
 TAGS=(persistence systemd remediation)

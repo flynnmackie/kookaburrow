@@ -1,5 +1,5 @@
 $Name = 'Host - Isolate'
-$Description = 'Network-isolates the host: the firewall is turned on for all profiles with inbound and outbound blocked by default, and Windows Firewall block rules (which override every allow rule) cover every IPv4 address except AllowedAddresses (comma separated IPv4 addresses or CIDR ranges, which must include this Kookaburrow server or you will lose contact); traffic with those addresses is allowed in both directions. On a domain-joined host its domain controllers are allowed too (a domain account cannot log in over WinRM while the host cannot reach a domain controller); set AllowDomainControllers to No to leave them out. No existing rule is changed, so it takes seconds however many rules the host has and release is just removing the new ones. AutoReleaseMinutes schedules an automatic release as a safety net if you lose contact. Undo it with Host - Release.'
+$Description = 'Network-isolates the host with Windows Firewall, blocking all traffic except AllowedAddresses (comma separated IPv4 addresses or CIDR ranges). These must include this Kookaburrow server or you will lose contact.'
 $Dependencies = @()
 $Parameters = @('AllowedAddresses', 'AutoReleaseMinutes?', 'AllowDomainControllers?')
 $Tags = @('containment', 'network', 'firewall')

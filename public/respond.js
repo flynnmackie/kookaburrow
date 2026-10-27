@@ -4,7 +4,7 @@
 // and the values you type for an action's parameters are used for that run only (never stored or logged).
 // Shares helpers with app.js: api, esc, $, toast, go, isActive, metaIcons, VERIFIED, highlight, bbFmt, huntStatus, huntElapsed, huntName.
 const br = { runs: [], sel: null, tab: 'details' };
-const BR_HINT = '<p class="dim" style="margin:0">Click a response above to see what it ran, its output files, any errors, and to download the results.</p>';
+const BR_HINT = '<p class="dim" style="margin:0">Select a response to see its files, errors and downloads.</p>';
 let respPoll;
 
 async function loadRespond() {

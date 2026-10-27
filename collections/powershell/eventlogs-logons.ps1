@@ -1,5 +1,5 @@
 $Name = 'Event Logs - Logons'
-$Description = 'Successful (4624) and failed (4625) logons and explicit-credential logons (4648) with account, logon type, source address and host, process and failure reason. Set LastMinutes for the last N minutes or StartTime and EndTime (yyyy-MM-dd HH:mm) for a range; default is 24 hours. LogonTypes limits to types such as 3,10 (network and RDP), UserContains to an account name, and OnlyFailures set to yes shows only failed logons. Needs administrator rights.'
+$Description = 'Successful (4624) and failed (4625) logons and explicit-credential logons (4648) with account, logon type, source address and host, process and failure reason. Needs administrator rights.'
 $Dependencies = @()
 $Parameters = @('LastMinutes?', 'StartTime?', 'EndTime?', 'LogonTypes?', 'UserContains?', 'OnlyFailures?', 'MaxEvents?')
 $Tags = @('event-logs', 'logons', 'lateral-movement', 'brute-force')

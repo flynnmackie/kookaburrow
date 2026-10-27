@@ -1,5 +1,5 @@
 $Name = 'Event Logs - Firewall Changes'
-$Description = 'Windows Firewall rule and setting changes: rule added, modified or deleted and profile settings changed (Security 4946 to 4950, 4954 to 4958 and Windows Firewall With Advanced Security 2004, 2005, 2006, 2033). Attackers open ports and disable the firewall to move laterally or reach out. Set LastMinutes for the last N minutes or StartTime and EndTime (yyyy-MM-dd HH:mm) for a range; default is 7 days.'
+$Description = 'Windows Firewall rule and setting changes.'
 $Dependencies = @()
 $Parameters = @('LastMinutes?', 'StartTime?', 'EndTime?', 'MaxEvents?')
 $Tags = @('event-logs', 'network', 'defense-evasion', 'persistence')

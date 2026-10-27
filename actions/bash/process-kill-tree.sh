@@ -1,5 +1,5 @@
 NAME='Processes - Kill Tree'
-DESCRIPTION='Stops a process and everything it started (all child and grandchild processes) by PID: children first, then the process. Use it when malware spawns helpers that would restart the parent. Refuses PID 1 and this shell.'
+DESCRIPTION='Stops a process and everything it started (all child and grandchild processes) by PID: children first, then the process.'
 DEPENDENCIES=()
 PARAMETERS=(PID)
 TAGS=(containment process)

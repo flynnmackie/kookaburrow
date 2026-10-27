@@ -1,5 +1,5 @@
 NAME='Processes - Open Files'
-DESCRIPTION='Open files and network sockets of running processes from lsof. PID limits to one process; CONTAINS keeps lines containing that text (a path, a port or a program). Shows what a suspicious process is reading, writing and connected to. Needs lsof (part of most distributions) and root, or an account with passwordless sudo, for other users processes.'
+DESCRIPTION='Open files and network sockets of running processes from lsof. Needs root or passwordless sudo.'
 DEPENDENCIES=()
 PARAMETERS=(PID? CONTAINS?)
 TAGS=(processes forensics)

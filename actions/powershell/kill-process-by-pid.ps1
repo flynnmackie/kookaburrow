@@ -1,5 +1,5 @@
 $Name = 'Processes - Kill by PID'
-$Description = 'Stops exactly one process by its process id. Use when a name is ambiguous or the process is masquerading.'
+$Description = 'Stops exactly one process by its process id.'
 $Dependencies = @()
 $Parameters = @('ProcessId')
 $Tags = @('containment', 'process')

@@ -1,5 +1,5 @@
 $Name = 'Event Logs - Share Access'
-$Description = 'Network share access: a share was accessed (5140), a file or folder was accessed over SMB (5145), and share created, changed or deleted (5142, 5143, 5144). Shows who touched which admin share (C$, ADMIN$, IPC$) from where, which is how PsExec and lateral movement look. Needs object access auditing. Set LastMinutes for the last N minutes or StartTime and EndTime (yyyy-MM-dd HH:mm) for a range; default is 24 hours.'
+$Description = 'Network share access: a share was accessed (5140), a file or folder was accessed over SMB (5145), and share created, changed or deleted (5142, 5143, 5144). Needs object access auditing.'
 $Dependencies = @()
 $Parameters = @('LastMinutes?', 'StartTime?', 'EndTime?', 'ShareContains?', 'MaxEvents?')
 $Tags = @('event-logs', 'smb', 'lateral-movement')

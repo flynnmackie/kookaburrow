@@ -1,5 +1,5 @@
 NAME='Processes - Suspend'
-DESCRIPTION='Freezes a process (SIGSTOP) without ending it, by PID. The process stays in memory with its connections, so you can image or inspect it, and continue it with Processes - Resume. Refuses PID 1.'
+DESCRIPTION='Freezes a process (SIGSTOP) without ending it, by PID.'
 DEPENDENCIES=()
 PARAMETERS=(PID)
 TAGS=(containment process)

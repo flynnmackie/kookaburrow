@@ -1,5 +1,5 @@
 $Name = 'Recent Files - Collect'
-$Description = 'Copies every user Recent folder shortcut (.lnk) for parsing with LECmd, plus the Office Recent shortcuts. Shortcuts hold the target path, volume serial number and timestamps even after the target is deleted. Set Days to copy only shortcuts changed in the last N days. Comes back over SMB, which is switched on for this collection only.'
+$Description = 'Copies every user Recent folder shortcut (.lnk) for parsing with LECmd, plus the Office Recent shortcuts.'
 $Dependencies = @()
 $Parameters = @('Days?')
 $Tags = @('execution', 'forensics', 'filesystem')

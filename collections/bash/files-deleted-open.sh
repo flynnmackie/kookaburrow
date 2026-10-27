@@ -1,5 +1,5 @@
 NAME='Files - Deleted but Open'
-DESCRIPTION='Files that have been deleted from disk but are still open by a running process, with the process, owner and size. Malware often deletes its own binary or a dropped file while it runs, and the content can still be recovered from /proc/PID/exe or /proc/PID/fd. Needs root, or an account with passwordless sudo, to see all processes.'
+DESCRIPTION='Files that have been deleted from disk but are still open by a running process, with the process, owner and size. Needs root or passwordless sudo.'
 DEPENDENCIES=()
 TAGS=(processes forensics malware defense-evasion)
 

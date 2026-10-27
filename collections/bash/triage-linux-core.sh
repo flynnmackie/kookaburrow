@@ -1,5 +1,5 @@
 NAME='Triage - Linux Core'
-DESCRIPTION='A native quick triage with no extra tools: volatile state as text files (processes with hashes, sockets, users and logins, mounts, interfaces, firewall, kernel modules, cron, systemd units), recent logs (DAYS, default 7: authentication, system, journal export), /etc without password hashes, shell histories and SSH authorized_keys for every user, and persistence files. Typically 10 to 200 MB. Returned as a folder of text files plus archives. Needs root, or an account with passwordless sudo. The files come back over SFTP.'
+DESCRIPTION='A native quick triage with no extra tools. Needs root or passwordless sudo.'
 DEPENDENCIES=()
 PARAMETERS=(DAYS?)
 TAGS=(forensics triage filesystem)

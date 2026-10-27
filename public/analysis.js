@@ -12,7 +12,7 @@ async function loadCompare() {
   const keep = $('cpRun').value;
   $('cpRun').innerHTML = `<option value="">Choose a run…</option>${group('hunt', 'Hunts')}${group('response', 'Responses')}`;
   if (keep) $('cpRun').value = keep;
-  if (!cp.res) $('cpOut').innerHTML = cp.runs.length ? '<p class="dim" style="margin:0">Only runs with results from two or more hosts are listed, and only the CSVs that more than one host returned. Choose a run and a CSV, then press Compare. Rows are ordered from the fewest hosts to the most, so the odd one out comes first.</p>' : '<p class="dim" style="margin:0">No run has results from two or more hosts yet. A comparison needs the same CSV from several hosts, so run a hunt against more than one host first.</p>';
+  if (!cp.res) $('cpOut').innerHTML = cp.runs.length ? '<p class="dim" style="margin:0">Choose a run and a CSV (runs with 2+ hosts), then Compare. Rows with the fewest hosts come first.</p>' : '<p class="dim" style="margin:0">No run has results from two or more hosts yet.</p>';
 }
 $('cpRun').onchange = async () => {
   const run = $('cpRun').value;

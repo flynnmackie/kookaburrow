@@ -1,5 +1,5 @@
 NAME='Files - Delete'
-DESCRIPTION='Permanently deletes one file after recording its SHA-256, size and owner. No copy is kept: use Files - Quarantine instead when you may need the file again. FILE_PATH must be a single regular file.'
+DESCRIPTION='Permanently deletes one file after recording its SHA-256, size and owner.'
 DEPENDENCIES=()
 PARAMETERS=(FILE_PATH)
 TAGS=(filesystem malware remediation)

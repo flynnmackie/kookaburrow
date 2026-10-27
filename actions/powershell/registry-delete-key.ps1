@@ -1,5 +1,5 @@
 $Name = 'Registry - Delete Key'
-$Description = 'Deletes a registry key and everything under it. The key is exported to C:\ProgramData\Kookaburrow\Quarantine as a .reg file first. KeyPath is the PowerShell path (for example HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\sethc.exe). Refuses top-level and well-known system keys.'
+$Description = 'Deletes a registry key and everything under it.'
 $Dependencies = @()
 $Parameters = @('KeyPath')
 $Tags = @('registry', 'persistence', 'remediation')

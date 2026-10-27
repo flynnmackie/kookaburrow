@@ -1,5 +1,5 @@
 NAME='Packages - Recent'
-DESCRIPTION='Lists the most recently installed or changed packages from the package manager (rpm, dpkg or apk). New tooling such as scanners, compilers and tunnelling software is worth reviewing after a suspected compromise.'
+DESCRIPTION='Lists the most recently installed or changed packages from the package manager (rpm, dpkg or apk).'
 DEPENDENCIES=()
 TAGS=(inventory software forensics)
 

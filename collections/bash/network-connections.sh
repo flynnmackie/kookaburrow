@@ -1,5 +1,5 @@
 NAME='Network - Connections'
-DESCRIPTION='Lists established TCP connections and all listening sockets with the owning process, falling back to netstat when ss is missing. Run as root to see process names for every socket.'
+DESCRIPTION='Lists established TCP connections and all listening sockets with the owning process, falling back to netstat when ss is missing. Needs root or passwordless sudo.'
 DEPENDENCIES=()
 TAGS=(network c2 lateral-movement listening)
 

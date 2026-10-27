@@ -1,5 +1,5 @@
 NAME='UAC - IR Triage'
-DESCRIPTION='Runs UAC (Unix-like Artifacts Collector) with the ir_triage profile on the host: live response data, system and user artefacts, logs and configuration, as one tar.gz plus the UAC log and hash file. Everything comes back as raw files over SFTP and is then removed from the host. Needs uac.tar.gz: the UAC release tarball (for example uac-3.x.x.tar.gz from the UAC GitHub releases page, uploaded under the name uac.tar.gz). Needs root, or an account with passwordless sudo. Can take a while and produce hundreds of MB.'
+DESCRIPTION='Runs UAC (Unix-like Artifacts Collector) with the ir_triage profile on the host. Needs root or passwordless sudo.'
 DEPENDENCIES=(uac.tar.gz)
 TAGS=(forensics triage filesystem)
 FOOTPRINT='transient'

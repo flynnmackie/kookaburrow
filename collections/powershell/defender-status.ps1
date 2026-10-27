@@ -1,5 +1,5 @@
 $Name = 'Defender - Status'
-$Description = 'Reports whether Microsoft Defender is running with real-time and tamper protection, the configured exclusion paths, processes and extensions, and recent threat detections. Attackers often add exclusions or disable protection before running tooling.'
+$Description = 'Reports whether Microsoft Defender is running with real-time and tamper protection, the configured exclusion paths, processes and extensions, and recent threat detections.'
 $Dependencies = @()
 $Tags = @('defense-evasion', 'antivirus', 'malware')
 

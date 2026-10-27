@@ -1,5 +1,5 @@
 $Name = 'Software - Remote Access Tools'
-$Description = 'Looks for common remote access and remote management tools (AnyDesk, TeamViewer, ScreenConnect, Splashtop, RustDesk, LogMeIn, VNC, Atera, NinjaOne and similar) in installed software, services, running processes and well-known folders. Legitimate IT tools are heavily abused for access and persistence.'
+$Description = 'Looks for common remote access and remote management tools.'
 $Dependencies = @()
 $Tags = @('c2', 'persistence', 'lateral-movement', 'software')
 

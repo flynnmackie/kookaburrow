@@ -27,6 +27,8 @@ const RULES = [
   ['POST', /^\/api\/responses\/[^/]+\/cancel$/, ['actions.run']],
   ['POST', /^\/api\/runs\/[^/]+\/cancel$/, ['hunts.run']],
   ['DELETE', /^\/api\/responses\/[^/]+$/, ['actions.run']],
+  ['GET', /^\/api\/workflows$/, ['workflows.view']],
+  ['*', /^\/api\/workflows(\/|$)/, ['workflows.manage']],
   ['GET', /^\/api\/schedules$/, ['hunts.view', 'actions.view']],
   ['DELETE', /^\/api\/schedules\/[^/]+$/, ['hunts.run', 'actions.run']],
   ['PUT', /^\/api\/schedules\/[^/]+$/, ['hunts.run', 'actions.run']], // pause / resume; the kind of schedule is checked in the handler // the kind of schedule is checked in the handler
@@ -54,7 +56,7 @@ const RULES = [
   ['GET', /^\/api\/quarantine(\/log)?$/, ['system.view']],
   ['*', /^\/api\/quarantine\/[^/]+$/, ['actions.run']], // isolating a host runs the Host - Isolate action
   ['*', /^\/api\/monitor(\/|$)/, ['system.view']],
-  ['GET', /^\/api\/settings\/(health|shell|runs|server|certificate(\/ca\.pem)?)$/, ['system.view']],
+  ['GET', /^\/api\/settings\/(health|shell|runs|server|elastic|certificate(\/ca\.pem)?)$/, ['system.view']],
   ['*', /^\/api\/settings(\/|$)/, ['system.manage']],
 
   ['GET', /^\/api\/(users|roles)$/, ['users.view']],

@@ -1,5 +1,5 @@
 $Name = 'Services - Weak Permissions'
-$Description = 'Services that ordinary accounts can change (Everyone, Users, Authenticated Users, Interactive) found with Sysinternals AccessChk. A user who can reconfigure a service can point it at their own program and run it as SYSTEM, which is a classic local privilege escalation. Needs the accesschk64.exe single-file binary uploaded under Settings, Binaries.'
+$Description = 'Services that ordinary accounts can change (Everyone, Users, Authenticated Users, Interactive) found with Sysinternals AccessChk.'
 $Dependencies = @('accesschk64.exe')
 $Tags = @('services', 'privilege-escalation', 'persistence')
 $Footprint = 'transient'

@@ -1,5 +1,5 @@
 NAME='Logs - Journal Query'
-DESCRIPTION='Reads the systemd journal with filters. LAST_MINUTES (for example 120) selects the last N minutes; or SINCE and UNTIL take times such as "2026-10-22 08:00" or "2 hours ago" (default is the last 24 hours). UNIT limits to one service (for example sshd.service), PRIORITY to a level (0 emerg to 7 debug, or a name such as err), GREP to messages containing a regular expression. MAX_LINES defaults to 3000. Needs root, or an account with passwordless sudo, to read all logs.'
+DESCRIPTION='Reads the systemd journal with filters. Needs root or passwordless sudo.'
 DEPENDENCIES=()
 PARAMETERS=(LAST_MINUTES? SINCE? UNTIL? UNIT? PRIORITY? GREP? MAX_LINES?)
 TAGS=(event-logs forensics)

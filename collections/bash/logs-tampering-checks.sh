@@ -1,5 +1,5 @@
 NAME='Logs - Tampering Checks'
-DESCRIPTION='Signs that logs and history were cleared or disabled: log files that are empty or smaller than expected for their age, wtmp, btmp and lastlog with suspicious sizes or gaps, history files linked to /dev/null or set to a zero size, HISTFILE or HISTSIZE overridden in startup files, immutable or append-only flags on logs (set to stop rotation or editing), journald storage disabled, and auditd rules that were removed. Needs root, or an account with passwordless sudo, to see every file.'
+DESCRIPTION='Signs that logs and history were cleared or disabled. Needs root or passwordless sudo.'
 DEPENDENCIES=()
 TAGS=(defense-evasion event-logs forensics)
 

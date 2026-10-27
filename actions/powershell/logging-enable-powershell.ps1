@@ -1,5 +1,5 @@
 $Name = 'Logging - Enable PowerShell Logging'
-$Description = 'Turns on PowerShell script block logging (event 4104) and module logging for all modules by policy, so attacker PowerShell is recorded from now on. TranscriptPath optionally also turns on transcription to that folder (for example C:\PSTranscripts). Takes effect for new PowerShell sessions.'
+$Description = 'Turns on PowerShell script block logging (event 4104) and module logging for all modules by policy, so attacker PowerShell is recorded from now on.'
 $Dependencies = @()
 $Parameters = @('TranscriptPath?')
 $Tags = @('hardening', 'powershell', 'event-logs')

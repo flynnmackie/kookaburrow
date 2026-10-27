@@ -1,5 +1,5 @@
 $Name = 'Registry - Set Value'
-$Description = 'Sets a registry value, creating the key if needed. KeyPath is the PowerShell path (for example HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging). ValueType is String (default), ExpandString, DWord, QWord or MultiString. The previous value is reported. Use it for hardening and to restore a setting.'
+$Description = 'Sets a registry value, creating the key if needed.'
 $Dependencies = @()
 $Parameters = @('KeyPath', 'ValueName', 'ValueData', 'ValueType?')
 $Tags = @('registry', 'remediation', 'hardening')

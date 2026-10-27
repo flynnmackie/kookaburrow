@@ -1,5 +1,5 @@
 $Name = 'AD - Privileged Groups'
-$Description = 'Members of the most powerful Active Directory groups (Domain Admins, Enterprise Admins, Schema Admins, Administrators, Account Operators, Backup Operators, Server Operators, Print Operators, DnsAdmins, Group Policy Creator Owners), including nested members, with whether each account is enabled, when it last logged on and when its password last changed. A surprise member of any of these is domain compromise or a step towards it. Run it against a domain controller (uses built-in ADSI, no modules needed; from a member server the WinRM double-hop limit blocks the query).'
+$Description = 'Members of the most powerful Active Directory groups.'
 $Dependencies = @()
 $Tags = @('accounts', 'privilege-escalation', 'persistence', 'active-directory')
 

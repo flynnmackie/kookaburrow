@@ -1,5 +1,5 @@
 NAME='Processes - Hidden PIDs'
-DESCRIPTION='Finds processes hidden from the process list. It probes every PID up to MAX_PID (default 65535) with signal 0 and compares the answer with what a directory listing of /proc shows: a process that exists but is not listed is hidden by a rootkit or a hook. Threads and short-lived processes are recognised and ignored, and each candidate is checked a second time. Also lists processes whose parent no longer exists. Needs root, or an account with passwordless sudo, to probe other users processes. Takes under a minute.'
+DESCRIPTION='Finds processes hidden from the process list. Needs root or passwordless sudo.'
 DEPENDENCIES=()
 PARAMETERS=(MAX_PID?)
 TAGS=(rootkit processes malware defense-evasion)

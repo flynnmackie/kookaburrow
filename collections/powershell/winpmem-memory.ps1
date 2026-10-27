@@ -1,5 +1,5 @@
 $Name = 'Memory - Full Dump'
-$Description = 'Acquires all physical memory (RAM) as a raw image with WinPmem, for analysis with Volatility or MemProcFS. The image is as large as the installed RAM, so the host needs at least that much free disk space and the transfer can take a long time and many GB. Needs the winpmem.exe single-file binary uploaded under Settings, Binaries (use the winpmem mini x64 build, renamed to winpmem.exe). Needs administrator rights. Comes back over SMB, which is switched on for this collection only.'
+$Description = 'Acquires all physical memory (RAM) as a raw image with WinPmem, for analysis with Volatility or MemProcFS. Needs administrator rights.'
 $Dependencies = @('winpmem.exe')
 $Tags = @('forensics', 'malware', 'processes')
 $Footprint = 'transient'

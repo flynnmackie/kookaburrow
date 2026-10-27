@@ -1,5 +1,5 @@
 NAME='Accounts - Delete User'
-DESCRIPTION='Deletes a local account and ends its processes. REMOVE_HOME set to yes also deletes the home directory and mail spool (otherwise it is left in place for evidence). Refuses root and any account with UID 0 or below 100. Use Accounts - Lock User first if you only want to stop access.'
+DESCRIPTION='Deletes a local account and ends its processes.'
 DEPENDENCIES=()
 PARAMETERS=(USER_NAME REMOVE_HOME?)
 TAGS=(accounts remediation)

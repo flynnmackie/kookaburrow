@@ -1,5 +1,5 @@
 $Name = 'Prefetch - Collect'
-$Description = 'Copies the raw Prefetch files (.pf) from C:\Windows\Prefetch back to the server for parsing with PECmd, WinPrefetchView or Prefetch - Parse. Optional Days copies only files changed in the last N days. Prefetch is usually disabled on servers. The files come back over SMB, which is switched on for this collection only.'
+$Description = 'Copies the raw Prefetch files (.pf) from C:\Windows\Prefetch back to the server for parsing with PECmd, WinPrefetchView or Prefetch - Parse.'
 $Dependencies = @()
 $Parameters = @('Days?')
 $Tags = @('execution', 'forensics', 'prefetch')

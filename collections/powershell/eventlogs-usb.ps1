@@ -1,5 +1,5 @@
 $Name = 'Event Logs - USB'
-$Description = 'USB device plug-in and removal events from the DriverFrameworks-UserMode (2003, 2100, 2101, 2102, 2105, 2106) and Kernel-PnP logs. Shows when removable media were attached and which device. Set LastMinutes for the last N minutes or StartTime and EndTime (yyyy-MM-dd HH:mm) for a range; default is 7 days. USB - History reads the registry for older activity.'
+$Description = 'USB device plug-in and removal events from the DriverFrameworks-UserMode (2003, 2100, 2101, 2102, 2105, 2106) and Kernel-PnP logs.'
 $Dependencies = @()
 $Parameters = @('LastMinutes?', 'StartTime?', 'EndTime?', 'MaxEvents?')
 $Tags = @('event-logs', 'forensics', 'inventory')

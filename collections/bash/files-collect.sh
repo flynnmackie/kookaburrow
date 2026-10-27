@@ -1,5 +1,5 @@
 NAME='Files - Collect'
-DESCRIPTION='Copies chosen files back to the server, keeping their folder structure. SOURCE_PATH is a file or a folder (a folder is copied recursively when RECURSE is yes). MAX_FILE_MB skips files bigger than that (default 200) and MODIFIED_DAYS only takes files changed in the last N days. Every file is hashed. The files come back over SFTP. Needs root, or an account with passwordless sudo, to read protected files.'
+DESCRIPTION='Copies chosen files back to the server, keeping their folder structure. Needs root or passwordless sudo.'
 DEPENDENCIES=()
 PARAMETERS=(SOURCE_PATH RECURSE? MAX_FILE_MB? MODIFIED_DAYS?)
 TAGS=(filesystem forensics malware)

@@ -1,5 +1,5 @@
 $Name = 'System - Info'
-$Description = 'Host identity and build: OS version, install date, last boot and uptime, domain membership, time zone, hardware and BIOS, logged-on user. The first thing to record about any host (like the Velociraptor Windows.Sys.Info artifact).'
+$Description = 'Host identity and build: OS version, install date, last boot and uptime, domain membership, time zone, hardware and BIOS, logged-on user.'
 $Dependencies = @()
 $Tags = @('inventory', 'discovery')
 

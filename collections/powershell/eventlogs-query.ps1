@@ -1,5 +1,5 @@
 $Name = 'Event Logs - Query'
-$Description = 'Reads any event log with filters: log name (for example Security, System, Microsoft-Windows-PowerShell/Operational), optional event IDs (comma separated), text the message must contain, and a time window. Set LastMinutes (for example 120) for the last N minutes, or StartTime and EndTime (yyyy-MM-dd HH:mm, host local time) for a range. Default is the last 24 hours, newest first, up to MaxEvents (default 2000).'
+$Description = 'Reads any event log with filters.'
 $Dependencies = @()
 $Parameters = @('LogName', 'EventIds?', 'Contains?', 'LastMinutes?', 'StartTime?', 'EndTime?', 'MaxEvents?')
 $Tags = @('event-logs', 'forensics')

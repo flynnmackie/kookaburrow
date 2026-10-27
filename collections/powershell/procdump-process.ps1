@@ -1,5 +1,5 @@
 $Name = 'Memory - Process Dump'
-$Description = 'Takes a full memory dump of one process with Sysinternals ProcDump and brings the .dmp file back for analysis with Volatility, WinDbg or strings. Target is the process name (for example notepad.exe) or its PID. The dump holds everything the process had in memory, including credentials if you dump lsass, so handle it as sensitive; many security products alert on lsass dumps. Needs the procdump64.exe single-file binary uploaded under Settings, Binaries. Needs administrator rights. Comes back over SMB, which is switched on for this collection only.'
+$Description = 'Takes a full memory dump of one process with Sysinternals ProcDump and brings the .dmp file back for analysis with Volatility, WinDbg or strings. Needs administrator rights.'
 $Dependencies = @('procdump64.exe')
 $Parameters = @('Target')
 $Tags = @('forensics', 'processes', 'malware')

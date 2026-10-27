@@ -1,5 +1,5 @@
 NAME='Processes - Hashes'
-DESCRIPTION='Every running process with user, parent, start time, command line, working directory, executable path and the SHA-256 of the executable, flagging executables that were deleted from disk (a running process whose file has been removed is a classic sign of malware). CONTAINS limits to processes whose command or path contains that text. Needs root, or an account with passwordless sudo, to see all processes.'
+DESCRIPTION='Every running process with user, parent, start time, command line, working directory, executable path and the SHA-256 of the executable, flagging executables that were deleted from disk. Needs root or passwordless sudo.'
 DEPENDENCIES=()
 PARAMETERS=(CONTAINS?)
 TAGS=(processes execution malware)

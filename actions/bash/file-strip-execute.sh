@@ -1,5 +1,5 @@
 NAME='Files - Remove Execute Permission'
-DESCRIPTION='Removes the execute bit from a file for everyone (chmod a-x) and clears SUID and SGID, so it can no longer be run directly, and reports the old mode. A softer alternative to deleting or quarantining a suspicious binary or script.'
+DESCRIPTION='Removes the execute bit from a file for everyone (chmod a-x) and clears SUID and SGID, so it can no longer be run directly, and reports the old mode.'
 DEPENDENCIES=()
 PARAMETERS=(FILE_PATH)
 TAGS=(filesystem containment malware)

@@ -1,5 +1,5 @@
 NAME='Files - Recently Changed'
-DESCRIPTION='Files created or changed in the last N minutes under a folder (default the whole file system, skipping /proc, /sys, /dev and /run), newest first, with owner, size and path. MINUTES defaults to 60. EXCLUDE is an optional text that paths must not contain. The quick way to see what an attacker touched just now. Needs root, or an account with passwordless sudo, to see every folder.'
+DESCRIPTION='Files created or changed in the last N minutes under a folder (default the whole file system, skipping /proc, /sys, /dev and /run), newest first, with owner, size and path. Needs root or passwordless sudo.'
 DEPENDENCIES=()
 PARAMETERS=(MINUTES? SEARCH_PATH? EXCLUDE? MAX_RESULTS?)
 TAGS=(filesystem forensics discovery)

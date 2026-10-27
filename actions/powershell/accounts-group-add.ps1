@@ -1,5 +1,5 @@
 $Name = 'Accounts - Add to Group'
-$Description = 'Adds a user to a local group such as Administrators, Remote Desktop Users or a custom group. Member is the account name (use DOMAIN\name for a domain account).'
+$Description = 'Adds a user to a local group such as Administrators, Remote Desktop Users or a custom group.'
 $Dependencies = @()
 $Parameters = @('Member', 'Group')
 $Tags = @('accounts', 'remediation')

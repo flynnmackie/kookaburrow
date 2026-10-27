@@ -1,5 +1,5 @@
 NAME='Persistence - Recent Config Changes'
-DESCRIPTION='Files changed in the last N days in the places that matter for persistence and tampering: /etc, systemd and cron folders, /usr/local, /opt, /root and every home directory dotfile, sshd and PAM configuration, plus new executables in the standard binary folders. DAYS defaults to 7. A tight window around an incident quickly shows what an attacker edited.'
+DESCRIPTION='Files changed in the last N days in the places that matter for persistence and tampering.'
 DEPENDENCIES=()
 PARAMETERS=(DAYS?)
 TAGS=(persistence forensics filesystem)

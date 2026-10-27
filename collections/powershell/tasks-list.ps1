@@ -1,5 +1,5 @@
 $Name = 'Tasks - List'
-$Description = 'Every scheduled task with its actions, triggers, run-as account and last run result. Set ExcludeMicrosoft to yes to hide tasks under the Microsoft folder, which leaves the ones an attacker or admin added. Scheduled tasks are one of the most common persistence methods (like Windows.System.TaskScheduler).'
+$Description = 'Every scheduled task with its actions, triggers, run-as account and last run result.'
 $Dependencies = @()
 $Parameters = @('ExcludeMicrosoft?')
 $Tags = @('persistence', 'scheduled-tasks', 'execution')

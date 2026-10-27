@@ -1,5 +1,5 @@
 $Name = 'Network - Wi-Fi Profiles'
-$Description = 'Saved wireless networks: SSID, authentication and cipher. Passwords are not collected. Shows where a laptop has connected, including rogue and public networks.'
+$Description = 'Saved wireless networks: SSID, authentication and cipher.'
 $Dependencies = @()
 $Tags = @('network', 'inventory')
 

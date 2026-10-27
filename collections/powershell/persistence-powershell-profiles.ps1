@@ -1,5 +1,5 @@
 $Name = 'Persistence - PowerShell Profiles'
-$Description = 'PowerShell profile scripts for all users and every user profile (Windows PowerShell and PowerShell 7, console and ISE). A profile runs at every shell start, so a modified one is persistence; the first lines and hash are shown.'
+$Description = 'PowerShell profile scripts for all users and every user profile (Windows PowerShell and PowerShell 7, console and ISE).'
 $Dependencies = @()
 $Tags = @('persistence', 'powershell', 'execution')
 

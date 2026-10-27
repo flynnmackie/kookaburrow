@@ -1,5 +1,5 @@
 $Name = 'System - Drivers'
-$Description = 'Kernel and file system drivers with path, state, start type and signature status. Rootkits and vulnerable-driver (BYOVD) attacks load drivers, so look for unsigned drivers or ones outside System32\drivers (like Windows.System.Drivers).'
+$Description = 'Kernel and file system drivers with path, state, start type and signature status.'
 $Dependencies = @()
 $Tags = @('persistence', 'defense-evasion', 'privilege-escalation')
 

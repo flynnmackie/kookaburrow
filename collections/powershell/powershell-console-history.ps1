@@ -1,5 +1,5 @@
 $Name = 'PowerShell - Console History'
-$Description = 'The PSReadLine command history of every user (ConsoleHost_history.txt), one row per command with its line number and the file modified time. Optional Contains returns only commands containing that text, for example download, Invoke-WebRequest, -enc or a hostname. Often shows exactly what an attacker typed.'
+$Description = 'The PSReadLine command history of every user (ConsoleHost_history.txt), one row per command with its line number and the file modified time.'
 $Dependencies = @()
 $Parameters = @('Contains?')
 $Tags = @('powershell', 'execution', 'history')

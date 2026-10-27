@@ -1,5 +1,5 @@
 $Name = 'System - Certificates'
-$Description = 'Certificates in the machine and current-user Root, CA, TrustedPublisher and personal stores with issuer, expiry and thumbprint. Attackers add root certificates to intercept TLS or to make malware look signed. Self-signed roots outside the Microsoft program deserve a look.'
+$Description = 'Certificates in the machine and current-user Root, CA, TrustedPublisher and personal stores with issuer, expiry and thumbprint.'
 $Dependencies = @()
 $Parameters = @('Store?')
 $Tags = @('persistence', 'defense-evasion', 'inventory')

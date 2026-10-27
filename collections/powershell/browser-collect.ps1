@@ -1,5 +1,5 @@
 $Name = 'Browser - Collect History'
-$Description = 'Copies browser history data for every user: Chrome, Edge and Brave (History, Bookmarks, Preferences) and Firefox (places.sqlite, formhistory.sqlite, extensions.json) for analysis with Hindsight, BrowsingHistoryView or SQLite. Passwords, cookies and saved logins are NOT collected. Locked files are copied from a volume shadow. Comes back over SMB, which is switched on for this collection only.'
+$Description = 'Copies browser history data for every user.'
 $Dependencies = @()
 $Tags = @('forensics', 'history', 'c2')
 $Footprint = 'transient'

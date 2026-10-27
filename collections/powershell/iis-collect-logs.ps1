@@ -1,5 +1,5 @@
 $Name = 'IIS - Collect Logs'
-$Description = 'Copies IIS web server logs from C:\inetpub\logs\LogFiles (and the HTTPERR folder) plus the server configuration (applicationHost.config), for web shell and exploitation investigations. Days limits to log files changed in the last N days (default 14). Comes back over SMB, which is switched on for this collection only.'
+$Description = 'Copies IIS web server logs from C:\inetpub\logs\LogFiles (and the HTTPERR folder) plus the server configuration (applicationHost.config), for web shell and exploitation investigations.'
 $Dependencies = @()
 $Parameters = @('Days?')
 $Tags = @('forensics', 'filesystem', 'c2')

@@ -1,5 +1,5 @@
 NAME='Accounts - Users and Groups'
-DESCRIPTION='Lists accounts with UID 0, accounts that have a login shell, members of privileged groups (sudo, wheel, admin, docker, lxd) and accounts with an empty password field. Unexpected UID 0 accounts and extra sudoers are classic persistence.'
+DESCRIPTION='Lists accounts with UID 0, accounts that have a login shell, members of privileged groups (sudo, wheel, admin, docker, lxd) and accounts with an empty password field.'
 DEPENDENCIES=()
 TAGS=(accounts persistence privilege-escalation)
 

@@ -1,5 +1,5 @@
 $Name = 'Defender - Enable Protection'
-$Description = 'Turns Microsoft Defender real-time protection, behaviour monitoring, script scanning and cloud protection back on, for example after an attacker disabled them. Reports the state before and after. Tamper protection, if enabled, may block changes made this way.'
+$Description = 'Turns Microsoft Defender real-time protection, behaviour monitoring, script scanning and cloud protection back on, for example after an attacker disabled them.'
 $Dependencies = @()
 $Tags = @('antivirus', 'defense-evasion', 'recovery')
 

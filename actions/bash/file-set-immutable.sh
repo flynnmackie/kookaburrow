@@ -1,5 +1,5 @@
 NAME='Files - Set Immutable'
-DESCRIPTION='Makes a file immutable with chattr +i, so nothing (even root) can modify, delete or rename it until the flag is cleared. Use it to protect a clean configuration or preserve evidence in place. Needs a file system that supports attributes (ext4, xfs, btrfs).'
+DESCRIPTION='Makes a file immutable with chattr +i, so nothing (even root) can modify, delete or rename it until the flag is cleared. Needs a file system that supports attributes (ext4, xfs, btrfs).'
 DEPENDENCIES=()
 PARAMETERS=(FILE_PATH)
 TAGS=(filesystem hardening containment)

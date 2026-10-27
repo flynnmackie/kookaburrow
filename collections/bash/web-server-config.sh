@@ -1,5 +1,5 @@
 NAME='Web - Server Config'
-DESCRIPTION='What web servers are running and how they are configured: nginx server names, document roots, proxied backends and listening ports; Apache virtual hosts and loaded modules; PHP settings that matter for compromise (disabled functions, auto-prepend and auto-append files); and Tomcat web applications. Shows where a web shell could sit and what is exposed. Needs root, or an account with passwordless sudo, to read all configuration.'
+DESCRIPTION='What web servers are running and how they are configured. Needs root or passwordless sudo.'
 DEPENDENCIES=()
 TAGS=(inventory c2 persistence filesystem)
 

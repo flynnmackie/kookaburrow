@@ -1,5 +1,5 @@
 $Name = 'Defender - Collect Logs'
-$Description = 'Copies Microsoft Defender evidence: the MPLog support logs (which record every file Defender scanned and process activity), the detection history files, plus a text export of detected threats and the current preferences including exclusions. Needs administrator rights. Comes back over SMB, which is switched on for this collection only.'
+$Description = 'Copies Microsoft Defender evidence. Needs administrator rights.'
 $Dependencies = @()
 $Tags = @('antivirus', 'forensics', 'malware')
 $Footprint = 'transient'

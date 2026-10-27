@@ -1,5 +1,5 @@
 NAME='Persistence - Clear ld.so.preload'
-DESCRIPTION='Moves /etc/ld.so.preload to /var/quarantine-kookaburrow, which stops every program loading the libraries it lists. A malicious entry here injects code into every process (a common user-mode rootkit). The file content and hash are reported first.'
+DESCRIPTION='Moves /etc/ld.so.preload to /var/quarantine-kookaburrow, which stops every program loading the libraries it lists.'
 DEPENDENCIES=()
 TAGS=(persistence malware remediation)
 

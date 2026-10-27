@@ -12,3 +12,4 @@ vendor/
 # What hunts and responses brought back
 output/
 evidence/
+build/

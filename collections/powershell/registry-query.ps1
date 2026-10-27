@@ -1,5 +1,5 @@
 $Name = 'Registry - Query Key'
-$Description = 'Lists the values under a registry key, optionally with all subkeys. KeyPath is the PowerShell registry path, for example HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run, or Registry::HKEY_USERS\SID\Software\... for a user. Contains keeps only entries whose name or data contains that text. The quick way to check one key across many hosts.'
+$Description = 'Lists the values under a registry key, optionally with all subkeys.'
 $Dependencies = @()
 $Parameters = @('KeyPath', 'Recurse?', 'Contains?')
 $Tags = @('registry', 'forensics', 'persistence')

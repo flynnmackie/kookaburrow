@@ -1,5 +1,5 @@
 NAME='Network - Interface Down'
-DESCRIPTION='Brings one network interface down (ip link set down), cutting the host off from that network. Taking down the interface this host is managed over will end your contact with it; use Host - Isolate to keep access from your server. Refuses the loopback interface.'
+DESCRIPTION='Brings one network interface down (ip link set down), cutting the host off from that network.'
 DEPENDENCIES=()
 PARAMETERS=(INTERFACE)
 TAGS=(containment network)

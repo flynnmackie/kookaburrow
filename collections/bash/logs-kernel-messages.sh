@@ -1,5 +1,5 @@
 NAME='Logs - Kernel Messages'
-DESCRIPTION='The kernel ring buffer with readable times, highlighting events that matter in an investigation: USB devices attached, kernel modules loaded, segfaults and crashes, out-of-memory kills, ptrace and audit denials, firewall drops and network link changes. CONTAINS limits to lines containing that text. Needs root, or an account with passwordless sudo, when dmesg is restricted.'
+DESCRIPTION='The kernel ring buffer with readable times, highlighting events that matter in an investigation. Needs root or passwordless sudo.'
 DEPENDENCIES=()
 PARAMETERS=(CONTAINS?)
 TAGS=(event-logs forensics kernel)

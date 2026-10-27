@@ -1,5 +1,5 @@
 $Name = 'Accounts - Log Off Session'
-$Description = 'Logs off one logon session by its session ID (shown by quser or Accounts - Logon Sessions), for example a single RDP session, leaving the account other sessions alone. Refuses session 0 (services).'
+$Description = 'Logs off one logon session by its session ID (shown by quser or Accounts - Logon Sessions), for example a single RDP session, leaving the account other sessions alone.'
 $Dependencies = @()
 $Parameters = @('SessionId')
 $Tags = @('accounts', 'containment', 'rdp')

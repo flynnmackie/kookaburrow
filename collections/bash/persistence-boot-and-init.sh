@@ -1,5 +1,5 @@
 NAME='Persistence - Boot and Init'
-DESCRIPTION='Persistence points outside cron and systemd: rc.local, SysV init scripts, login-time scripts (profile.d, bashrc, motd update scripts), /etc/environment, the dynamic linker preload and config, PAM modules, udev rules, kernel modules loaded at boot, GRUB command line, XDG autostart entries and initramfs hooks, with modification times. Anything modified recently or containing network or shell commands deserves a look.'
+DESCRIPTION='Persistence points outside cron and systemd.'
 DEPENDENCIES=()
 TAGS=(persistence privilege-escalation)
 

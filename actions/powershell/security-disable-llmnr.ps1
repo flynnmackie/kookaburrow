@@ -1,5 +1,5 @@
 $Name = 'Security - Disable LLMNR and NetBIOS'
-$Description = 'Turns off LLMNR (by policy) and NetBIOS over TCP/IP on every network adapter, closing the name-resolution poisoning path that tools like Responder use to capture credentials. Applies immediately for NetBIOS and to new DNS client lookups for LLMNR. Some very old software and workgroup name resolution relies on these protocols.'
+$Description = 'Turns off LLMNR (by policy) and NetBIOS over TCP/IP on every network adapter, closing the name-resolution poisoning path that tools like Responder use to capture credentials.'
 $Dependencies = @()
 $Tags = @('hardening', 'network', 'lateral-movement')
 

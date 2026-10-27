@@ -1,5 +1,5 @@
 $Name = 'Defender - Scan'
-$Description = 'Starts a Microsoft Defender scan and waits for it to finish. ScanType is Quick (default), Full or Custom; Custom needs ScanPath (a file or folder). Detections are reported afterwards. A full scan can take hours, so the run may time out while the scan carries on in the background.'
+$Description = 'Starts a Microsoft Defender scan and waits for it to finish.'
 $Dependencies = @()
 $Parameters = @('ScanType?', 'ScanPath?')
 $Tags = @('antivirus', 'malware', 'remediation')

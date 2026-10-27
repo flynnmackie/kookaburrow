@@ -1,5 +1,5 @@
 NAME='Processes - Environment'
-DESCRIPTION='The command line, working directory, environment variables and loaded libraries of one process, read from /proc. PID is required. Environment variables can reveal how a process was started, its proxy and C2 settings and LD_PRELOAD tricks; they can also contain secrets, so handle the output carefully. Needs root, or an account with passwordless sudo, for processes of other users.'
+DESCRIPTION='The command line, working directory, environment variables and loaded libraries of one process, read from /proc. Needs root or passwordless sudo.'
 DEPENDENCIES=()
 PARAMETERS=(PID)
 TAGS=(processes forensics malware)

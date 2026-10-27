@@ -1,5 +1,5 @@
 NAME='Files - Directory Listing'
-DESCRIPTION='Lists the contents of a folder with permissions, owner, size and full timestamps, including hidden files. Optionally recursive. DIR_PATH is required; MAX_RESULTS defaults to 5000. Use it to see what is in a staging folder, a home directory or a web root.'
+DESCRIPTION='Lists the contents of a folder with permissions, owner, size and full timestamps, including hidden files.'
 DEPENDENCIES=()
 PARAMETERS=(DIR_PATH RECURSE? MAX_RESULTS?)
 TAGS=(filesystem discovery)

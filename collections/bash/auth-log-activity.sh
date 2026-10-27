@@ -1,5 +1,5 @@
 NAME='Logs - Auth Activity'
-DESCRIPTION='Summarises SSH logins and sudo use from the authentication log (auth.log or secure, or journald): successful logins, failed attempts grouped by source address, and recent sudo commands. Run as root to read the logs.'
+DESCRIPTION='Summarises SSH logins and sudo use from the authentication log (auth.log or secure, or journald). Needs root or passwordless sudo.'
 DEPENDENCIES=()
 TAGS=(logons event-logs brute-force accounts)
 

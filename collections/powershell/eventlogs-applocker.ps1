@@ -1,5 +1,5 @@
 $Name = 'Event Logs - AppLocker and WDAC'
-$Description = 'Blocked and audited program execution from AppLocker (EXE and DLL, MSI and Script, Packaged app logs: 8003, 8004, 8006, 8007) and Windows Defender Application Control code integrity (3076, 3077). Shows what an application control policy stopped or would have stopped. Set LastMinutes for the last N minutes or StartTime and EndTime (yyyy-MM-dd HH:mm) for a range; default is 24 hours.'
+$Description = 'Blocked and audited program execution from AppLocker (EXE and DLL, MSI and Script, Packaged app logs.'
 $Dependencies = @()
 $Parameters = @('LastMinutes?', 'StartTime?', 'EndTime?', 'MaxEvents?')
 $Tags = @('event-logs', 'execution', 'defense-evasion')

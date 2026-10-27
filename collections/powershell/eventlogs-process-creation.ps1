@@ -1,5 +1,5 @@
 $Name = 'Event Logs - Process Creation'
-$Description = 'Process creation events: Security 4688 (needs process auditing; includes the command line only if command-line auditing is on) and Sysmon event 1 when Sysmon is installed. Set LastMinutes for the last N minutes or StartTime and EndTime (yyyy-MM-dd HH:mm) for a range; default is 24 hours. Contains keeps only command lines or images containing that text (for example powershell, certutil, -enc, whoami). Needs administrator rights.'
+$Description = 'Process creation events: Security 4688 (needs process auditing; includes the command line only if command-line auditing is on) and Sysmon event 1 when Sysmon is installed. Needs administrator rights.'
 $Dependencies = @()
 $Parameters = @('LastMinutes?', 'StartTime?', 'EndTime?', 'Contains?', 'MaxEvents?')
 $Tags = @('event-logs', 'execution', 'processes')

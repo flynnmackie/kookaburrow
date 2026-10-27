@@ -1,5 +1,5 @@
 $Name = 'Persistence - IFEO'
-$Description = 'Image File Execution Options debuggers, GlobalFlag settings and SilentProcessExit monitors. Setting a Debugger for a program (or a MonitorProcess for when it exits) makes Windows run an attacker binary instead or alongside it, and is used to hijack accessibility tools and security software.'
+$Description = 'Image File Execution Options debuggers, GlobalFlag settings and SilentProcessExit monitors.'
 $Dependencies = @()
 $Tags = @('persistence', 'defense-evasion', 'registry')
 

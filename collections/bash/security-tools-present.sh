@@ -1,5 +1,5 @@
 NAME='Security - Tools Present'
-DESCRIPTION='What defends and watches this Linux host: auditd and its rules, fail2ban, ClamAV, AIDE, rkhunter, chkrootkit, osquery, Wazuh and OSSEC, and the running agents of common EDR products (CrowdStrike Falcon, SentinelOne, Carbon Black, Microsoft Defender for Endpoint, Sophos, Trend Micro, Elastic, Velociraptor), plus SELinux, AppArmor and the firewall state. Tells you what coverage exists, and which agent an attacker has stopped.'
+DESCRIPTION='What defends and watches this Linux host.'
 DEPENDENCIES=()
 TAGS=(inventory defense-evasion security)
 

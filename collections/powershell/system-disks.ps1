@@ -1,5 +1,5 @@
 $Name = 'System - Disks and Volumes'
-$Description = 'Physical disks, volumes with file system, size and free space, and BitLocker state. Shows removable and network drives and how much room there is for an acquisition (like Windows.Sys.Drives).'
+$Description = 'Physical disks, volumes with file system, size and free space, and BitLocker state.'
 $Dependencies = @()
 $Tags = @('inventory', 'filesystem')
 

@@ -1,5 +1,5 @@
 NAME='Containers - Remove'
-DESCRIPTION='Stops and removes a container (docker or podman) by name or ID. Its image and volumes are kept. The container configuration is saved to /var/quarantine-kookaburrow (docker inspect output) first. Use it to remove a malicious or unauthorised container.'
+DESCRIPTION='Stops and removes a container (docker or podman) by name or ID.'
 DEPENDENCIES=()
 PARAMETERS=(CONTAINER)
 TAGS=(containers remediation)

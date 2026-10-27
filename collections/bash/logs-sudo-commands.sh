@@ -1,5 +1,5 @@
 NAME='Logs - Sudo and Su Commands'
-DESCRIPTION='Commands run through sudo (user, working directory, target user and full command) and su or sudo sessions opened, over the last N days (DAYS, default 7). CONTAINS keeps lines containing that text, for example a command name or an account. Shows what an account did with elevated rights. Reads the auth log, the secure log or the journal. Needs root, or an account with passwordless sudo.'
+DESCRIPTION='Commands run through sudo (user, working directory, target user and full command) and su or sudo sessions opened, over the last N days (DAYS, default 7). Needs root or passwordless sudo.'
 DEPENDENCIES=()
 PARAMETERS=(DAYS? CONTAINS?)
 TAGS=(accounts privilege-escalation execution event-logs)

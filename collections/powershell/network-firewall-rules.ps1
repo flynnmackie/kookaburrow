@@ -1,5 +1,5 @@
 $Name = 'Firewall - Rules'
-$Description = 'Windows Firewall rules read straight from the registry (fast even with thousands of rules): action, direction, protocol, ports, program and whether active. Filter text is optional and matches anywhere in the rule, for example 3389, Allow or a program name. Look for allow rules to unusual programs or ports (like Windows.Sys.FirewallRules).'
+$Description = 'Windows Firewall rules read straight from the registry (fast even with thousands of rules).'
 $Dependencies = @()
 $Parameters = @('Filter?')
 $Tags = @('network', 'persistence', 'defense-evasion')

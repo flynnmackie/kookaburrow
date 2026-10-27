@@ -1,5 +1,5 @@
 NAME='SSH - Remove Authorized Key'
-DESCRIPTION='Removes SSH public keys from an account authorized_keys file: every line containing KEY_TEXT (part of the key or its comment, shown by SSH - Keys and Config). The file is backed up to /var/quarantine-kookaburrow first and the removed lines are reported. Planted keys survive password resets, so this is a key containment step.'
+DESCRIPTION='Removes SSH public keys from an account authorized_keys file.'
 DEPENDENCIES=()
 PARAMETERS=(USER_NAME KEY_TEXT)
 TAGS=(ssh persistence remediation accounts)

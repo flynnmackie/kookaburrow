@@ -1,5 +1,5 @@
 NAME='Packages - Installed'
-DESCRIPTION='Every installed package with version and, where the package manager records it, the install date (dpkg, rpm and apk are supported). CONTAINS limits to package names containing that text. Look for attacker tools (nmap, netcat, tcpdump, compilers) and packages installed around the time of an incident.'
+DESCRIPTION='Every installed package with version and, where the package manager records it, the install date (dpkg, rpm and apk are supported).'
 DEPENDENCIES=()
 PARAMETERS=(CONTAINS?)
 TAGS=(inventory software)

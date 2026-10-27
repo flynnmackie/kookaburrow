@@ -1,5 +1,5 @@
 NAME='Logins - History'
-DESCRIPTION='Login history from wtmp and btmp: successful logins with source address and duration (last), failed logins (lastb), the last login of every account (lastlog) and who is on now. DAYS limits to the last N days (default 30). Shows when and from where accounts were used, and brute force attempts. Needs root, or an account with passwordless sudo, for failed logins.'
+DESCRIPTION='Login history from wtmp and btmp. Needs root or passwordless sudo.'
 DEPENDENCIES=()
 PARAMETERS=(DAYS?)
 TAGS=(logons accounts brute-force)

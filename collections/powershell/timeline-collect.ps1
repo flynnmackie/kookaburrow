@@ -1,5 +1,5 @@
 $Name = 'Windows Timeline - Collect'
-$Description = 'Copies the Windows Timeline / Activity History database (ActivitiesCache.db) of every user, with its write-ahead log files, for analysis with WxTCmd or SQLite. It records applications opened, files and web pages visited and clipboard use, with start and end times, for up to 30 days on Windows 10 and some builds of Windows 11. Comes back over SMB, which is switched on for this collection only.'
+$Description = 'Copies the Windows Timeline / Activity History database (ActivitiesCache.db) of every user, with its write-ahead log files, for analysis with WxTCmd or SQLite.'
 $Dependencies = @()
 $Tags = @('forensics', 'execution', 'filesystem')
 $Footprint = 'transient'

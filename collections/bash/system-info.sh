@@ -1,5 +1,5 @@
 NAME='System - Info'
-DESCRIPTION='Host identity and build: hostname, distribution, kernel, architecture, uptime and last boot, time zone, CPU and memory, virtualisation, currently logged in users and the Linux security modules in use. The first thing to record about any Linux host.'
+DESCRIPTION='Host identity and build: hostname, distribution, kernel, architecture, uptime and last boot, time zone, CPU and memory, virtualisation, currently logged in users and the Linux security modules in use.'
 DEPENDENCIES=()
 TAGS=(inventory discovery)
 

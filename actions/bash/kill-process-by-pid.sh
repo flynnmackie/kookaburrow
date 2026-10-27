@@ -1,5 +1,5 @@
 NAME='Processes - Kill by PID'
-DESCRIPTION='Sends SIGKILL to one process by its process id. Use when a name is ambiguous or the process is masquerading.'
+DESCRIPTION='Sends SIGKILL to one process by its process id.'
 DEPENDENCIES=()
 PARAMETERS=(PID)
 TAGS=(containment process)

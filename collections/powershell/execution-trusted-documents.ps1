@@ -1,5 +1,5 @@
 $Name = 'Execution - Trusted Documents'
-$Description = 'Office documents where a user clicked Enable Content or Enable Editing (the TrustRecords registry), per user and Office application, with the full path and the time it was trusted. Macro malware needs that click, so this lists the documents that were allowed to run macros and exactly when. Offline user hives are loaded for the run.'
+$Description = 'Office documents where a user clicked Enable Content or Enable Editing (the TrustRecords registry), per user and Office application, with the full path and the time it was trusted.'
 $Dependencies = @()
 $Tags = @('execution', 'forensics', 'registry', 'office', 'malware')
 

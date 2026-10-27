@@ -1,5 +1,5 @@
 $Name = 'Network - ARP Cache'
-$Description = 'The IP to MAC neighbour table. Shows hosts this machine has recently talked to on the local network and can reveal lateral movement or ARP spoofing (duplicate MACs) (like Windows.Network.ArpCache).'
+$Description = 'The IP to MAC neighbour table.'
 $Dependencies = @()
 $Tags = @('network', 'lateral-movement')
 

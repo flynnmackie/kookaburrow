@@ -1,5 +1,5 @@
 NAME='Network - Packet Capture'
-DESCRIPTION='Captures network traffic on all interfaces for a short time with tcpdump and brings back a pcap file for Wireshark. DURATION is the capture length in seconds (default 30, maximum 600). PORT limits the capture to one TCP or UDP port (for example 443 or 53) and ADDRESS to one IP address. Needs tcpdump installed on the host, and root or an account with passwordless sudo. The file comes back over SFTP.'
+DESCRIPTION='Captures network traffic on all interfaces for a short time with tcpdump and brings back a pcap file for Wireshark. Needs root or passwordless sudo.'
 DEPENDENCIES=()
 PARAMETERS=(DURATION? PORT? ADDRESS?)
 TAGS=(network forensics c2)

@@ -1,5 +1,5 @@
 NAME='Processes - Suspicious'
-DESCRIPTION='Walks /proc for processes whose executable has been deleted from disk or runs from /tmp, /var/tmp or /dev/shm. Malware often deletes itself after starting or runs from world-writable memory-backed folders. Run as root to see every process.'
+DESCRIPTION='Walks /proc for processes whose executable has been deleted from disk or runs from /tmp, /var/tmp or /dev/shm. Needs root or passwordless sudo.'
 DEPENDENCIES=()
 TAGS=(execution malware processes defense-evasion)
 

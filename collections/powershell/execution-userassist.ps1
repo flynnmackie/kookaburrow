@@ -1,5 +1,5 @@
 $Name = 'Execution - UserAssist'
-$Description = 'Programs launched from Explorer by each user, decoded from the UserAssist registry keys (ROT13 names): run count, focus count and time, and last execution time. Evidence that a user started a program, even if it was later deleted (like Windows.Registry.UserAssist). Offline user hives are loaded for the run.'
+$Description = 'Programs launched from Explorer by each user, decoded from the UserAssist registry keys (ROT13 names).'
 $Dependencies = @()
 $Tags = @('execution', 'forensics', 'registry')
 

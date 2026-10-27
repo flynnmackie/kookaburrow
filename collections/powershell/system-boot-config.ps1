@@ -1,5 +1,5 @@
 $Name = 'System - Boot Configuration'
-$Description = 'Boot and platform security configuration: the boot configuration store (bcdedit: test signing, debug mode, safe boot, boot status policy, recovery), Secure Boot state, firmware type, TPM presence and BitLocker status. Test signing and debug mode allow unsigned or hostile drivers; a disabled Secure Boot or recovery environment is a bootkit and ransomware enabler.'
+$Description = 'Boot and platform security configuration.'
 $Dependencies = @()
 $Tags = @('inventory', 'defense-evasion', 'persistence', 'security')
 

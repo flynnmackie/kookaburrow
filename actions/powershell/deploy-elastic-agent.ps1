@@ -1,5 +1,5 @@
 $Name = 'Deploy - Elastic Agent (Windows)'
-$Description = 'Installs the Elastic Agent on the host and enrols it in your Fleet Server: the agent zip is copied to a temporary folder, unpacked, and elastic-agent install is run with FleetUrl and EnrollmentToken (both are used for this run only and are never stored by Kookaburrow; the token is hidden in the output). Set Insecure to Yes only for a lab Fleet Server with a self-signed certificate. Nothing is changed if an Elastic Agent service is already installed. Needs elastic-agent-windows.zip (the official windows-x86_64 zip) uploaded under Settings, Binaries, and administrator rights. The agent stays installed and keeps running.'
+$Description = 'Installs the Elastic Agent on the host and enrols it in your Fleet Server. Needs administrator rights.'
 $Dependencies = @('elastic-agent-windows.zip')
 $Parameters = @('FleetUrl', 'EnrollmentToken', 'Insecure?')
 $Tags = @('deploy', 'elastic', 'agent', 'persistence')

@@ -1,5 +1,5 @@
 $Name = 'Accounts - Disable Guest'
-$Description = 'Disables the built-in Guest account if it is enabled, and reports the state of the built-in Administrator and DefaultAccount. An enabled Guest account gives anyone limited access without a password and is a common persistence trick.'
+$Description = 'Disables the built-in Guest account if it is enabled, and reports the state of the built-in Administrator and DefaultAccount.'
 $Dependencies = @()
 $Tags = @('accounts', 'hardening', 'persistence')
 

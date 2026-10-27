@@ -1,5 +1,5 @@
 $Name = 'Files - Recently Changed'
-$Description = 'Files created or modified in the last N minutes under a folder (default the whole system drive), newest first, with the creation and modification times and hashes. LastMinutes defaults to 60. Exclude is an optional text that paths must not contain (for example \Windows\WinSxS). Quick way to see what an attacker touched just now. Can be slow on a whole drive: narrow SearchPath when you can.'
+$Description = 'Files created or modified in the last N minutes under a folder (default the whole system drive), newest first, with the creation and modification times and hashes.'
 $Dependencies = @()
 $Parameters = @('LastMinutes?', 'SearchPath?', 'Exclude?', 'Hash?', 'MaxResults?')
 $Tags = @('filesystem', 'forensics', 'discovery')

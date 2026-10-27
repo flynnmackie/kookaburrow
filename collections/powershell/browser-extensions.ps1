@@ -1,5 +1,5 @@
 $Name = 'Browser - Extensions'
-$Description = 'Browser extensions for Chrome, Edge, Brave and Firefox in every user profile: name, version, ID, requested permissions and install time. Malicious or unwanted extensions can read pages, steal sessions and redirect traffic. Look for broad permissions (all URLs, cookies, webRequest) and extensions not from the store.'
+$Description = 'Browser extensions for Chrome, Edge, Brave and Firefox in every user profile: name, version, ID, requested permissions and install time.'
 $Dependencies = @()
 $Tags = @('persistence', 'inventory', 'malware')
 

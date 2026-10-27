@@ -1,5 +1,5 @@
 $Name = 'USB - Allow Storage'
-$Description = 'Re-enables USB storage devices by setting the USBSTOR driver back to start on demand. Undoes USB - Block Storage.'
+$Description = 'Re-enables USB storage devices by setting the USBSTOR driver back to start on demand.'
 $Dependencies = @()
 $Tags = @('recovery', 'usb')
 

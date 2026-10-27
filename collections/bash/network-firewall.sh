@@ -1,5 +1,5 @@
 NAME='Firewall - Rules'
-DESCRIPTION='The active firewall rules from iptables, ip6tables, nftables, ufw and firewalld, whichever are present. Shows what is allowed in and out, and rules added by an attacker (extra ACCEPT, NAT or redirect rules). Needs root, or an account with passwordless sudo.'
+DESCRIPTION='The active firewall rules from iptables, ip6tables, nftables, ufw and firewalld, whichever are present. Needs root or passwordless sudo.'
 DEPENDENCIES=()
 TAGS=(network defense-evasion persistence)
 

@@ -1,5 +1,5 @@
 NAME='Cron - All Jobs'
-DESCRIPTION='Every scheduled job: the system crontab and cron.d, the hourly, daily, weekly and monthly folders, every user crontab, anacron, at jobs and active systemd timers, each with the file modification time. Jobs that fetch and run remote content (curl, wget, base64, bash -i, nc) are marked with a leading !!. Needs root, or an account with passwordless sudo, to read user crontabs.'
+DESCRIPTION='Every scheduled job: the system crontab and cron.d, the hourly, daily, weekly and monthly folders, every user crontab, anacron, at jobs and active systemd timers, each with the file modification time. Needs root or passwordless sudo.'
 DEPENDENCIES=()
 TAGS=(persistence cron execution)
 

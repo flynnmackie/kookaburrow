@@ -1,5 +1,5 @@
 NAME='SSH - Disable Password Login'
-DESCRIPTION='Turns off SSH password authentication (key login only) with a drop-in file (/etc/ssh/sshd_config.d/99-kookaburrow-password.conf), checks the configuration with sshd -t and reloads SSH. WARNING: if the account Kookaburrow uses to manage this host logs in with a password, you will lose contact. Set CONFIRM to YES only when you are sure key login works. Remove it with SSH - Remove Overrides.'
+DESCRIPTION='Turns off SSH password authentication (key login only) with a drop-in file (/etc/ssh/sshd_config.d/99-kookaburrow-password.conf), checks the configuration with sshd -t and reloads SSH. WARNING: if the account Kookaburrow uses to manage this host logs in with a password, you will lose contact. Set CONFIRM to YES only when you are sure key login works.'
 DEPENDENCIES=()
 PARAMETERS=(CONFIRM)
 TAGS=(ssh hardening containment)

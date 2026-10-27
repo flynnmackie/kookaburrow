@@ -1,5 +1,5 @@
 $Name = 'Files - Unsigned Executables'
-$Description = 'Scans a folder with Sysinternals Sigcheck and returns executables and DLLs that are not signed (or whose signature is invalid), with hashes, publisher and version information. ScanPath is the folder (default C:\Windows\System32); set Recurse to no for just that folder. Unsigned files in system folders and in user-writable folders are strong leads. Needs the sigcheck64.exe single-file binary uploaded under Settings, Binaries.'
+$Description = 'Scans a folder with Sysinternals Sigcheck and returns executables and DLLs that are not signed (or whose signature is invalid), with hashes, publisher and version information.'
 $Dependencies = @('sigcheck64.exe')
 $Parameters = @('ScanPath?', 'Recurse?')
 $Tags = @('signing', 'malware', 'filesystem')

@@ -8,6 +8,7 @@ const { createAudit, sha256 } = require('./audit');
 const { safeName, createRunFolder, parseCsv, combine } = require('./output');
 const { runLarge } = require('./large-transfer');
 const cancel = require('./cancel');
+const elastic = require('./elastic');
 
 // A hunt runs one or more collections on a set of hosts and writes what comes back under output/hunts/ (the layout is described in
 // src/output.js): a folder per hunt, a folder per host inside it with one CSV per collection, and the hunt's log, All_Hosts CSV and
@@ -119,6 +120,7 @@ function startHunt({ name, collectionIds, hosts, params, startedBy, scheduleId, 
             file = `${hostBase(host)}/${base}`;
             rows = Math.max(0, parseCsv(csv).length - 1);
             data.set(`${c.id}|${host.id}`, csv);
+            elastic.forwardResult({ run, collection: c, host: { hostLabel: label(host), address: host.address }, csv });
           }
           const error = ok ? '' : String(out.stderr || out.stdout || 'Failed').trim().split(/\r?\n/)[0].slice(0, 300);
           if (ok) {

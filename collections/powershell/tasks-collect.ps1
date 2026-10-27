@@ -1,5 +1,5 @@
 $Name = 'Tasks - Collect'
-$Description = 'Copies the scheduled task definitions: every XML file under C:\Windows\System32\Tasks (the full task folder tree) and any legacy .job files in C:\Windows\Tasks. The XML holds the exact command, arguments, triggers and author of each task, including ones that have been hidden from the Task Scheduler. Comes back over SMB, which is switched on for this collection only.'
+$Description = 'Copies the scheduled task definitions.'
 $Dependencies = @()
 $Tags = @('persistence', 'scheduled-tasks', 'forensics')
 $Footprint = 'transient'

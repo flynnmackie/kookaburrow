@@ -1,5 +1,5 @@
 NAME='Logs - Var Archive'
-DESCRIPTION='Packs /var/log into one compressed archive and pulls it back to the server over SFTP, for offline analysis. Can be hundreds of MB. Needs root to read every log.'
+DESCRIPTION='Packs /var/log into one compressed archive and pulls it back to the server over SFTP, for offline analysis. Needs root or passwordless sudo.'
 DEPENDENCIES=()
 TAGS=(forensics filesystem)
 FOOTPRINT='transient'

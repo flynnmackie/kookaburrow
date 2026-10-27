@@ -1,5 +1,5 @@
 $Name = 'Event Logs - Audit Policy'
-$Description = 'Effective advanced audit policy (auditpol), whether command lines are included in process creation events, and the PowerShell script block, module and transcription logging policies. Tells you what the host is able to record before you rely on its logs, and shows weakened auditing. Needs administrator rights.'
+$Description = 'Effective advanced audit policy (auditpol), whether command lines are included in process creation events, and the PowerShell script block, module and transcription logging policies. Needs administrator rights.'
 $Dependencies = @()
 $Tags = @('event-logs', 'inventory', 'defense-evasion')
 

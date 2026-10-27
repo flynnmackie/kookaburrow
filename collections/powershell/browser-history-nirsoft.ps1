@@ -1,5 +1,5 @@
 $Name = 'Browser - History'
-$Description = 'Browsing history for every user and browser (Chrome, Edge, Firefox, Brave, Internet Explorer and others) listed with NirSoft BrowsingHistoryView: URL, title, visit time, visit count, how the page was reached, browser and user profile. Days keeps only visits in the last N days (default 7); Contains keeps URLs or titles containing that text. Needs the BrowsingHistoryView.exe single-file binary uploaded under Settings, Binaries. Use Browser - Collect History to bring the raw databases back instead.'
+$Description = 'Browsing history for every user and browser (Chrome, Edge, Firefox, Brave, Internet Explorer and others) listed with NirSoft BrowsingHistoryView.'
 $Dependencies = @('BrowsingHistoryView.exe')
 $Parameters = @('Days?', 'Contains?')
 $Tags = @('forensics', 'history', 'c2')

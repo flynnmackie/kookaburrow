@@ -1,5 +1,5 @@
 $Name = 'Persistence - Active Setup'
-$Description = 'Active Setup components: programs that run once for every user at their next logon (StubPath), for the machine and 32-bit views. Attackers add a component here to run code as each user, including administrators, who log on. Shows the component, version and what it runs.'
+$Description = 'Active Setup components: programs that run once for every user at their next logon (StubPath), for the machine and 32-bit views.'
 $Dependencies = @()
 $Tags = @('persistence', 'registry', 'autoruns')
 

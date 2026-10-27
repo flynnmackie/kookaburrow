@@ -1,5 +1,5 @@
 $Name = 'Services - Delete'
-$Description = 'Stops a service and deletes its registration (sc delete). The service binary is not removed, so collect or quarantine it first. Use it to remove a malicious or unwanted service for good. Refuses well-known core Windows services.'
+$Description = 'Stops a service and deletes its registration (sc delete).'
 $Dependencies = @()
 $Parameters = @('ServiceName')
 $Tags = @('persistence', 'services', 'remediation')

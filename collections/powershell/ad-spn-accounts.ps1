@@ -1,5 +1,5 @@
 $Name = 'AD - Kerberoastable Accounts'
-$Description = 'User accounts that have a service principal name (SPN) set, which makes them targets for Kerberoasting (any user can request their service ticket and crack the password offline). Shows each account, its SPNs, whether it is enabled, when its password last changed (old passwords are easiest to crack), and whether it is in a privileged group. Run it against a domain controller (uses built-in ADSI, no modules needed; from a member server the WinRM double-hop limit blocks the query).'
+$Description = 'User accounts that have a service principal name (SPN) set, which makes them targets for Kerberoasting (any user can request their service ticket and crack the password offline).'
 $Dependencies = @()
 $Tags = @('accounts', 'privilege-escalation', 'lateral-movement', 'active-directory')
 

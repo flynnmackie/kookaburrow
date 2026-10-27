@@ -1,5 +1,5 @@
 $Name = 'Files - Alternate Streams'
-$Description = 'Finds NTFS alternate data streams (anything other than the main data stream and the harmless Zone.Identifier) under a folder. Malware hides payloads and scripts in streams such as file.txt:payload.exe. SearchPath is required and defaults to recursive; set Recurse to no for one folder (like Windows.Forensics.Ads).'
+$Description = 'Finds NTFS alternate data streams (anything other than the main data stream and the harmless Zone.Identifier) under a folder.'
 $Dependencies = @()
 $Parameters = @('SearchPath', 'Recurse?')
 $Tags = @('filesystem', 'defense-evasion', 'forensics')

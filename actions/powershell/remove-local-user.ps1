@@ -1,5 +1,5 @@
 $Name = 'Accounts - Remove User'
-$Description = 'Deletes a local account. The profile folder on disk is left in place for forensics. Not reversible.'
+$Description = 'Deletes a local account.'
 $Dependencies = @()
 $Parameters = @('UserName')
 $Tags = @('accounts', 'remediation')

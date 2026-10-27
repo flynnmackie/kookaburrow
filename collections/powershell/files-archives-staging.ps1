@@ -1,5 +1,5 @@
 $Name = 'Files - Archives and Staging'
-$Description = 'Large archives and compressed or encrypted bundles (zip, rar, 7z, tar, gz, cab, iso, vhd, pst, ost, bak) created or changed in the last N days (Days, default 14) and bigger than MinSizeMB (default 20), in user folders, ProgramData and temp locations (SearchPath defaults to C:\Users plus C:\ProgramData). Data theft starts with staging data into an archive before it leaves the network.'
+$Description = 'Large archives and compressed or encrypted bundles.'
 $Dependencies = @()
 $Parameters = @('Days?', 'MinSizeMB?', 'SearchPath?')
 $Tags = @('filesystem', 'forensics', 'c2', 'discovery')

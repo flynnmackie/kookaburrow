@@ -1,5 +1,5 @@
 NAME='Host - Power Off'
-DESCRIPTION='Powers the host off after DELAY_MINUTES (default 1) with a message to logged-in users. The host will not come back until someone starts it, so use it only when you must stop a compromised machine, and collect volatile evidence first. Cancel it with Host - Cancel Shutdown before the delay ends.'
+DESCRIPTION='Powers the host off after DELAY_MINUTES (default 1) with a message to logged-in users.'
 DEPENDENCIES=()
 PARAMETERS=(DELAY_MINUTES?)
 TAGS=(containment host)

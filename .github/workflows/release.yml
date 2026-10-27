@@ -1,0 +1,30 @@
+# Builds the offline Windows installer (Kookaburrow-<version>-x64.msi) and attaches it to a GitHub release.
+#   Release:  git tag v1.0.0 && git push origin v1.0.0
+#   Test:     Actions > Build installer > Run workflow (the .msi is kept as a build artifact)
+name: Build installer
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  msi:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci            # also builds the bundled WinRM engine (vendor/winrm-runtime)
+      - run: node scripts/build-msi.js
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Kookaburrow-msi
+          path: build/Kookaburrow-*-x64.msi
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/Kookaburrow-*-x64.msi
+          generate_release_notes: true

@@ -1,5 +1,5 @@
 $Name = 'RDP - Disable'
-$Description = 'Turns off Remote Desktop: sets fDenyTSConnections so new RDP connections are refused, and disables the Remote Desktop firewall rules. Existing sessions stay connected until logged off (use Accounts - Log Off Session). Use it to stop an attacker coming in over RDP.'
+$Description = 'Turns off Remote Desktop: sets fDenyTSConnections so new RDP connections are refused, and disables the Remote Desktop firewall rules.'
 $Dependencies = @()
 $Tags = @('containment', 'rdp', 'hardening')
 

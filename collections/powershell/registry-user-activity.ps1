@@ -1,5 +1,5 @@
 $Name = 'Registry - User Activity'
-$Description = 'User activity recorded in each NTUSER.DAT: Run dialog history (RunMRU), typed Explorer paths, typed URLs, Explorer search terms, mapped-drive history, RDP client connections and saved servers, and PuTTY and WinSCP saved sessions. Shows what a user typed and where they connected from this host. Offline user hives are loaded for the run.'
+$Description = 'User activity recorded in each NTUSER.DAT.'
 $Dependencies = @()
 $Tags = @('forensics', 'registry', 'lateral-movement', 'execution')
 

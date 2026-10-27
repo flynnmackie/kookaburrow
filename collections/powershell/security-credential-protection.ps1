@@ -1,5 +1,5 @@
 $Name = 'Security - Credential Protection'
-$Description = 'Settings that decide how easily credentials can be stolen from this host: LSA protection (RunAsPPL), Credential Guard and virtualization-based security, WDigest clear-text caching, the number of cached domain logons, LM hash storage, NTLM level, restricted admin mode and whether SMB signing is required. Shows hosts where tools like Mimikatz would succeed.'
+$Description = 'Settings that decide how easily credentials can be stolen from this host.'
 $Dependencies = @()
 $Tags = @('inventory', 'privilege-escalation', 'defense-evasion', 'security')
 

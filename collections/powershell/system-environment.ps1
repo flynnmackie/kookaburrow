@@ -1,5 +1,5 @@
 $Name = 'System - Environment Variables'
-$Description = 'Machine-wide and per-user environment variables. Attackers abuse PATH, COMSPEC, PSModulePath and user TEMP locations to hijack execution.'
+$Description = 'Machine-wide and per-user environment variables.'
 $Dependencies = @()
 $Tags = @('persistence', 'inventory')
 

@@ -1,5 +1,5 @@
 $Name = 'Tasks - Delete'
-$Description = 'Deletes a scheduled task. Its definition is exported to C:\ProgramData\Kookaburrow\Quarantine as XML first so it can be restored or analysed. TaskName is the task name; TaskPath is the folder (default the root folder).'
+$Description = 'Deletes a scheduled task.'
 $Dependencies = @()
 $Parameters = @('TaskName', 'TaskPath?')
 $Tags = @('persistence', 'scheduled-tasks', 'remediation')

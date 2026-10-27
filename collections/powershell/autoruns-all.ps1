@@ -1,5 +1,5 @@
 $Name = 'Autoruns - All Entries'
-$Description = 'Every autostart location Sysinternals Autoruns knows about (logon, services, drivers, scheduled tasks, Run keys, shell extensions, browser helpers, WMI, Winsock, boot execute and more), with signature verification and file hashes. HideMicrosoft set to yes drops verified Microsoft entries. The most complete persistence listing available. Needs the autorunsc.exe single-file binary uploaded under Settings, Binaries.'
+$Description = 'Every autostart location Sysinternals Autoruns knows about.'
 $Dependencies = @('autorunsc.exe')
 $Parameters = @('HideMicrosoft?')
 $Tags = @('persistence', 'autoruns', 'signing')

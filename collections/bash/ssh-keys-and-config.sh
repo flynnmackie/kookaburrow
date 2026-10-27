@@ -1,5 +1,5 @@
 NAME='SSH - Keys and Config'
-DESCRIPTION='Lists authorized_keys entries for every user (key type, comment and a short fingerprint source, not the key itself), the size of known_hosts files, and the security-relevant sshd settings. Added authorized keys are a quiet persistence method.'
+DESCRIPTION='Lists authorized_keys entries for every user (key type, comment and a short fingerprint source, not the key itself), the size of known_hosts files, and the security-relevant sshd settings.'
 DEPENDENCIES=()
 TAGS=(persistence ssh lateral-movement accounts)
 

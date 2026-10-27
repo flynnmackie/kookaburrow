@@ -1,5 +1,5 @@
 NAME='Security - Apply Kernel Hardening'
-DESCRIPTION='Applies a safe set of kernel hardening settings through /etc/sysctl.d/99-kookaburrow-hardening.conf and loads them: restricted ptrace (yama scope 1), hidden kernel pointers, restricted dmesg, no core dumps from setuid programs, no ICMP redirects and source routing, SYN cookies and reverse path filtering. Undo it with Security - Remove Kernel Hardening. Settings that could break normal operation (such as disabling IP forwarding) are not changed.'
+DESCRIPTION='Applies a safe set of kernel hardening settings through /etc/sysctl.d/99-kookaburrow-hardening.conf and loads them.'
 DEPENDENCIES=()
 TAGS=(hardening kernel)
 

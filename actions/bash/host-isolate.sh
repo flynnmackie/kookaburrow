@@ -1,5 +1,5 @@
 NAME='Host - Isolate'
-DESCRIPTION='Network-isolates the host with iptables: the current rules are saved, then only loopback and traffic with ALLOWED_ADDRESSES (comma separated IPv4 addresses, which must include this Kookaburrow server or you will lose contact) are allowed in both directions and everything else is dropped. AUTO_RELEASE_MINUTES schedules an automatic release as a safety net if you lose contact. Undo it with Host - Release. Needs iptables and root, or an account with passwordless sudo.'
+DESCRIPTION='Network-isolates the host with iptables: the current rules are saved, then only loopback and traffic with ALLOWED_ADDRESSES (comma separated IPv4 addresses, which must include this Kookaburrow server or you will lose contact) are allowed in both directions and everything else is dropped. Needs iptables and root, or an account with passwordless sudo.'
 DEPENDENCIES=()
 PARAMETERS=(ALLOWED_ADDRESSES AUTO_RELEASE_MINUTES?)
 TAGS=(containment network firewall)

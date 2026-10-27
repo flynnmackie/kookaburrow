@@ -1,5 +1,5 @@
 $Name = 'Security - Installed Products'
-$Description = 'Security software on the host: antivirus products registered with Windows Security Center (name, state, signatures up to date), Defender state, and running services and processes of well-known EDR and monitoring agents (CrowdStrike, SentinelOne, Carbon Black, Cortex, Sophos, Trend Micro, Symantec, McAfee, Elastic, Wazuh, Sysmon, Splunk, Velociraptor, osquery and others). Tells you what is watching the host, and what an attacker has stopped.'
+$Description = 'Security software on the host.'
 $Dependencies = @()
 $Tags = @('inventory', 'antivirus', 'defense-evasion', 'security')
 

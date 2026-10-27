@@ -1,5 +1,5 @@
 NAME='Files - Webshell Hunt'
-DESCRIPTION='Searches web folders for likely web shells: script files (php, jsp, aspx, py, pl, cgi) containing dangerous patterns (eval of request data, base64 decoding, system, passthru, shell_exec, assert, preg_replace with the e modifier, Runtime.exec) and script files changed recently. WEB_ROOT is a colon separated list of folders (default /var/www:/srv/www:/usr/share/nginx/html:/opt); DAYS (default 30) limits the recently changed list. Needs root, or an account with passwordless sudo, to read all web folders.'
+DESCRIPTION='Searches web folders for likely web shells. Needs root or passwordless sudo.'
 DEPENDENCIES=()
 PARAMETERS=(WEB_ROOT? DAYS?)
 TAGS=(malware persistence filesystem c2)

@@ -1,5 +1,5 @@
 NAME='Persistence - Collect Files'
-DESCRIPTION='Collects the files that control startup and privilege on a Linux host as one compressed archive: cron folders and user crontabs, systemd unit folders (system and user), rc.local and init.d, profile.d and shell rc files, ld.so.preload and linker config, sudoers, PAM, SSH daemon config and every authorized_keys file. The raw copies let you diff them against a known-good host. The archive comes back over SFTP. Needs root, or an account with passwordless sudo.'
+DESCRIPTION='Collects the files that control startup and privilege on a Linux host as one compressed archive. Needs root or passwordless sudo.'
 DEPENDENCIES=()
 TAGS=(persistence forensics systemd cron)
 FOOTPRINT='transient'

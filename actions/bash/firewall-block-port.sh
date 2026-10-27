@@ -1,5 +1,5 @@
 NAME='Firewall - Block Port'
-DESCRIPTION='Drops traffic for one TCP or UDP port with iptables (not persistent across reboots). PROTOCOL is tcp (default) or udp; DIRECTION is in (default) for traffic to this host or out for traffic from it. Use it to stop a service reachable from the network while you contain a host.'
+DESCRIPTION='Drops traffic for one TCP or UDP port with iptables (not persistent across reboots).'
 DEPENDENCIES=()
 PARAMETERS=(PORT PROTOCOL? DIRECTION?)
 TAGS=(network firewall containment)

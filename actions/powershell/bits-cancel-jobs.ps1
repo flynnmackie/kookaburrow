@@ -1,5 +1,5 @@
 $Name = 'BITS - Cancel Jobs'
-$Description = 'Cancels BITS transfer jobs for all users, used to stop a payload download or a notify-command persistence job. JobName limits to jobs whose display name contains that text; use all to cancel every job. Each job source and destination is reported.'
+$Description = 'Cancels BITS transfer jobs for all users, used to stop a payload download or a notify-command persistence job.'
 $Dependencies = @()
 $Parameters = @('JobName')
 $Tags = @('persistence', 'c2', 'remediation')

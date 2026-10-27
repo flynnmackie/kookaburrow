@@ -1,5 +1,5 @@
 $Name = 'Processes - Kill Tree'
-$Description = 'Stops a process and everything it started (all child and grandchild processes), by process id. Use it when malware spawns helpers that would restart the parent. Refuses system PIDs (4 and below).'
+$Description = 'Stops a process and everything it started (all child and grandchild processes), by process id.'
 $Dependencies = @()
 $Parameters = @('ProcessId')
 $Tags = @('containment', 'process')

@@ -1,5 +1,5 @@
 NAME='Files - Capabilities'
-DESCRIPTION='Programs with Linux file capabilities set (getcap), for example cap_setuid or cap_dac_override on an interpreter or copy of a shell. Capabilities are a quiet alternative to SUID that attackers use for privilege escalation and persistence. Needs getcap (libcap2-bin or libcap), and root for a complete scan.'
+DESCRIPTION='Programs with Linux file capabilities set (getcap), for example cap_setuid or cap_dac_override on an interpreter or copy of a shell. Needs root or passwordless sudo.'
 DEPENDENCIES=()
 TAGS=(privilege-escalation persistence filesystem)
 

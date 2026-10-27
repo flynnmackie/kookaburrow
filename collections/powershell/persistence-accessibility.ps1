@@ -1,5 +1,5 @@
 $Name = 'Persistence - Accessibility Binaries'
-$Description = 'Hashes and signatures of the programs reachable from the Windows logon screen (sethc, utilman, osk, narrator, magnify, displayswitch, atbroker) compared with cmd.exe and powershell.exe. If one has been replaced by a command shell (the sticky keys backdoor) the hash will match cmd.exe or the signature will be missing.'
+$Description = 'Hashes and signatures of the programs reachable from the Windows logon screen (sethc, utilman, osk, narrator, magnify, displayswitch, atbroker) compared with cmd.exe and powershell.exe.'
 $Dependencies = @()
 $Tags = @('persistence', 'defense-evasion', 'privilege-escalation')
 

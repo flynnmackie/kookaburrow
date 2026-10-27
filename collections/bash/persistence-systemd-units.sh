@@ -1,5 +1,5 @@
 NAME='Systemd - Services'
-DESCRIPTION='All systemd service units with state and unit file path, then the ExecStart of every service that is not from a distribution package (units in /etc/systemd/system, /run/systemd and user unit folders) which is where attackers install persistence. Unit files modified in the last N days are listed with DAYS (default 14).'
+DESCRIPTION='All systemd service units with state and unit file path, then the ExecStart of every service that is not from a distribution package.'
 DEPENDENCIES=()
 PARAMETERS=(DAYS?)
 TAGS=(persistence systemd services)

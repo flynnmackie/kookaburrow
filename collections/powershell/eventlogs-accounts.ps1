@@ -1,5 +1,5 @@
 $Name = 'Event Logs - Account Changes'
-$Description = 'Account and group management events: user created, enabled, disabled, deleted, password reset or changed, locked out, added to or removed from local, global and universal groups, account name changed. Set LastMinutes for the last N minutes or StartTime and EndTime (yyyy-MM-dd HH:mm) for a range; default is 24 hours. Needs administrator rights.'
+$Description = 'Account and group management events. Needs administrator rights.'
 $Dependencies = @()
 $Parameters = @('LastMinutes?', 'StartTime?', 'EndTime?', 'UserContains?', 'MaxEvents?')
 $Tags = @('event-logs', 'accounts', 'persistence', 'privilege-escalation')

@@ -1,5 +1,5 @@
 $Name = 'Processes - Hashes and Signatures'
-$Description = 'Running processes with full command line, parent, owner, image path, SHA-256 and signature status. Optional ProcessName filters by name (wildcards allowed, for example power*). Unsigned images in user folders and unusual parent-child pairs are the leads (like Windows.System.Pslist with hashes).'
+$Description = 'Running processes with full command line, parent, owner, image path, SHA-256 and signature status.'
 $Dependencies = @()
 $Parameters = @('ProcessName?')
 $Tags = @('processes', 'execution', 'signing')

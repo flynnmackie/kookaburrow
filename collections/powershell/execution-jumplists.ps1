@@ -1,5 +1,5 @@
 $Name = 'Execution - Jump Lists'
-$Description = 'Jump List files (AutomaticDestinations and CustomDestinations) for every user: the application ID (the first part of the file name identifies the program), size and timestamps. These record files recently opened by each program. Use Jump Lists - Collect to bring the files back for full parsing.'
+$Description = 'Jump List files (AutomaticDestinations and CustomDestinations) for every user.'
 $Dependencies = @()
 $Tags = @('execution', 'forensics', 'filesystem')
 

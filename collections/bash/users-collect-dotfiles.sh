@@ -1,5 +1,5 @@
 NAME='Users - Collect Dotfiles'
-DESCRIPTION='Collects per-user evidence from every home directory as a compressed archive: shell histories (bash, zsh, fish), shell startup files, SSH authorized_keys, config and known_hosts (private keys are never collected), vim, less, Python, MySQL and PostgreSQL histories, git configuration, user crontabs and systemd user units. The archive comes back over SFTP. Needs root, or an account with passwordless sudo, to read other homes.'
+DESCRIPTION='Collects per-user evidence from every home directory as a compressed archive. Needs root or passwordless sudo.'
 DEPENDENCIES=()
 TAGS=(forensics history persistence accounts)
 FOOTPRINT='transient'

@@ -1,5 +1,5 @@
 $Name = 'Files - Search'
-$Description = 'Finds files under a folder by name pattern (wildcards, for example *.ps1 or invoice*.exe), with optional size limits, only files changed in the last N days, and SHA-256 hashes. Returns path, size, created, modified and accessed times, attributes and owner. The general-purpose file finder (like Windows.Search.FileFinder). SearchPath is required; set Recurse to no for just that folder. MaxResults defaults to 5000.'
+$Description = 'Finds files under a folder by name pattern (wildcards, for example *.ps1 or invoice*.exe), with optional size limits, only files changed in the last N days, and SHA-256 hashes.'
 $Dependencies = @()
 $Parameters = @('SearchPath', 'Pattern?', 'ModifiedDays?', 'MinSizeKB?', 'MaxSizeKB?', 'Recurse?', 'Hash?', 'MaxResults?')
 $Tags = @('filesystem', 'forensics', 'discovery')

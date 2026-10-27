@@ -1,5 +1,5 @@
 $Name = 'AD - Domain Info'
-$Description = 'The shape of the Active Directory domain: domain and forest names and functional levels, domain controllers with their roles and operating systems, trust relationships, FSMO role holders and the domain password and lockout policy. Context for any domain investigation. Works on any domain-joined host using built-in .NET directory services (no modules needed).'
+$Description = 'The shape of the Active Directory domain.'
 $Dependencies = @()
 $Tags = @('inventory', 'discovery', 'active-directory')
 

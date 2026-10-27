@@ -1,5 +1,5 @@
 $Name = 'Accounts - Logon Sessions'
-$Description = 'Current logon sessions with the account, logon type, authentication package and start time (interactive, remote, service, network). Unexpected remote or service sessions and long-lived sessions of privileged accounts stand out.'
+$Description = 'Current logon sessions with the account, logon type, authentication package and start time (interactive, remote, service, network).'
 $Dependencies = @()
 $Tags = @('accounts', 'logons', 'lateral-movement')
 

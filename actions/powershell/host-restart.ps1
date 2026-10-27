@@ -1,5 +1,5 @@
 $Name = 'Host - Restart'
-$Description = 'Restarts the host, optionally after DelaySeconds (default 30) with a message shown to logged-on users. Restarting clears memory, so collect volatile evidence first.'
+$Description = 'Restarts the host, optionally after DelaySeconds (default 30) with a message shown to logged-on users.'
 $Dependencies = @()
 $Parameters = @('DelaySeconds?', 'Message?')
 $Tags = @('containment', 'recovery', 'host')

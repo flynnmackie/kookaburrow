@@ -1,5 +1,5 @@
 $Name = 'RDP - Sessions'
-$Description = 'Remote Desktop session lifecycle from the Terminal Services logs: connection attempts with the client address (RemoteConnectionManager 1149), session logon, logoff, disconnect and reconnect (LocalSessionManager 21, 22, 23, 24, 25, 39, 40). Complements RDP - Logons, which reads the Security log. Set LastMinutes for the last N minutes or StartTime and EndTime (yyyy-MM-dd HH:mm) for a range; default is 24 hours.'
+$Description = 'Remote Desktop session lifecycle from the Terminal Services logs.'
 $Dependencies = @()
 $Parameters = @('LastMinutes?', 'StartTime?', 'EndTime?', 'MaxEvents?')
 $Tags = @('event-logs', 'rdp', 'lateral-movement', 'logons')

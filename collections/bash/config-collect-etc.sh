@@ -1,5 +1,5 @@
 NAME='Config - Collect Etc'
-DESCRIPTION='Collects the /etc configuration folder as a compressed archive for offline review: accounts, sudoers, SSH, PAM, services, cron, networking, package sources and everything else. Password hash files (shadow and gshadow) are left out unless INCLUDE_SHADOW is yes. The archive comes back over SFTP. Needs root, or an account with passwordless sudo, to read protected files.'
+DESCRIPTION='Collects the /etc configuration folder as a compressed archive for offline review. Needs root or passwordless sudo.'
 DEPENDENCIES=()
 PARAMETERS=(INCLUDE_SHADOW?)
 TAGS=(forensics persistence filesystem)

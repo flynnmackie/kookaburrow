@@ -1,5 +1,5 @@
 $Name = 'USB - Block Storage'
-$Description = 'Stops the host mounting USB storage devices (flash drives and external disks) by disabling the USBSTOR driver, to prevent data theft and malware delivery. Devices already mounted stay until removed. Undo it with USB - Allow Storage.'
+$Description = 'Stops the host mounting USB storage devices (flash drives and external disks) by disabling the USBSTOR driver, to prevent data theft and malware delivery.'
 $Dependencies = @()
 $Tags = @('containment', 'hardening', 'usb')
 

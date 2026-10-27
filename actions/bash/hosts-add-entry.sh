@@ -1,5 +1,5 @@
 NAME='Hosts File - Add Entry'
-DESCRIPTION='Adds a line to /etc/hosts to sinkhole a domain: DOMAIN_NAME resolves to ADDRESS (default 0.0.0.0, which makes connections fail). /etc/hosts is backed up to /var/quarantine-kookaburrow first. Use DNS - Flush Cache afterwards.'
+DESCRIPTION='Adds a line to /etc/hosts to sinkhole a domain.'
 DEPENDENCIES=()
 PARAMETERS=(DOMAIN_NAME ADDRESS?)
 TAGS=(dns network containment)

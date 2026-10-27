@@ -1,5 +1,5 @@
 $Name = 'Yara - Scan Processes'
-$Description = 'Scans the memory of running processes with YARA rules and returns the processes that match and which rule matched. ProcessName limits the scan to processes with that name (wildcards allowed, for example power*); with nothing set every process is scanned, which can take a while. The rules come from the kb-rules.yar file you upload under Settings, Binaries, and the yara64.exe single-file binary must be uploaded there too. Needs administrator rights.'
+$Description = 'Scans the memory of running processes with YARA rules and returns the processes that match and which rule matched. Needs administrator rights.'
 $Dependencies = @('yara64.exe', 'kb-rules.yar')
 $Parameters = @('ProcessName?')
 $Tags = @('malware', 'processes', 'forensics')

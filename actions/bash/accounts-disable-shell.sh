@@ -1,5 +1,5 @@
 NAME='Accounts - Disable Login Shell'
-DESCRIPTION='Changes an account login shell to nologin so it can no longer log in interactively or over SSH with a shell, and records the old shell. Less drastic than locking the account (cron jobs and services running as it continue). Restore it by setting the shell back with Accounts - Restore Login Shell. Refuses root.'
+DESCRIPTION='Changes an account login shell to nologin so it can no longer log in interactively or over SSH with a shell, and records the old shell.'
 DEPENDENCIES=()
 PARAMETERS=(USER_NAME)
 TAGS=(accounts containment)

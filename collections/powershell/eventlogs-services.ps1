@@ -1,5 +1,5 @@
 $Name = 'Event Logs - Service Installs'
-$Description = 'New and changed services: System 7045 (service installed), Security 4697 (service installed on the system) and System 7040 (start type changed). Malware and PsExec-style tools install services. Set LastMinutes for the last N minutes or StartTime and EndTime (yyyy-MM-dd HH:mm) for a range; default is 24 hours.'
+$Description = 'New and changed services: System 7045 (service installed), Security 4697 (service installed on the system) and System 7040 (start type changed).'
 $Dependencies = @()
 $Parameters = @('LastMinutes?', 'StartTime?', 'EndTime?', 'MaxEvents?')
 $Tags = @('event-logs', 'persistence', 'services', 'lateral-movement')

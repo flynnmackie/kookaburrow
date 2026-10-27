@@ -1,5 +1,5 @@
 NAME='Logs - Collect Recent'
-DESCRIPTION='Collects log files changed in the last N days (DAYS, default 14) from /var/log (authentication, system, kernel, package, web server, database and audit logs including rotated ones, plus wtmp, btmp and lastlog) and exports the systemd journal for the same period, as raw evidence. Smaller and faster than archiving all of /var/log. The files come back over SFTP. Needs root, or an account with passwordless sudo, for protected logs.'
+DESCRIPTION='Collects log files changed in the last N days. Needs root or passwordless sudo.'
 DEPENDENCIES=()
 PARAMETERS=(DAYS?)
 TAGS=(event-logs forensics filesystem)

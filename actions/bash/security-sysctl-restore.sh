@@ -1,5 +1,5 @@
 NAME='Security - Remove Kernel Hardening'
-DESCRIPTION='Removes the settings file created by Security - Apply Kernel Hardening and reloads the system defaults. Values that were changed in the running kernel go back to what the rest of the sysctl configuration sets at the next reload or reboot.'
+DESCRIPTION='Removes the settings file created by Security - Apply Kernel Hardening and reloads the system defaults.'
 DEPENDENCIES=()
 TAGS=(recovery kernel)
 

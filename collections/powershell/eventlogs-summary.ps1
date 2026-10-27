@@ -1,5 +1,5 @@
 $Name = 'Event Logs - Summary'
-$Description = 'Every event log with its record count, size, oldest and newest event time, whether it is enabled and whether it wraps. Shows logging coverage and gaps: logs that are disabled, tiny, or that stop short of the incident (cleared or overwritten). Set OnlyWithEvents to yes to hide empty logs.'
+$Description = 'Every event log with its record count, size, oldest and newest event time, whether it is enabled and whether it wraps.'
 $Dependencies = @()
 $Parameters = @('OnlyWithEvents?')
 $Tags = @('event-logs', 'inventory', 'defense-evasion')

@@ -1,5 +1,5 @@
 NAME='System - Mounts and Disks'
-DESCRIPTION='Mounted file systems with options, block devices, disk usage, fstab, loop and network mounts. Shows removable media, unexpected NFS or CIFS mounts, tmpfs or loop devices used to hide files, and low free space before an acquisition.'
+DESCRIPTION='Mounted file systems with options, block devices, disk usage, fstab, loop and network mounts.'
 DEPENDENCIES=()
 TAGS=(inventory filesystem)
 

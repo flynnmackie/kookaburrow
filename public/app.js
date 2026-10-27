@@ -92,11 +92,11 @@ document.addEventListener('mousedown', (e) => { const el = lockedTarget(e); if (
 
 // Which permission each page needs. The top-bar tab for an area is locked when every page in it is.
 const PAGE_PERM = {
-  'settings/user-management': 'users.view', 'settings/shell-settings': 'system.view', 'settings/health-settings': 'system.view', 'settings/run-settings': 'system.view', 'settings/server-settings': 'system.view', 'settings/certificate': 'system.view',
+  'settings/user-management': 'users.view', 'settings/shell-settings': 'system.view', 'settings/health-settings': 'system.view', 'settings/run-settings': 'system.view', 'settings/server-settings': 'system.view', 'settings/certificate': 'system.view', 'settings/elastic': 'system.view',
   'settings/view-collections': 'collections.view', 'settings/add-collections': 'collections.manage', 'settings/binaries': 'collections.manage',
   'settings/view-actions': 'actions.view', 'settings/add-actions': 'actions.manage',
   'hosts/view-hosts': 'hosts.view', 'hosts/profiles': 'hosts.view', 'hosts/groups': 'hosts.view', 'hosts/discover': 'hosts.manage', 'hosts/manual': 'hosts.manage',
-  'burrow/hunt': 'hunts.view', 'burrow/respond': 'actions.view', 'burrow/recurring': 'hunts.view,actions.view',
+  'burrow/hunt': 'hunts.view', 'burrow/respond': 'actions.view', 'burrow/workflow': 'workflows.view', 'burrow/recurring': 'hunts.view,actions.view',
   'output/log': 'hunts.view', 'output/report': 'hunts.view', 'output/json': 'hunts.view', 'browse/files': 'hunts.view', 'browse/pinned': 'hunts.view', 'output/diff': 'hunts.view', 'output/compare': 'hunts.view', 'output/ioc': 'hunts.view', 'output/baseline': 'hunts.view',
   'shell/shell': 'shell.open', 'health/monitor': 'system.view', 'health/monitor-log': 'system.view', 'health/quarantine-log': 'system.view',
 };
@@ -117,7 +117,7 @@ const NAV = [
   // A third entry puts a page under a titled dropdown in the side menu (the titles are not pages).
   // { heading: 'Name' } is a titled dropdown with no pages yet.
   { id: 'settings', label: 'Settings', pages: [
-    ['user-management', 'User Management', 'System'], ['shell-settings', 'Shell Settings', 'System'], ['health-settings', 'Health Settings', 'System'], ['run-settings', 'Run Settings', 'System'], ['server-settings', 'Server Settings', 'System'], ['certificate', 'Certificate', 'System'],
+    ['user-management', 'User Management', 'System'], ['shell-settings', 'Shell Settings', 'System'], ['health-settings', 'Health Settings', 'System'], ['run-settings', 'Run Settings', 'System'], ['server-settings', 'Server Settings', 'System'], ['certificate', 'Certificate', 'System'], ['elastic', 'Elastic', 'System'],
     ['view-collections', 'View Collections', 'Collections'], ['add-collections', 'Add Collections', 'Collections'],
     ['view-actions', 'View Actions', 'Actions'], ['add-actions', 'Add Actions', 'Actions'],
     ['binaries', 'Upload Binaries'],
@@ -126,7 +126,7 @@ const NAV = [
     ['view-hosts', 'View Hosts', 'Hosts'], ['profiles', 'Profiles', 'Hosts'], ['groups', 'Groups', 'Hosts'],
     ['discover', 'Discover', 'Add Hosts'], ['manual', 'Manually Add', 'Add Hosts'],
   ] },
-  { id: 'burrow', label: 'Burrow!', accent: true, pages: [['hunt', 'Hunt'], ['respond', 'Respond'], ['recurring', 'Recurring']],
+  { id: 'burrow', label: 'Burrow!', accent: true, pages: [['hunt', 'Hunt'], ['respond', 'Respond'], ['workflow', 'Workflow'], ['recurring', 'Recurring']],
     // Hyperlink-style shortcuts under the pages: [label, slug of the page they open]
     links: [['View Collections (Hunt)', 'settings/view-collections'], ['View Actions (Respond)', 'settings/view-actions'], ['Upload Binaries', 'settings/binaries']] },
   { id: 'output', label: 'Results', pages: [
@@ -144,6 +144,7 @@ const loaders = {
   'settings/view-collections': () => loadCollectionList(),
   'settings/view-actions': () => loadActionList(),
   'burrow/hunt': loadBurrowHunts,
+  'burrow/workflow': () => window.loadWorkflows?.(),
   'burrow/recurring': () => window.loadRecurring?.(),
   'output/report': () => window.loadReports?.(), // report.js loads after this file
   'burrow/respond': () => window.loadRespond?.(), // respond.js loads after this file
@@ -163,6 +164,7 @@ const loaders = {
   'settings/run-settings': loadRunSettings,
   'settings/server-settings': loadServerSettings,
   'settings/certificate': loadCertificate,
+  'settings/elastic': loadElastic,
   'settings/shell-settings': loadShellSettings,
   'settings/add-collections': () => addCollections(),
   'settings/add-actions': () => addActions(),
@@ -1115,7 +1117,7 @@ function makeEditor({ P, url, noun, folder, items, hints }) {
       ${h.tags.length ? `<div class="htags">${h.tags.map((t) => `<span class="htag">${esc(t)}</span>`).join('')}</div>` : ''}
       ${h[itemKey].length ? `<div class="uh-deps">${items.label}: ${(itemKey === 'parameters' ? h.parameters.map((p) => (h.optionalParameters.includes(p) ? `${p} (optional)` : p)) : h[itemKey]).map(esc).join(', ')}</div>` : ''}
       ${viewing === h.id ? `<pre class="code">${highlight(h.body, h.type)}</pre>` : ''}</div>`).join('')
-      || `<p class="dim" style="margin:0">You have not added any ${noun}s yet. Use the form on the left; ${noun}s you add are saved to <code>${folder}/powershell</code> or <code>${folder}/bash</code>.</p>`;
+      || `<p class="dim" style="margin:0">No custom ${noun}s yet. Use the form on the left.</p>`;
   }
 
   el('Type').onclick = (e) => { if (e.target.dataset.type && !editing) setType(e.target.dataset.type); };
@@ -1269,7 +1271,7 @@ async function cancelRunUi(r, isHunt) {
   const name = huntName(r);
   const msg = isHunt
     ? `Cancel the hunt "${name}"?\n\nThe host being worked on is cut off and collections that have not started are skipped. What was already collected is kept.`
-    : `WARNING: cancel the response "${name}"?\n\nActions CHANGE the hosts they run on. Cancelling cuts the connection to the host that is being worked on part-way through, so its action may have changed that host partly or completely, and it may even finish on its own on the host. Actions that have not started are skipped.\n\nAfter cancelling, check the affected hosts (the response log says which action was cut off).\n\nCancel this response?`;
+    : `WARNING: cancel the response "${name}"?\n\n• Actions change hosts. The one in progress is cut off part-way and may be partly applied, or still finish on the host.\n• Actions not yet started are skipped.\n• Check the affected hosts afterwards (the response log shows what was cut off).`;
   if (!confirm(msg)) return false;
   try { await api('POST', isHunt ? `/api/runs/${r.id}/cancel` : `/api/responses/${r.id}/cancel`, isHunt ? {} : { confirm: true }); toast('Cancelling…'); return true; } catch (e) { toast(e.message); return false; }
 }
@@ -1286,7 +1288,7 @@ async function loadBurrowHunts() {
   if (runs.some((r) => r.status === 'running') && isActive('burrow/hunt')) huntPoll = setTimeout(loadBurrowHunts, 2000);
 }
 let huntPoll;
-const BH_HINT = '<p class="dim" style="margin:0">Click a hunt above to see what it ran, the files it pulled back, any errors, and to download its results.</p>';
+const BH_HINT = '<p class="dim" style="margin:0">Select a hunt to see its files, errors and downloads.</p>';
 function renderHuntList() {
   $('bhList').innerHTML = bh.runs.length
     ? `<table class="bh"><thead><tr><th>Hunt</th><th>Run by</th><th>Status</th><th>Started</th><th>Finished</th><th>Elapsed</th><th></th></tr></thead><tbody>${bh.runs.map((r) => `<tr class="bh-row ${r.id === bh.sel ? 'on' : ''}" data-id="${esc(r.id)}">
@@ -1529,7 +1531,7 @@ async function hmShow(id) {
     const h = await api('GET', `/api/collections/${id}`);
     if (id !== hm.shown) return;
     hmEl('Detail').innerHTML = `<button type="button" class="fav-btn ${hmF.favs.has(h.id) ? 'on' : ''}" data-fav="${esc(h.id)}" title="${hmF.favs.has(h.id) ? 'Remove from your favourites' : 'Add to your favourites'}" aria-pressed="${hmF.favs.has(h.id)}">${hmF.favs.has(h.id) ? '★' : '☆'}</button><div class="hd-name">${esc(h.name)}</div><div class="hd-file">${esc(h.id)}</div>${metaIcons(h, true)}
-      <div class="hd-label hd-label-desc">Description</div><div class="hd-desc">${h.description ? esc(h.description) : '<span class="dim">-</span>'}${h.transfer === 'large' ? '<div class="smb-note"><b>Large transfer.</b> The files this collection leaves on the host are pulled back to the server: over SMB for Windows hosts (switched on for the hunt only, then off again) and over SFTP for Linux hosts.</div>' : ''}</div>
+      <div class="hd-label hd-label-desc">Description</div><div class="hd-desc">${h.description ? esc(h.description) : '<span class="dim">-</span>'}${h.transfer === 'large' ? '<div class="smb-note"><b>Large transfer.</b> Files are pulled back over SMB (Windows, enabled temporarily) or SFTP (Linux).</div>' : ''}</div>
       <div class="hd-label hd-label-dep">Dependencies</div><div class="hd-deps">${h.dependencies.length ? h.dependencies.map((d) => `<span class="dep ${h.missingDependencies.includes(d) ? 'miss' : 'have'}">${esc(d)}${h.missingDependencies.includes(d) ? ' (not uploaded)' : ''}</span>`).join('') : '<span class="dim">None</span>'}</div>
       <div class="hd-label hd-label-tags">Tags</div><div class="hd-tags">${h.tags.length ? h.tags.map((t) => `<span class="hd-tag">${esc(t)}</span>`).join('') : '<span class="dim">None</span>'}</div>
       <div class="hd-label hd-label-code">Collection</div><pre class="code">${highlight(h.body, h.type)}</pre>`;
@@ -1570,7 +1572,7 @@ function hmRenderTargetList() {
   const box = hmEl('SmbWarn');
   box.hidden = !big.length;
   box.innerHTML = big.length ? `<b>⚠ Large file transfer:</b> ${big.map((c) => esc(c.name)).join(', ')} brings back big files.
-    ${win.length || !list.length ? `<p><b>SMB will be enabled temporarily</b> on ${win.length ? `${win.length} Windows host${win.length === 1 ? '' : 's'} (${names(win)})` : 'Windows hosts'} for this hunt. Before the collection runs, port 445 is switched on for this server's address only; the files are pulled over SMB; then SMB is switched off again and checked. If SMB was already on, it is left as it was found.</p>` : ''}
+    ${win.length || !list.length ? `<p><b>SMB is enabled temporarily</b> on ${win.length ? `${win.length} Windows host${win.length === 1 ? '' : 's'} (${names(win)})` : 'Windows hosts'}, for this server only, then switched off again (left as found if already on).</p>` : ''}
     ${lin.length ? `<p>${lin.length} Linux host${lin.length === 1 ? '' : 's'} (${names(lin)}): the files come back over SFTP on the SSH connection, so nothing is switched on.</p>` : ''}` : '';
 }
 const HM_ORDER = ['who', 'coll', 'params', 'name'];
@@ -2072,7 +2074,7 @@ function rsAdvice(key, n) {
     return { level: 'bad', text: `Too high for ${sv.cores} cores and ${gb(sv.ramGb)} GB (above ${rec.caution}): expect a slow server, timeouts on hosts and possible memory shortage; ${memTxt}. Recommended: ${rec.concurrency}.` };
   }
   const base = n <= rec.largeConcurrency ? { level: 'ok', text: `Fine for this server (recommended up to ${rec.largeConcurrency}).` }
-    : n <= rec.largeConcurrency * 2 ? { level: 'warn', text: `Above the recommended ${rec.largeConcurrency}: transfers are limited by disk and network, so each one will be slower, and large collections can be several GB each.` }
+    : n <= rec.largeConcurrency * 2 ? { level: 'warn', text: `Above the recommended ${rec.largeConcurrency}: transfers are limited by disk and network, so each is slower.` }
     : { level: 'bad', text: `Far above the recommended ${rec.largeConcurrency}: the disk and network will be saturated and transfers may time out.` };
   if (sv.freeDiskGb != null && n > 1 && sv.freeDiskGb < 20 * n) { base.text += ` Free disk space for results is ${sv.freeDiskGb} GB, which may not be enough for ${n} large collections at once.`; if (base.level === 'ok') base.level = 'warn'; }
   return base;
@@ -2139,9 +2141,9 @@ async function loadServerSettings() {
   document.querySelectorAll('input[name=svMode]').forEach((x) => { x.disabled = !editable; });
   $('svAddr').disabled = $('svPort').disabled = $('svAllow').disabled = !editable;
   $('svAddr').hidden = mode !== 'one';
-  $('svNow').textContent = `Listening on ${r.running.host === '0.0.0.0' ? 'all network interfaces' : r.running.host}, port ${r.running.port}. You are connected from ${r.you.address} as ${r.you.host}.`;
+  $('svNow').textContent = `Listening on ${r.running.host === '0.0.0.0' ? 'all interfaces' : r.running.host}:${r.running.port}. You are connected from ${r.you.address}.`;
   $('svFallback').hidden = !r.fallback;
-  if (r.fallback) $('svFallbackText').textContent = `The saved settings could not be used (${r.fallback.reason}), so the server started on ${r.fallback.used} instead. Fix the settings below and save, or dismiss this.`;
+  if (r.fallback) $('svFallbackText').textContent = `Saved settings failed (${r.fallback.reason}); started on ${r.fallback.used} instead.`;
   $('svMsg').textContent = '';
   svCheck();
 }
@@ -2171,7 +2173,7 @@ async function svWaitForRestart(urls, port) {
     await new Promise((r) => setTimeout(r, 1000));
   }
   $('svMsg').className = 'um-msg bad';
-  $('svMsg').textContent = `The server did not answer at ${target}. From the server PC, open http://127.0.0.1:${port} (localhost always works); if the saved settings could not be used it falls back to localhost and says why on this page.`;
+  $('svMsg').textContent = `No answer at ${target}. Try http://127.0.0.1:${port} on the server PC.`;
 }
 $('svSave').onclick = async () => {
   const body = svForm();
@@ -2192,6 +2194,77 @@ $('svSave').onclick = async () => {
 // (localhost) keeps working over plain HTTP whatever the certificate is.
 const ce = { st: null, addrs: [] };
 const ceDate = (iso) => new Date(iso).toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' });
+// ---- Elastic: forward hunt rows to Elasticsearch ----
+const el = { st: null };
+function elShowAuth() { const a = $('elAuth').value; $('elKeyRow').hidden = a !== 'apikey'; $('elBasicRow').hidden = a !== 'basic'; }
+function elBody() {
+  const b = { url: $('elUrl').value, auth: $('elAuth').value, index: $('elIndex').value, insecure: $('elInsecure').checked, ca: $('elCa').value, username: $('elUser').value };
+  if ($('elKey').value) b.apiKey = $('elKey').value;
+  if ($('elPass').value) b.password = $('elPass').value;
+  return b;
+}
+function elMsg(t, cls) { $('elMsg').className = 'um-msg ' + (cls || ''); $('elMsg').textContent = t; }
+function elStatusText(s) {
+  const bits = [];
+  if (s.sent || s.failed) bits.push(`${s.sent.toLocaleString()} rows sent, ${s.failed.toLocaleString()} failed since the server started`);
+  if (s.queued) bits.push(`${s.queued.toLocaleString()} waiting`);
+  if (s.lastOkAt) bits.push('last sent ' + new Date(s.lastOkAt).toLocaleString());
+  if (s.lastError) bits.push('last error: ' + s.lastError);
+  $('elStatus').textContent = bits.join(' \u00b7 ');
+}
+async function loadElastic() {
+  let r;
+  try { r = await api('GET', '/api/settings/elastic'); } catch (e) { elMsg(e.message, 'bad'); return; }
+  const s = r.settings; el.st = s;
+  const editable = can('system.manage');
+  setSwitch('elEnabled', s.enabled);
+  $('elEnabledLabel').textContent = `Forwarding: ${s.enabled ? 'On' : 'Off'}`;
+  $('elEnabledNote').textContent = s.enabled ? 'New hunt results are sent as they arrive.' : 'Off: nothing is sent unless you send a hunt below.';
+  $('elUrl').value = s.url; $('elAuth').value = s.auth; $('elIndex').value = s.index; $('elInsecure').checked = s.insecure; $('elCa').value = s.ca; $('elUser').value = s.username;
+  $('elKey').value = ''; $('elPass').value = '';
+  $('elKey').placeholder = s.hasApiKey ? '(saved: type to replace)' : 'Paste the key (encoded or id:key)';
+  $('elPass').placeholder = s.hasPassword ? '(saved: type to replace)' : '';
+  $('elIndexHint').textContent = `indexes: ${s.index}-<collection>  (data view: ${s.index}-*)`;
+  elShowAuth();
+  for (const id of ['elUrl', 'elAuth', 'elKey', 'elUser', 'elPass', 'elIndex', 'elInsecure', 'elCa']) $(id).disabled = !editable;
+  $('elAdvice').innerHTML = '';
+  elStatusText(r.status);
+  try {
+    const runs = (await api('GET', '/api/runs')).filter((x) => x.kind === 'hunt' && x.status !== 'running').slice(0, 100);
+    $('elRun').innerHTML = runs.length ? runs.map((x) => `<option value="${esc(x.id)}">${esc(x.name)} (${esc(new Date(x.startedAt).toLocaleString())}${x.elastic ? `, sent ${x.elastic.sent}${x.elastic.failed ? `, failed ${x.elastic.failed}` : ''}` : ''})</option>`).join('') : '<option value="">No finished hunts</option>';
+    $('elSend').disabled = !editable || !runs.length;
+  } catch { $('elRun').innerHTML = '<option value="">Hunts unavailable</option>'; $('elSend').disabled = true; }
+}
+$('elAuth').onchange = elShowAuth;
+$('elEnabled').onclick = async () => {
+  if (!can('system.manage')) return;
+  const to = $('elEnabled').getAttribute('aria-checked') !== 'true';
+  try { await api('PUT', '/api/settings/elastic', { ...elBody(), enabled: to }); } catch (e) { elMsg(e.message, 'bad'); return; }
+  await loadElastic(); elMsg(to ? 'Forwarding turned on' : 'Forwarding turned off', 'ok');
+};
+$('elSave').onclick = async () => {
+  elMsg('Saving\u2026', 'dim');
+  try { await api('PUT', '/api/settings/elastic', elBody()); } catch (e) { elMsg(e.message, 'bad'); return; }
+  await loadElastic(); elMsg('Saved', 'ok');
+};
+$('elTest').onclick = async () => {
+  elMsg('Testing\u2026', 'dim'); $('elAdvice').innerHTML = '';
+  let t;
+  try { t = await api('POST', '/api/settings/elastic/test', elBody()); } catch (e) { elMsg(e.message, 'bad'); return; }
+  elMsg('');
+  const lines = [];
+  if (t.version) lines.push(`<div class="rs-adv ok">\u2713 Connected to Elasticsearch ${esc(t.version)}${t.cluster ? ` (cluster ${esc(t.cluster)})` : ''}${t.security === false ? ', security is off' : ''}</div>`);
+  if (t.canWrite === true && t.security) lines.push('<div class="rs-adv ok">\u2713 This account can create indexes and write documents</div>');
+  if (t.note) lines.push(`<div class="rs-adv">${esc(t.note)}</div>`);
+  if (t.error) lines.push(`<div class="rs-adv bad">${esc(t.error)}</div>`);
+  $('elAdvice').innerHTML = lines.join('');
+};
+$('elSend').onclick = async () => {
+  const runId = $('elRun').value; if (!runId) return;
+  elMsg('Queuing\u2026', 'dim');
+  try { const r = await api('POST', '/api/settings/elastic/forward', { runId }); elMsg(`${r.queued.toLocaleString()} rows queued`, 'ok'); } catch (e) { elMsg(e.message, 'bad'); return; }
+  setTimeout(async () => { try { elStatusText((await api('GET', '/api/settings/elastic')).status); } catch { /* ignore */ } }, 3000);
+};
 async function loadCertificate() {
   let st;
   try { st = await api('GET', '/api/settings/certificate'); } catch (e) { $('ceMsg').textContent = e.message; $('ceMsg').className = 'um-msg bad'; return; }
@@ -2235,7 +2308,7 @@ $('ceEnabled').onclick = async () => {
   const to = !ce.st.enabled;
   if (to && !ce.st.hasCert) { $('ceMsg').textContent = 'Generate a certificate first.'; $('ceMsg').className = 'um-msg bad'; return; }
   const msg = to
-    ? 'Turn HTTPS on and restart the server? Other machines are redirected to https://, so each must trust the CA (or click through the certificate warning). This PC keeps working over plain http://.'
+    ? 'Turn HTTPS on and restart? Other machines are redirected to https:// and must trust the CA. This PC keeps plain http://.'
     : 'Turn HTTPS off and restart the server? Everything goes back to plain HTTP.';
   if (!confirm(msg)) return;
   const running = [...bh.runs, ...br.runs].filter((x) => x.status === 'running').length;
@@ -2314,11 +2387,11 @@ function renderMonitor() {
   monQuarantineToasts();
   if (monSnap.enabled === false) {
     $('monSum').innerHTML = '<span class="dim">Monitoring is off</span>';
-    $('monGrid').innerHTML = '<p class="dim" style="margin:0">Health monitoring is turned off, so no hosts are being checked. It can be turned back on under Settings → System → Health Settings.</p>';
+    $('monGrid').innerHTML = '<p class="dim" style="margin:0">Health monitoring is off (Settings → System → Health Settings).</p>';
     return;
   }
   const pe = fmtSecs(monSnap.summary.pingEveryMs / 1000), re = fmtSecs(monSnap.summary.portsEveryMs / 1000);
-  $('monSub').textContent = `Each monitored host is pinged every ${pe}, and its WinRM or SSH port is checked every ${re}. Green is up, red is not responding, dashed is not monitored (change it under Settings → System → Health Settings).`;
+  $('monSub').textContent = `Ping every ${pe}, WinRM / SSH port every ${re}. Green up, red down, dashed not monitored.`;
   $('monSum').innerHTML = monCountsHtml(monSnap) + (monSnap.summary.excluded ? `<span class="dim" title="Change which hosts are monitored in Settings > System > Health Settings">${monSnap.summary.excluded} not monitored</span>` : '');
   const n = (ip) => ip.split('.').reduce((a, b) => a * 256 + Number(b), 0) || 0;
   const hosts = [...monSnap.hosts].sort((a, b) => n(a.address) - n(b.address) || a.address.localeCompare(b.address));
@@ -2411,7 +2484,7 @@ function renderMonitorLog() {
     ? `<table class="ml"><thead><tr><th>Time</th><th>Host</th><th>Check</th><th>Command</th><th>Result</th><th>Message</th></tr></thead><tbody>${shown.map((e) => `<tr><td class="dim" title="${esc(e.t)}">${esc(new Date(e.t).toLocaleString([], { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }))}</td>
         <td><b>${esc(e.host)}</b> <span class="dim">${esc(e.address)}</span></td><td>${esc(e.check)}</td><td class="mlc">${esc(e.command)}</td>
         <td class="${e.ok ? 'ok' : 'bad'}">${e.ok ? 'Success' : 'Error'}</td><td class="mlm ${e.ok ? '' : 'bad'}">${esc(e.message)}</td></tr>`).join('')}</tbody></table>`
-    : `<p class="dim" style="margin:0">${mlEnabled ? (mlEntries.length ? 'No checks match.' : 'No checks have run yet since the server started.') : 'Health monitoring is turned off, so no checks are running. Turn it on under Settings → System → Health Settings.'}</p>`;
+    : `<p class="dim" style="margin:0">${mlEnabled ? (mlEntries.length ? 'No checks match.' : 'No checks have run yet since the server started.') : 'Health monitoring is off.'}</p>`;
 }
 $('mlSearch').oninput = renderMonitorLog;
 $('mlFilter').onclick = (e) => { if (e.target.dataset.f) { mlFilter = e.target.dataset.f; renderMonitorLog(); } };
@@ -2822,8 +2895,8 @@ let uploadSlot = null;
 const FS_TYPES = {
   folder: { label: 'Folder on the server', fields: [['path', 'Folder', 'text', 'D:\\Tools  or  /srv/tools']], note: 'A folder this server can open: a local disk, a mounted share or a network path it is already signed in to.' },
   smb: { label: 'SMB share', fields: [['path', 'Share and folder', 'text', '\\\\server\\share\\tools'], ['username', 'Username', 'text', 'DOMAIN\\user'], ['password', 'Password', 'password', '']], note: 'Searches the folder and everything below it. A Linux server needs smbclient installed.' },
-  nextcloud: { label: 'Nextcloud', fields: [['url', 'Nextcloud address', 'text', 'https://cloud.example.com'], ['insecure', 'Allow a self-signed certificate', 'checkbox', '']], nc: true, note: 'Enter the web address of your Nextcloud and press Sign in: you sign in on your Nextcloud page as usual (single sign-on works) and approve access. Kookaburrow only receives a temporary app password, which is removed from Nextcloud again when you close this popup.' },
-  webdav: { label: 'WebDAV (manual)', fields: [['url', 'Folder address', 'text', 'https://cloud.example.com/apps/files/?dir=/Tools'], ['username', 'Username', 'text', ''], ['password', 'Password', 'password', 'app password'], ['insecure', 'Allow a self-signed certificate', 'checkbox', '']], note: 'Paste the folder\'s web address, its WebDAV address (.../remote.php/dav/files/USER/Tools) or a public share link (.../s/TOKEN, with the share password if it has one). Use an app password if two-factor sign-in is on.' },
+  nextcloud: { label: 'Nextcloud', fields: [['url', 'Nextcloud address', 'text', 'https://cloud.example.com'], ['insecure', 'Allow a self-signed certificate', 'checkbox', '']], nc: true, note: 'Enter your Nextcloud address and press Sign in. A temporary app password is used and removed when you close this.' },
+  webdav: { label: 'WebDAV (manual)', fields: [['url', 'Folder address', 'text', 'https://cloud.example.com/apps/files/?dir=/Tools'], ['username', 'Username', 'text', ''], ['password', 'Password', 'password', 'app password'], ['insecure', 'Allow a self-signed certificate', 'checkbox', '']], note: 'Folder, WebDAV (.../remote.php/dav/files/USER/Tools) or public share (.../s/TOKEN) address. Use an app password with 2FA.' },
   sftp: { label: 'SFTP', fields: [['host', 'Server', 'text', 'files.example.com'], ['port', 'Port', 'text', '22'], ['username', 'Username', 'text', ''], ['password', 'Password', 'password', ''], ['path', 'Folder', 'text', '/tools']], note: 'Searches the folder and everything below it.' },
 };
 const fsx = { type: 'folder', vals: {}, session: null, result: null, nc: null }; // nc: the Nextcloud sign-in { id, status, user, loginUrl }

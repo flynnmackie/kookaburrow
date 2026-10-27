@@ -1,5 +1,5 @@
 NAME='Shell - Other History'
-DESCRIPTION='Command and query history kept by other tools in every home directory: Python, MySQL, PostgreSQL, Redis, SQLite, Node, less, vim command lines (viminfo), wget HSTS entries and git configuration. These often reveal database access, pasted passwords on command lines and downloaded content that the shell history does not. CONTAINS limits to lines containing that text. Needs root, or an account with passwordless sudo, to read other homes.'
+DESCRIPTION='Command and query history kept by other tools in every home directory. Needs root or passwordless sudo.'
 DEPENDENCIES=()
 PARAMETERS=(CONTAINS?)
 TAGS=(history execution forensics)

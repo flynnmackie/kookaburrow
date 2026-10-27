@@ -1,5 +1,5 @@
 $Name = 'Hosts File - Add Entry'
-$Description = 'Adds a line to the hosts file to sinkhole a domain: Hostname resolves to Address (default 0.0.0.0, which makes connections fail). The hosts file is backed up to C:\ProgramData\Kookaburrow\Quarantine first. Use DNS - Flush Cache afterwards.'
+$Description = 'Adds a line to the hosts file to sinkhole a domain: Hostname resolves to Address (default 0.0.0.0, which makes connections fail).'
 $Dependencies = @()
 $Parameters = @('Hostname', 'Address?')
 $Tags = @('dns', 'network', 'containment')

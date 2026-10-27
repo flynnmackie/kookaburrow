@@ -1,5 +1,5 @@
 $Name = 'Software - Uninstall'
-$Description = 'Silently uninstalls a Windows Installer (MSI) program found by name in the Uninstall registry keys. ProductName is matched exactly (as shown by Software - Installed); if more than one program matches nothing is uninstalled. Programs without an MSI uninstaller cannot be removed this way. Use it to remove unwanted remote access tools or other software.'
+$Description = 'Silently uninstalls a Windows Installer (MSI) program found by name in the Uninstall registry keys.'
 $Dependencies = @()
 $Parameters = @('ProductName')
 $Tags = @('software', 'remediation')

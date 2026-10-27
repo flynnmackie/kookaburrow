@@ -1,5 +1,5 @@
 $Name = 'Registry - Collect Hives'
-$Description = 'Copies the registry hives for offline analysis with RegRipper, Registry Explorer or RECmd: SYSTEM, SOFTWARE, SAM and SECURITY (exported with reg save), Amcache.hve, and every user NTUSER.DAT and UsrClass.dat (copied from a volume shadow when locked, with their transaction logs). Set Users to no to collect only the machine hives. Includes credential material (SAM, SECURITY), so handle the output as sensitive. Needs administrator rights. Comes back over SMB, which is switched on for this collection only.'
+$Description = 'Copies the registry hives for offline analysis with RegRipper, Registry Explorer or RECmd. Needs administrator rights.'
 $Dependencies = @()
 $Parameters = @('Users?')
 $Tags = @('registry', 'forensics', 'persistence')

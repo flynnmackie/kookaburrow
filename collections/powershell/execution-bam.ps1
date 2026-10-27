@@ -1,5 +1,5 @@
 $Name = 'Execution - BAM'
-$Description = 'Background Activity Moderator entries: the full path of each program a user ran and the last time it ran, per user SID (Windows 10 1709 and later). Persists for about a week and survives deletion of the program (like Windows.Forensics.Bam).'
+$Description = 'Background Activity Moderator entries: the full path of each program a user ran and the last time it ran, per user SID (Windows 10 1709 and later).'
 $Dependencies = @()
 $Tags = @('execution', 'forensics', 'registry')
 

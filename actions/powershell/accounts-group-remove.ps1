@@ -1,5 +1,5 @@
 $Name = 'Accounts - Remove from Group'
-$Description = 'Removes a user from a local group, for example from Administrators to take away rights an attacker granted. Member is the account name (use DOMAIN\name for a domain account).'
+$Description = 'Removes a user from a local group, for example from Administrators to take away rights an attacker granted.'
 $Dependencies = @()
 $Parameters = @('Member', 'Group')
 $Tags = @('accounts', 'remediation', 'containment')

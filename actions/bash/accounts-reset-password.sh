@@ -1,5 +1,5 @@
 NAME='Accounts - Reset Password'
-DESCRIPTION='Sets a new password on a local account. Use it to lock out an attacker who knows the old password, or to recover an account. The new password is used for this run only and is never stored or logged. Does not affect SSH keys, so combine it with SSH - Remove Authorized Key if a key was planted.'
+DESCRIPTION='Sets a new password on a local account.'
 DEPENDENCIES=()
 PARAMETERS=(USER_NAME NEW_PASSWORD)
 TAGS=(accounts remediation containment)

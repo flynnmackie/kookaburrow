@@ -87,9 +87,18 @@
       </div>
       <div class="card bh-detail" id="brDetail"><p class="dim" style="margin:0">Click a response above to see what it ran, its output files, any errors, and to download the results.</p></div>
     </section>
+    <section class="page" id="burrow/workflow">
+      <div class="card">
+        <div class="bh-bar"><h2>Workflows</h2><button class="act" id="wfNew" data-perm="workflows.manage" data-perm-what="create workflows">New Workflow</button></div>
+        <p class="dim hs-sub">A hunt followed by server-side tools and a destination, for example event logs, then Hayabusa, then Elastic.</p>
+        <div id="wfList"></div>
+      </div>
+    </section>
     <section class="page" id="burrow/recurring">
-      <div class="card"><h2>Recurring hunts</h2><div id="rcHunts"></div></div>
-      <div class="card"><h2>Recurring responses</h2><div id="rcResps"></div></div>
+      <div class="card">
+        <div class="bh-bar"><h2>Recurring</h2><div class="toggle rc-kind" id="rcKind"><button type="button" data-kind="hunt" class="on">Hunts</button><button type="button" data-kind="response">Actions</button><button type="button" data-kind="workflow">Workflows</button></div></div>
+        <div id="rcList"></div>
+      </div>
     </section>
     <section class="page" id="settings/view-actions">
       <div class="collection-layout">
@@ -148,7 +157,7 @@
     <section class="page" id="settings/shell-settings">
       <div class="card">
         <h2>Shell Settings</h2>
-        <p class="dim hs-sub">Controls the interactive shells on the Shell tab. Changes take effect straight away, and any open shell that is no longer allowed is closed.</p>
+        <p class="dim hs-sub">Who may use interactive shells. Changes apply immediately.</p>
         <div class="sw-row" data-perm="system.manage" data-perm-what="turn shell access on or off"><button class="switch" id="ssEnabled" type="button" role="switch" aria-checked="true" aria-label="Shell access"></button><b id="ssEnabledLabel">Shell access: On</b><span class="dim" id="ssEnabledNote"></span></div>
         <div id="ssBody">
           <div class="hs-block">
@@ -168,7 +177,7 @@
     <section class="page" id="settings/run-settings">
       <div class="card">
         <h2>Run Settings</h2>
-        <p class="dim hs-sub">How many hosts a hunt or response works on at the same time. Each host's collections or actions still run one after another. Changes apply to hunts and responses started afterwards. More hosts at once finishes sooner but loads this server (each WinRM host runs its own PowerShell) and the network.</p>
+        <p class="dim hs-sub">Hosts a hunt or response works on at once. Applies to runs started afterwards. More is faster but loads the server and network.</p>
         <p class="rs-server" id="rsServer"></p>
         <div class="hs-block">
           <span class="fl">Hosts at once (per hunt or response)</span>
@@ -184,7 +193,7 @@
     <section class="page" id="settings/server-settings">
       <div class="card">
         <h2>Server Settings</h2>
-        <p class="dim hs-sub">The address and port this server listens on, and which other computers may connect. Saving restarts the server. This PC (localhost) can always connect, whatever is set here.</p>
+        <p class="dim hs-sub">Listen address, port and allowed clients. Saving restarts the server. localhost is always allowed.</p>
         <div class="rs-adv warn" id="svFallback" hidden><span id="svFallbackText"></span> <a id="svFallbackDismiss" style="cursor:pointer">Dismiss</a></div>
         <p class="rs-server" id="svNow"></p>
         <div class="hs-block">
@@ -203,10 +212,37 @@
         <div class="hs-actions"><button class="act" id="svSave" type="button" data-perm="system.manage" data-perm-what="change server settings">Save and restart</button><button class="act sec" id="svReset" type="button" data-perm="system.manage" data-perm-what="change server settings">Reset to defaults</button><span class="um-msg" id="svMsg"></span></div>
       </div>
     </section>
+    <section class="page" id="settings/elastic">
+      <div class="card">
+        <h2>Elastic</h2>
+        <p class="dim hs-sub">Forward hunt rows to Elasticsearch (also SOF-ELK: use its Elasticsearch port, 9200). One document per row, in an index per collection.</p>
+        <div class="sw-row" data-perm="system.manage" data-perm-what="turn forwarding on or off"><button class="switch" id="elEnabled" type="button" role="switch" aria-checked="false" aria-label="Forward hunt results"></button><b id="elEnabledLabel">Forwarding: Off</b><span class="dim" id="elEnabledNote"></span></div>
+        <div class="hs-block">
+          <span class="fl">Elasticsearch address</span>
+          <div class="hs-row"><input id="elUrl" type="text" spellcheck="false" placeholder="https://elastic.lab.local:9200" style="width:380px;max-width:100%"></div>
+          <span class="fl">Sign-in</span>
+          <div class="hs-row"><select id="elAuth"><option value="none">None (security off)</option><option value="apikey">API key</option><option value="basic">User name and password</option></select></div>
+          <div id="elKeyRow"><span class="fl">API key</span><div class="hs-row"><input id="elKey" type="password" autocomplete="off" placeholder="Paste the key (encoded or id:key)" style="width:380px;max-width:100%"></div></div>
+          <div id="elBasicRow"><span class="fl">User name</span><div class="hs-row"><input id="elUser" type="text" autocomplete="off" style="width:240px"></div>
+            <span class="fl">Password</span><div class="hs-row"><input id="elPass" type="password" autocomplete="new-password" style="width:240px"></div></div>
+          <span class="fl">Index prefix</span>
+          <div class="hs-row"><input id="elIndex" type="text" spellcheck="false" style="width:240px"><span class="dim" id="elIndexHint"></span></div>
+          <span class="fl">Certificate (https only)</span>
+          <label class="dim" style="display:block;margin:2px 0"><input type="checkbox" id="elInsecure"> Skip certificate check (self-signed, not recommended)</label>
+          <textarea id="elCa" rows="3" spellcheck="false" placeholder="Or paste the CA certificate (PEM) to trust" style="width:380px;max-width:100%;background:var(--panel2,#11161d);color:var(--text);border:1px solid var(--line-hi);border-radius:6px;padding:6px 8px;font:12.5px var(--f-mono,monospace)"></textarea>
+        </div>
+        <div id="elAdvice"></div>
+        <div class="hs-actions"><button class="act" id="elSave" type="button" data-perm="system.manage" data-perm-what="change Elastic settings">Save</button><button class="act sec" id="elTest" type="button" data-perm="system.manage" data-perm-what="test the Elastic connection">Test connection</button><span class="um-msg" id="elMsg"></span></div>
+        <h3 style="margin:16px 0 4px;font-size:13px">Send a past hunt</h3>
+        <p class="dim" style="font-size:12.5px;margin:0 0 6px">Sends all of a finished hunt's rows. Sending again replaces the same documents, so nothing is duplicated.</p>
+        <div class="hs-row"><select id="elRun" style="max-width:420px"></select><button class="act sec" id="elSend" type="button" data-perm="system.manage" data-perm-what="send a hunt to Elastic">Send</button></div>
+        <p class="dim" id="elStatus" style="font-size:12.5px;margin:10px 0 0"></p>
+      </div>
+    </section>
     <section class="page" id="settings/certificate">
       <div class="card">
         <h2>Certificate</h2>
-        <p class="dim hs-sub">HTTPS for this server. Kookaburrow makes its own certificate authority (CA) and a server certificate signed by it for the names and addresses you list. Browsers trust it once the CA file is imported on the machine they browse from; until then they show a warning. Plain HTTP from other machines is redirected to HTTPS, and this PC can always use plain HTTP, so a certificate problem can never lock you out.</p>
+        <p class="dim hs-sub">HTTPS with a built-in CA. Import the CA on browsing machines to avoid warnings. Other machines are redirected to HTTPS; localhost keeps plain HTTP.</p>
         <div class="sw-row" data-perm="system.manage" data-perm-what="turn HTTPS on or off"><button class="switch" id="ceEnabled" type="button" role="switch" aria-checked="false" aria-label="HTTPS"></button><b id="ceEnabledLabel">HTTPS: Off</b><span class="dim" id="ceEnabledNote"></span></div>
         <div id="ceInfo" style="margin:10px 0"></div>
         <div class="hs-block">
@@ -217,16 +253,18 @@
         <div id="ceAdvice"></div>
         <div class="hs-actions"><button class="act" id="ceGen" type="button" data-perm="system.manage" data-perm-what="generate the certificate">Generate certificate</button><button class="act sec" id="ceNewCa" type="button" data-perm="system.manage" data-perm-what="generate a new CA">New CA and certificate…</button><a class="act sec" id="ceCa" href="/api/settings/certificate/ca.pem" download hidden>Download CA certificate</a><span class="um-msg" id="ceMsg"></span></div>
         <h3 style="margin:16px 0 4px;font-size:13px">Trusting the CA on another machine</h3>
-        <p class="dim" style="max-width:760px;font-size:12.5px;margin:0">Download the CA certificate (not the server certificate) and import it where you browse from.<br>
-          <b>Windows:</b> rename it to kookaburrow-ca.crt, double-click, Install Certificate, Local Machine, "Trusted Root Certification Authorities" (or in an administrator prompt: <code>certutil -addstore -f Root kookaburrow-ca.pem</code>).<br>
-          <b>Linux:</b> copy it to /usr/local/share/ca-certificates/kookaburrow-ca.crt and run <code>sudo update-ca-certificates</code>.<br>
-          <b>macOS:</b> open it in Keychain Access and set it to Always Trust. <b>Firefox</b> has its own store: Settings, Privacy &amp; Security, Certificates, View Certificates, Authorities, Import.</p>
+        <ul class="dim" style="max-width:760px;font-size:12.5px;margin:0;padding-left:18px">
+          <li><b>Windows:</b> <code>certutil -addstore -f Root kookaburrow-ca.pem</code> (administrator)</li>
+          <li><b>Linux:</b> copy to /usr/local/share/ca-certificates/kookaburrow-ca.crt, run <code>sudo update-ca-certificates</code></li>
+          <li><b>macOS:</b> Keychain Access, set to Always Trust</li>
+          <li><b>Firefox:</b> Settings, Certificates, Authorities, Import</li>
+        </ul>
       </div>
     </section>
     <section class="page" id="settings/health-settings">
       <div class="card">
         <h2>Health Settings</h2>
-        <p class="dim hs-sub">Turn health monitoring on or off, set how often hosts are checked, and choose which hosts are checked. Changes take effect straight away.</p>
+        <p class="dim hs-sub">Monitoring on or off, check interval and which hosts are checked.</p>
         <div class="sw-row" data-perm="system.manage" data-perm-what="turn health monitoring on or off"><button class="switch" id="hsEnabled" type="button" role="switch" aria-checked="true" aria-label="Health monitoring"></button><b id="hsEnabledLabel">Health monitoring: On</b><span class="dim" id="hsEnabledNote"></span></div>
         <div id="hsBody">
         <div class="hs-block">
@@ -236,7 +274,7 @@
           <div class="hs-row"><input id="hsPort" type="number" min="1" step="1"><select id="hsPortUnit"></select><span class="dim" id="hsPortHint"></span></div>
         </div>
         <div class="hs-hosts-head"><span class="fl" style="margin:0">Hosts to monitor</span><span class="dim" id="hsCount"></span><span class="hs-links"><a id="hsAll">All</a><a id="hsNone">None</a></span></div>
-        <p class="dim" style="margin:0 0 6px; max-width:760px; font-size:12px">Choose per host whether its ping, its WinRM / SSH port, or both are checked. A check that is off shows as "not monitored" on the Health page.</p>
+        <p class="dim" style="margin:0 0 6px; max-width:760px; font-size:12px">Choose per host whether ping, the WinRM / SSH port, or both are checked.</p>
         <div class="hs-hosts" id="hsHosts"></div>
         <div class="hs-actions"><button class="act" id="hsSave" type="button" data-perm="system.manage" data-perm-what="change health settings">Save</button><button class="act sec" id="hsDefaults" type="button" data-perm="system.manage" data-perm-what="change health settings">Reset to defaults</button><span class="um-msg" id="hsMsg"></span></div>
         </div>
@@ -245,7 +283,7 @@
     <section class="page" id="settings/binaries">
       <div class="card">
         <div style="display:flex; align-items:center; gap:10px"><h2 style="margin:0">Binaries</h2><button class="act sec" id="binFromServer" type="button" style="margin-left:auto" data-perm="collections.manage" data-perm-what="upload binaries">Upload from server</button></div>
-        <p class="dim">External tools that collections depend on. They are not shipped with the platform: upload each one here. On every run the platform copies the binary to a temporary folder on the target, runs the collection, and deletes the folder afterwards.</p>
+        <p class="dim">Tools that collections depend on. Upload each one here; it is staged on the target for the run and removed afterwards.</p>
         <div id="binMsg" class="bad" style="margin-bottom:8px"></div>
         <table id="binTable"><thead><tr><th>Binary</th><th>Used by</th><th>File</th><th></th></tr></thead><tbody></tbody></table>
         <input type="file" id="binFile" hidden>
@@ -316,7 +354,7 @@
       <div class="add-layout">
         <div class="card" id="mnForm">
           <h2>Manually add a host</h2>
-          <p class="dim" style="margin:0 0 6px">Kookaburrow logs in with these details. Only if the login works is the host added to the known hosts (Host Management → View Hosts).</p>
+          <p class="dim" style="margin:0 0 6px">The host is saved only if this login works.</p>
           <span class="fl">Connect with</span>
           <div class="toggle" id="mnProto"><button type="button" data-v="winrm" class="on">WinRM (Windows)</button><button type="button" data-v="ssh">SSH (Linux)</button></div>
           <span class="fl">IP address or host name</span>
@@ -371,7 +409,7 @@
     <section class="page" id="health/monitor-log">
       <div class="card">
         <div class="mon-top"><h2>Monitor log</h2><span class="dim" id="mlCount"></span></div>
-        <p class="dim lg-sub">Every ping and remote port check, newest first: the command that ran, the host, when, and whether it worked or why not. The log is written to a file on the server (data/monitor-log.jsonl, trimmed at 20 MB), so it survives restarts; this page shows the latest 1000 checks.</p>
+        <p class="dim lg-sub">Every ping and port check, newest first (latest 1000). Kept in data/monitor-log.jsonl.</p>
         <div class="row" style="margin-bottom:8px"><input id="mlSearch" type="search" placeholder="Search host, address, command or message" autocomplete="off" style="flex:1; max-width:460px"><div class="toggle" id="mlFilter" style="margin:0"><button type="button" data-f="all" class="on">All</button><button type="button" data-f="ok">Success</button><button type="button" data-f="fail">Failed</button></div></div>
         <div id="mlBox"></div>
       </div>
@@ -379,7 +417,7 @@
     <section class="page" id="health/quarantine-log">
       <div class="card">
         <div class="mon-top"><h2>Quarantine log</h2><span class="dim" id="qlCount"></span></div>
-        <p class="dim lg-sub">Every time a host was quarantined or released from Health &gt; Monitor, newest first: who did it, when, and what happened. Each step also appears under Burrow &gt; Respond.</p>
+        <p class="dim lg-sub">Quarantine and release events, newest first: who, when and the result.</p>
         <div class="row" style="margin-bottom:8px"><input id="qlSearch" type="search" placeholder="Search host, address, event, user or detail" autocomplete="off" style="flex:1; max-width:460px"></div>
         <div id="qlBox"></div>
       </div>
@@ -432,7 +470,7 @@
     <section class="page" id="output/diff">
       <div class="card auto">
         <h2>Diff</h2>
-        <p class="dim hs-sub">Compare two hunts or responses, or pick one file from each to compare just those two (for example the same CSV from two runs). Whole runs are compared file by file: files are matched by their path inside the run (the date in a name is ignored), and each file is compared row by row, in any order.</p>
+        <p class="dim hs-sub">Compare two runs, or one file from each. Files are matched by path (dates in names ignored) and compared row by row.</p>
         <div class="df-pick">
           <div><span class="fl">Run A (usually the older)</span><div class="df-sel"><select id="dfA"></select><button type="button" class="act sec" id="dfPinA" title="Pin run A">☆</button></div><select id="dfFA" class="df-file-sel"></select></div>
           <button type="button" class="act sec" id="dfSwap" title="Swap A and B">⇄</button>
@@ -445,14 +483,14 @@
     <section class="page" id="output/ioc">
       <div class="card" id="iocCard">
         <div class="ioc-top"><h2>IOC</h2><button type="button" class="act" id="iocAdd" data-perm="hunts.run" data-perm-what="add IOC lists">Add IOC list</button></div>
-        <p class="dim hs-sub">Upload indicators (IPs, domains, hashes, URLs, file names). Each list gets a header here, and under it you see the hunts whose results contain one of its indicators, and the individual files that returned it.</p>
+        <p class="dim hs-sub">Upload indicators (IPs, domains, hashes, URLs, file names) and see which hunts and files contain them.</p>
         <div id="iocLists"></div>
       </div>
     </section>
     <section class="page" id="output/compare">
       <div class="card auto">
         <h2>Cross-host comparison</h2>
-        <p class="dim hs-sub">Put one CSV from a hunt side by side across all its hosts. Every row shows how many hosts have it, so something found on one host out of many stands out.</p>
+        <p class="dim hs-sub">One hunt CSV across all its hosts, with the number of hosts that have each row.</p>
         <div class="cp-pick">
           <div><span class="fl">Hunt or response</span><select id="cpRun"></select></div>
           <div><span class="fl">CSV</span><select id="cpFile"></select></div>
@@ -464,7 +502,7 @@
     <section class="page" id="output/baseline">
       <div class="card" id="blCard">
         <div class="ioc-top"><h2>Baseline</h2><button type="button" class="act" id="blAdd" data-perm="hunts.run" data-perm-what="upload baselines">Upload baseline</button></div>
-        <p class="dim hs-sub">Keep an initial baseline scan here: the known-good state of a host or group of hosts, to compare later hunts against.</p>
+        <p class="dim hs-sub">Known-good baseline scans to compare later hunts against.</p>
         <div class="bl-note">Comparing hunts against a baseline is not available yet. For now baselines are only uploaded and stored.</div>
         <div id="blList"></div>
       </div>
@@ -472,7 +510,7 @@
     <section class="page" id="output/log">
       <div class="card">
         <div class="lg-top"><h2>Activity log</h2><span class="lg-btns"><a id="logExpand">Expand all</a><a id="logCollapse">Collapse all</a></span></div>
-        <p class="dim lg-sub">A timestamped record of every action taken during each hunt, with hash verification. Hover a Detail cell to see the SHA-256 of what was written.</p>
+        <p class="dim lg-sub">Timestamped record of every step of each hunt, with hashes. Hover Detail for the SHA-256.</p>
         <div id="logBox"></div>
       </div>
     </section>
@@ -491,7 +529,7 @@
     <section class="page" id="output/report">
       <div class="card">
         <div class="bh-bar"><h2>Reports</h2><button class="act" id="rpNew" type="button" data-perm="hunts.export" data-perm-what="generate reports">Generate report</button></div>
-        <p class="dim lg-sub">An HTML report of a hunt or response, covering every host together: a section for each collection or action with all the rows, searchable on one page. It is saved in the output/reports folder.</p>
+        <p class="dim lg-sub">Searchable HTML report of a hunt or response, saved in output/reports.</p>
         <div id="rpList"></div>
       </div>
     </section>
@@ -525,7 +563,7 @@
       </section>
       <section class="hsec" data-pane="params" hidden>
         <h3>Parameters</h3>
-        <p class="dim pr-help">The collections you picked that take parameters are on the left: <b class="pr-k red">red</b> needs them, <b class="pr-k orange">orange</b> takes optional ones, <b class="pr-k green">green</b> is set. Fill them in and press <b>Set parameters</b>. A red collection cannot be run.</p>
+        <p class="dim pr-help"><b class="pr-k red">Red</b> needs parameters, <b class="pr-k orange">orange</b> takes optional ones, <b class="pr-k green">green</b> is set. Press <b>Set parameters</b> when done.</p>
         <div class="hcoll">
           <div class="coll-list"><div class="pickbox" id="hmPList"></div></div>
           <div class="coll-detail" id="hmPDetail"></div>
@@ -578,7 +616,7 @@
       </section>
       <section class="hsec" data-pane="params" hidden>
         <h3>Parameters</h3>
-        <p class="dim pr-help">The actions you picked that take parameters are on the left: <b class="pr-k red">red</b> needs them, <b class="pr-k orange">orange</b> takes optional ones, <b class="pr-k green">green</b> is set. Fill them in and press <b>Set parameters</b>. A red action cannot be run.</p>
+        <p class="dim pr-help"><b class="pr-k red">Red</b> needs parameters, <b class="pr-k orange">orange</b> takes optional ones, <b class="pr-k green">green</b> is set. Press <b>Set parameters</b> when done.</p>
         <div class="hcoll">
           <div class="coll-list"><div class="pickbox" id="rmPList"></div></div>
           <div class="coll-detail" id="rmPDetail"></div>
@@ -600,7 +638,7 @@
 <div class="modal" id="rerunRespModal" hidden role="dialog" aria-modal="true" aria-labelledby="rxTitle">
   <div class="dlg rr">
     <div class="dlg-head"><h2 id="rxTitle">Rerun a past response</h2><button class="dlg-x" id="rxClose" aria-label="Close">×</button></div>
-    <div class="dlg-body"><p class="dim" style="margin:2px 0 8px">Pick a response. Its hosts and actions are filled in for you; you then enter any parameter values again, check the details and press Run Response.</p><div id="rxList"></div></div>
+    <div class="dlg-body"><p class="dim" style="margin:2px 0 8px">Pick a response to reuse its hosts and actions. Re-enter any parameters.</p><div id="rxList"></div></div>
     <div class="dlg-foot"><button class="act" id="rxUse" type="button" disabled>Use this response</button><button class="act sec" id="rxCancel" type="button">Cancel</button><span id="rxMsg"></span></div>
   </div>
 </div>
@@ -613,6 +651,18 @@
     <div class="pm-bar"><button class="act sec" id="pmUp" type="button" title="Up one folder">↑ Up</button><input id="pmPath" type="text" spellcheck="false" autocomplete="off"><button class="act sec" id="pmGo" type="button">Go</button></div>
     <div class="dlg-body pm-body" id="pmList"></div>
     <div class="dlg-foot"><button class="act" id="pmPull" type="button" disabled>Pull</button><button class="act sec" id="pmCancel" type="button">Cancel</button><span id="pmMsg"></span><span class="sum" id="pmSel"></span></div>
+  </div>
+</div>
+<div class="modal" id="wfModal" hidden role="dialog" aria-modal="true" aria-labelledby="wfTitle">
+  <div class="dlg pwdlg">
+    <div class="dlg-head"><h2 id="wfTitle">New workflow</h2><button class="dlg-x" id="wfX" type="button" aria-label="Close">×</button></div>
+    <div class="dlg-body pw-body">
+      <span class="fl">Name</span><input id="wfName" type="text" maxlength="80" autocomplete="off">
+      <span class="fl">Description <span class="dim">(optional)</span></span><input id="wfDesc" type="text" maxlength="500" autocomplete="off">
+      <p class="dim" style="margin:10px 0 0">Collections, processing steps and destinations are added in a later version.</p>
+      <div class="um-msg" id="wfMsg" style="margin-top:8px"></div>
+    </div>
+    <div class="dlg-foot"><button class="act" id="wfSave" type="button">Create</button><button class="act sec" id="wfCancel" type="button">Cancel</button></div>
   </div>
 </div>
 <div class="modal" id="pwModal" hidden role="dialog" aria-modal="true" aria-labelledby="pwTitle">
@@ -642,7 +692,7 @@
       <span class="fl">Indicators</span>
       <div class="ioc-file"><label class="act sec" for="iocFile">Choose a file…</label><input type="file" id="iocFile" accept=".txt,.csv,.ioc,.tsv,.list,.json,text/*" hidden><span class="dim" id="iocFileName">.txt or .csv, one indicator per line</span></div>
       <textarea id="iocText" rows="9" spellcheck="false" placeholder="Or paste them here, one per line&#10;185.220.101.4&#10;evil-domain.example&#10;44d88612fea8a8f36de82e1278abb02f&#10;C:UsersPublicevil.exe"></textarea>
-      <div class="dim" style="margin-top:4px">A CSV can use a column called ioc, indicator, value, hash, ip, domain or url. Lines starting with # are ignored, and defanged indicators (hxxp, [.]) are restored.</div>
+      <div class="dim" style="margin-top:4px">CSV column: ioc, indicator, value, hash, ip, domain or url. # lines ignored; defanged indicators restored.</div>
       <span class="fl">Note (optional)</span><input id="iocNote" type="text" maxlength="500" placeholder="Where these came from" autocomplete="off">
       <div class="um-actions"><button class="act" type="button" id="iocSave">Add list</button><button class="act sec" type="button" id="iocCancel">Cancel</button><span class="um-msg" id="iocMsg"></span></div>
     </div>
@@ -748,6 +798,7 @@
 <script src="app.js"></script>
 <script src="respond.js"></script>
 <script src="recurring.js"></script>
+<script src="workflow.js"></script>
 <script src="report.js"></script>
 <script src="browse.js"></script>
 <script src="analysis.js"></script>

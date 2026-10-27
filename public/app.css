@@ -823,3 +823,5 @@
     .card { padding:8px 10px; }
     .auth-layout, .host-layout, .collection-layout, .add-layout, .run-layout, .browse-layout, .prof-layout { grid-template-columns:minmax(0, 1fr); grid-template-rows:none; grid-auto-rows:minmax(0, 1fr); }
   }
+
+  .rc-kind { flex:none; width:auto; } .rc-kind button { padding:5px 14px; }

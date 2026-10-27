@@ -1,5 +1,5 @@
 NAME='Host - Release'
-DESCRIPTION='Undoes Host - Isolate: restores the iptables rules that were saved before isolation and cancels any automatic release. Safe to run when the host is not isolated.'
+DESCRIPTION='Undoes Host - Isolate: restores the iptables rules that were saved before isolation and cancels any automatic release.'
 DEPENDENCIES=()
 TAGS=(containment network recovery)
 

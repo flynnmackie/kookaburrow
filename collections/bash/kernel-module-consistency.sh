@@ -1,5 +1,5 @@
 NAME='Kernel - Module Consistency'
-DESCRIPTION='Looks for kernel modules that hide: modules visible in /sys/module but not in /proc/modules or lsmod (a hiding rootkit removes itself from the module list but not from sysfs), the kernel taint flags (an out-of-tree, unsigned or forced module taints the kernel), and loaded modules with no file on disk or outside /lib/modules. Needs root, or an account with passwordless sudo, for full detail.'
+DESCRIPTION='Looks for kernel modules that hide. Needs root or passwordless sudo.'
 DEPENDENCIES=()
 TAGS=(rootkit kernel malware defense-evasion)
 

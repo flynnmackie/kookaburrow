@@ -1,5 +1,5 @@
 $Name = 'Event Logs - Export'
-$Description = 'Exports event logs as .evtx files and pulls them back to the server for analysis in tools such as Event Log Explorer, Hayabusa or Chainsaw. LogNames is a comma separated list (default Security,System,Application; for example Security,Microsoft-Windows-PowerShell/Operational,Microsoft-Windows-Sysmon/Operational), or All for every log that has events. Set LastMinutes for only the last N minutes, or StartTime and EndTime (yyyy-MM-dd HH:mm, host local time) for a range; with none of them the whole log is exported. Files can be hundreds of MB, so they come back over SMB, which is switched on for this collection only.'
+$Description = 'Exports event logs as .evtx files and pulls them back to the server for analysis in tools such as Event Log Explorer, Hayabusa or Chainsaw.'
 $Dependencies = @()
 $Parameters = @('LogNames?', 'LastMinutes?', 'StartTime?', 'EndTime?')
 $Tags = @('event-logs', 'forensics')

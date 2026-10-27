@@ -1,5 +1,5 @@
 NAME='Accounts - Remove Sudoers File'
-DESCRIPTION='Removes one file from /etc/sudoers.d (moved to /var/quarantine-kookaburrow) and checks that the sudoers configuration is still valid with visudo. SUDOERS_FILE is the file name only. Attackers add a file here to give an account passwordless root. The file content is reported first. The main /etc/sudoers file is never touched.'
+DESCRIPTION='Removes one file from /etc/sudoers.d (moved to /var/quarantine-kookaburrow) and checks that the sudoers configuration is still valid with visudo.'
 DEPENDENCIES=()
 PARAMETERS=(SUDOERS_FILE)
 TAGS=(accounts privilege-escalation persistence remediation)

@@ -1,5 +1,5 @@
 $Name = 'Persistence - Office Startup'
-$Description = 'Microsoft Office persistence: files in the Word STARTUP and Excel XLSTART folders, the global Normal.dotm template, registered add-ins and the Trusted Locations list (a path trusted for macros). Macro-enabled templates and add-ins run code every time Office starts.'
+$Description = 'Microsoft Office persistence.'
 $Dependencies = @()
 $Tags = @('persistence', 'execution', 'office')
 

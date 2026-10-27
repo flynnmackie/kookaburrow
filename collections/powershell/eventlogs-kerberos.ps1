@@ -1,5 +1,5 @@
 $Name = 'Event Logs - Kerberos'
-$Description = 'Kerberos and NTLM authentication on a domain controller: TGT requests (4768), service ticket requests (4769), pre-authentication failures (4771) and NTLM credential validation (4776), with account, service, client address, ticket encryption type and result. RC4 (0x17) service tickets for user accounts are the signature of Kerberoasting; many 4771 or 4776 failures from one address are password spraying. Run on domain controllers. Set LastMinutes for the last N minutes or StartTime and EndTime (yyyy-MM-dd HH:mm) for a range; default is 60 minutes.'
+$Description = 'Kerberos and NTLM authentication on a domain controller.'
 $Dependencies = @()
 $Parameters = @('LastMinutes?', 'StartTime?', 'EndTime?', 'UserContains?', 'MaxEvents?')
 $Tags = @('event-logs', 'accounts', 'lateral-movement', 'brute-force')

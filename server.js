@@ -914,6 +914,19 @@ const runSettings = require('./src/run-settings');
 app.get('/api/settings/runs', (req, res) => res.json({ settings: runSettings.settings(), defaults: runSettings.DEFAULTS, limits: runSettings.LIMITS, server: runSettings.serverInfo() }));
 app.put('/api/settings/runs', wrap((req, res) => { runSettings.setSettings(req.body || {}); res.json({ settings: runSettings.settings() }); }));
 
+// ---- Workflows (Burrow > Workflow): skeleton, see src/workflows.js ----
+const workflows = require('./src/workflows');
+app.get('/api/workflows', (req, res) => res.json({ workflows: workflows.list() }));
+app.post('/api/workflows', wrap((req, res) => res.status(201).json(workflows.create({ ...(req.body || {}), createdBy: req.user }))));
+app.delete('/api/workflows/:id', wrap((req, res) => { workflows.remove(req.params.id); res.json({ ok: true }); }));
+
+// ---- Elastic: forward hunt rows to Elasticsearch (Settings > System > Elastic) ----
+const elastic = require('./src/elastic');
+app.get('/api/settings/elastic', (req, res) => res.json({ settings: elastic.settings(), status: elastic.status() }));
+app.put('/api/settings/elastic', wrap((req, res) => { elastic.setSettings(req.body || {}); res.json({ settings: elastic.settings(), status: elastic.status() }); }));
+app.post('/api/settings/elastic/test', wrap(async (req, res) => res.json(await elastic.test(req.body || {}))));
+app.post('/api/settings/elastic/forward', wrap((req, res) => res.json(elastic.forwardRun(String((req.body || {}).runId || '')))));
+
 // ---- Server Settings: the address and port the server listens on and who may connect (Settings > System > Server Settings) ----
 // Saving restarts the server. This PC (localhost) is always allowed and always listened on.
 const reqCtx = (req) => ({ clientAddr: req.socket.remoteAddress, hostHeader: req.headers.host });
@@ -1051,6 +1064,8 @@ async function startListening() {
 // Saving Server Settings restarts the server: stop listening, start a fresh copy of this process (detached) and exit.
 serverSettings.onRestart(() => setTimeout(() => {
   for (const s of servers) { try { s.close(); s.closeAllConnections?.(); } catch { /* going down anyway */ } }
+  // run as a Windows service, the service wrapper starts the new copy when this one exits
+  if (process.env.KB_SERVICE) return setTimeout(() => process.exit(0), 300);
   const child = require('child_process').spawn(process.execPath, [...process.execArgv, ...process.argv.slice(1)], { detached: true, stdio: 'ignore', windowsHide: true, cwd: process.cwd(), env: process.env });
   child.unref();
   setTimeout(() => process.exit(0), 300);

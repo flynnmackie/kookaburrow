@@ -1,5 +1,5 @@
 NAME='Files - SUID and SGID'
-DESCRIPTION='Finds files with the setuid or setgid bit on the main filesystem and separately lists those outside the standard system directories. Unexpected SUID binaries are a common privilege escalation and persistence trick.'
+DESCRIPTION='Finds files with the setuid or setgid bit on the main filesystem and separately lists those outside the standard system directories.'
 DEPENDENCIES=()
 TAGS=(privilege-escalation persistence filesystem)
 

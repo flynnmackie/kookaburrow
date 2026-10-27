@@ -1,5 +1,5 @@
 NAME='Files - Quarantine'
-DESCRIPTION='Moves a file into /var/quarantine-kookaburrow with permissions removed, recording its SHA-256 first. The original is not deleted.'
+DESCRIPTION='Moves a file into /var/quarantine-kookaburrow with permissions removed, recording its SHA-256 first.'
 DEPENDENCIES=()
 PARAMETERS=(FILE_PATH)
 TAGS=(filesystem malware containment)

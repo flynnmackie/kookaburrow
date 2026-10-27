@@ -1,5 +1,5 @@
 $Name = 'WMI - Collect Repository'
-$Description = 'Copies the WMI repository (OBJECTS.DATA, INDEX.BTR and the mapping files from C:\Windows\System32\wbem\Repository). Permanent event subscriptions, which attackers use for fileless persistence, live in OBJECTS.DATA and can be extracted offline with PyWMIPersistenceFinder or strings. The files are copied from a volume shadow. Needs administrator rights. Comes back over SMB, which is switched on for this collection only.'
+$Description = 'Copies the WMI repository (OBJECTS.DATA, INDEX.BTR and the mapping files from C:\Windows\System32\wbem\Repository). Needs administrator rights.'
 $Dependencies = @()
 $Tags = @('wmi', 'persistence', 'forensics')
 $Footprint = 'transient'

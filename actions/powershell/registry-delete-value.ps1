@@ -1,5 +1,5 @@
 $Name = 'Registry - Delete Value'
-$Description = 'Deletes one registry value. The key is exported to C:\ProgramData\Kookaburrow\Quarantine as a .reg file first so the value can be restored. KeyPath is the PowerShell path (for example HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run); ValueName is the value to remove.'
+$Description = 'Deletes one registry value.'
 $Dependencies = @()
 $Parameters = @('KeyPath', 'ValueName')
 $Tags = @('registry', 'persistence', 'remediation')

@@ -1,5 +1,5 @@
 $Name = 'Security - Enable LSA Protection'
-$Description = 'Turns on LSA protection (RunAsPPL), which makes lsass.exe a protected process so credential dumping tools cannot read its memory without a signed driver. Takes effect after the next restart. Security software that injects into lsass must support protected processes, so test before wide use.'
+$Description = 'Turns on LSA protection (RunAsPPL), which makes lsass.exe a protected process so credential dumping tools cannot read its memory without a signed driver.'
 $Dependencies = @()
 $Tags = @('hardening', 'defense-evasion', 'privilege-escalation')
 

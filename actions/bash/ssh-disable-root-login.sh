@@ -1,5 +1,5 @@
 NAME='SSH - Disable Root Login'
-DESCRIPTION='Stops root logging in over SSH by adding a drop-in configuration file (/etc/ssh/sshd_config.d/99-kookaburrow-root.conf with PermitRootLogin no), checking the configuration with sshd -t and reloading the SSH service. Make sure you can still get in with another account first. Remove it with SSH - Remove Overrides.'
+DESCRIPTION='Stops root logging in over SSH by adding a drop-in configuration file.'
 DEPENDENCIES=()
 TAGS=(ssh hardening containment)
 

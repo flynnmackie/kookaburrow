@@ -1,5 +1,5 @@
 NAME='Kernel - Unload Module'
-DESCRIPTION='Unloads a kernel module (rmmod) and optionally stops it loading again by adding it to a modprobe blacklist (BLACKLIST set to yes, in /etc/modprobe.d/kookaburrow-blacklist.conf). Use it to remove a rootkit or a module you do not want, such as usb-storage. Fails if the module is in use.'
+DESCRIPTION='Unloads a kernel module (rmmod) and optionally stops it loading again by adding it to a modprobe blacklist (BLACKLIST set to yes, in /etc/modprobe.d/kookaburrow-blacklist.conf).'
 DEPENDENCIES=()
 PARAMETERS=(MODULE_NAME BLACKLIST?)
 TAGS=(kernel containment remediation)

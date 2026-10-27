@@ -1,5 +1,5 @@
 $Name = 'Accounts - Reset Password'
-$Description = 'Sets a new password on a local account. Use it to lock out an attacker who knows the old password, or to recover an account. The new password is used for this run only and is never stored or logged. Does not change domain accounts.'
+$Description = 'Sets a new password on a local account.'
 $Dependencies = @()
 $Parameters = @('UserName', 'NewPassword')
 $Tags = @('accounts', 'remediation', 'containment')

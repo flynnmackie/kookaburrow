@@ -1,5 +1,5 @@
 $Name = 'Network - Interfaces'
-$Description = 'Network adapters with MAC, link state, IP addresses, gateways and DNS servers, plus the routing table. Shows unexpected adapters (VPN, tunnels, virtual) and rogue DNS or gateway settings (like Windows.Network.InterfaceAddresses).'
+$Description = 'Network adapters with MAC, link state, IP addresses, gateways and DNS servers, plus the routing table.'
 $Dependencies = @()
 $Tags = @('network', 'inventory')
 

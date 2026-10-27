@@ -1,5 +1,5 @@
 NAME='Kernel - eBPF Programs'
-DESCRIPTION='eBPF programs, maps and attachments loaded into the kernel (bpftool), pinned objects under /sys/fs/bpf, and kprobe and uprobe tracing events. Modern Linux rootkits and some security tools use eBPF to hide processes, files and connections or to capture traffic. Compare against what your security tooling is expected to load. Needs bpftool for detail, and root or passwordless sudo.'
+DESCRIPTION='eBPF programs, maps and attachments loaded into the kernel (bpftool), pinned objects under /sys/fs/bpf, and kprobe and uprobe tracing events. Needs root or passwordless sudo.'
 DEPENDENCIES=()
 TAGS=(rootkit kernel malware defense-evasion)
 

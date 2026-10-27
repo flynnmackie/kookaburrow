@@ -1,5 +1,5 @@
 NAME='Files - Temp Directories'
-DESCRIPTION='Finds executable files, scripts and hidden entries in /tmp, /var/tmp and /dev/shm, plus world-writable directories elsewhere without the sticky bit. Attackers stage tools in these world-writable locations.'
+DESCRIPTION='Finds executable files, scripts and hidden entries in /tmp, /var/tmp and /dev/shm, plus world-writable directories elsewhere without the sticky bit.'
 DEPENDENCIES=()
 TAGS=(malware filesystem execution)
 

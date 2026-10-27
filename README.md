@@ -2,7 +2,26 @@
 
 Threat hunting platform: scan a subnet, verify and save hosts over WinRM/SSH, run PowerShell collections against one host or a list, and keep the output.
 
-## Run
+## Install (Windows, offline)
+
+Download `Kookaburrow-<version>-x64.msi` from Releases and run it as an administrator. It bundles Node.js, the app and the WinRM engine, so no internet is needed. Windows 10 / Server 2016 or later, 64-bit.
+
+- **Quickstart**: this PC only, http://127.0.0.1:46200; you only create the admin account.
+- **Custom**: listening address, port (default 46200) and allowed computers, then the admin account. Inputs are checked and the firewall port is opened.
+- Runs as the auto-start service **Kookaburrow** (LocalSystem). Programs: `C:Program FilesKookaburrow`. Data (database, keys, results, tools): `C:ProgramDataKookaburrow`, kept on upgrade and uninstall.
+- Reinstalling over existing data keeps its users and settings. Log: `dataserver.log`.
+- Change the address or port later in Settings > System > Server Settings (add a firewall rule yourself for a new port).
+
+Silent install:
+
+```powershell
+msiexec /i Kookaburrow-1.0.0-x64.msi /qn ADMINLOGIN=admin ADMINPASS=...
+msiexec /i Kookaburrow-1.0.0-x64.msi /qn SETUPMODE=custom LISTENIP=0.0.0.0 PORT=46200 ALLOWFROM=10.0.0.0/24 ADMINLOGIN=admin ADMINPASS=...
+```
+
+Build it with `node scripts/build-msi.js` (downloads WiX once; output in `build/`). Pushing a tag like `v1.0.0` builds and attaches it to a release via GitHub Actions.
+
+## Run from source
 
 Requires Node.js 20+ on Windows.
 
@@ -11,7 +30,17 @@ npm install
 npm start        # http://127.0.0.1:46200
 ```
 
-Env vars: `KB_HOST` (default 127.0.0.1), `KB_PORT` (default 46200). These are only the starting values: Settings > System > Server Settings sets the listen address, the port and which other addresses may connect (this PC is always allowed), checks the values for mistakes, and restarts the server when saved. Settings > System > Certificate turns on HTTPS: it generates a private CA and a server certificate for the names you list (using the bundled Python), serves the CA for download so other machines can trust it, and redirects plain HTTP from other machines to HTTPS; this PC always keeps plain HTTP so a certificate problem cannot lock you out. If the saved settings cannot be used at start-up (port taken, address gone) the server falls back to localhost and says why on that page.
+Env vars: `KB_HOST` (default 127.0.0.1), `KB_PORT` (default 46200), `KB_HOME` (where data is kept). Saved Server Settings and Certificate (HTTPS) settings override the host and port; localhost is always allowed.
+
+## Elastic
+
+Settings > System > Elastic forwards hunt rows to Elasticsearch (7/8, and SOF-ELK via its port 9200).
+
+- One document per CSV row, sent with the bulk API as results arrive. Index: `<prefix>-<collection>` (data view `<prefix>-*`).
+- Fields: `@timestamp`, `host.name`, `host.ip`, `event.dataset`, `kookaburrow.{run_id, hunt, run_by, collection}` (`run_by` = who started the hunt, so users can filter to their own) and the CSV columns under `kookaburrow.data.*` (as text).
+- Sign-in: none, API key or user and password (stored encrypted). Needs `create_index`, `index` and `auto_configure` on `<prefix>-*`. **Test connection** checks reachability, sign-in and privileges.
+- "Send a past hunt" resends a finished hunt; ids are fixed, so resending replaces rather than duplicates. Failed batches are retried; counts show per hunt and on the page.
+- Off by default. Hunts only for now.
 
 ## Flow
 

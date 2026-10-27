@@ -1,5 +1,5 @@
 $Name = 'Files - Downloaded (MOTW)'
-$Description = 'Files with a Mark of the Web (the Zone.Identifier alternate data stream) in user Downloads, Desktop, Documents and Temp folders, showing the zone, the URL it was downloaded from and the referring page. Tells you where a file came from and when it arrived. Set Days to limit to files changed in the last N days (default 30).'
+$Description = 'Files with a Mark of the Web (the Zone.Identifier alternate data stream) in user Downloads, Desktop, Documents and Temp folders, showing the zone, the URL it was downloaded from and the referring page.'
 $Dependencies = @()
 $Parameters = @('Days?')
 $Tags = @('filesystem', 'forensics', 'execution', 'malware')

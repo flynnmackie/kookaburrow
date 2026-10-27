@@ -1,5 +1,5 @@
 $Name = 'Event Logs - WMI Activity'
-$Description = 'WMI activity events: operations started (5857), permanent event subscriptions registered (5860, 5861) and errors (5858). Permanent subscriptions and remote WMI execution (wmic, Invoke-WmiMethod) are common persistence and lateral movement. Set LastMinutes for the last N minutes or StartTime and EndTime (yyyy-MM-dd HH:mm) for a range; default is 24 hours.'
+$Description = 'WMI activity events: operations started (5857), permanent event subscriptions registered (5860, 5861) and errors (5858).'
 $Dependencies = @()
 $Parameters = @('LastMinutes?', 'StartTime?', 'EndTime?', 'Contains?', 'MaxEvents?')
 $Tags = @('event-logs', 'wmi', 'persistence', 'lateral-movement')

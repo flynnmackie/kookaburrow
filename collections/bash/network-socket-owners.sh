@@ -1,5 +1,5 @@
 NAME='Network - Socket Owners'
-DESCRIPTION='Every open network socket with the process that owns it: listening and established TCP and UDP, local and remote address, state, PID, command and the executable path. CONTAINS limits to lines containing that text (an address, a port or a program name). Shows which program is talking to which remote address. Needs root, or an account with passwordless sudo, to see other users processes.'
+DESCRIPTION='Every open network socket with the process that owns it. Needs root or passwordless sudo.'
 DEPENDENCIES=()
 PARAMETERS=(CONTAINS?)
 TAGS=(network processes c2)

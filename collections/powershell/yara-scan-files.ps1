@@ -1,5 +1,5 @@
 $Name = 'Yara - Scan Files'
-$Description = 'Scans files in a folder with YARA rules and returns the files that match and which rule matched. ScanPath is a file or folder (set Recurse to no for just that folder). The rules come from the kb-rules.yar file you upload under Settings, Binaries (any YARA rules text), and the yara64.exe single-file binary must be uploaded there too. Use it to sweep many hosts for a family or an indicator.'
+$Description = 'Scans files in a folder with YARA rules and returns the files that match and which rule matched.'
 $Dependencies = @('yara64.exe', 'kb-rules.yar')
 $Parameters = @('ScanPath', 'Recurse?')
 $Tags = @('malware', 'filesystem', 'forensics')

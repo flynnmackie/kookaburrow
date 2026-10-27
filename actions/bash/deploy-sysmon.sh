@@ -1,5 +1,5 @@
 NAME='Deploy - Sysmon (Linux)'
-DESCRIPTION='Installs Sysmon for Linux on a Debian or Ubuntu host: the SysinternalsEBPF package and the Sysmon package are installed with dpkg, then Sysmon is started with your configuration file (sysmon -accepteula -i config). The files are copied to a temporary folder that is removed afterwards. The configuration is checked to be well-formed XML first when xmllint is available. Nothing is changed if Sysmon is already installed. Needs sysinternalsebpf.deb, sysmonforlinux.deb and sysmon-linux-config.xml uploaded under Settings, Binaries, and root or passwordless sudo. Sysmon stays installed and keeps running.'
+DESCRIPTION='Installs Sysmon for Linux on a Debian or Ubuntu host. Needs root or passwordless sudo.'
 DEPENDENCIES=(sysinternalsebpf.deb sysmonforlinux.deb sysmon-linux-config.xml)
 PARAMETERS=()
 TAGS=(deploy sysmon logging persistence)

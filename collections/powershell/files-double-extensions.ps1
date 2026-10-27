@@ -1,5 +1,5 @@
 $Name = 'Files - Disguised Executables'
-$Description = 'Looks in user folders for files that pretend to be something else: double extensions (invoice.pdf.exe), executables with document or image names, names using a right-to-left override character, and executable content (MZ header) in files with a harmless extension. SearchPath defaults to C:\Users.'
+$Description = 'Looks in user folders for files that pretend to be something else.'
 $Dependencies = @()
 $Parameters = @('SearchPath?')
 $Tags = @('filesystem', 'malware', 'defense-evasion', 'execution')

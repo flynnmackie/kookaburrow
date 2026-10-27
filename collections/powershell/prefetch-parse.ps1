@@ -1,5 +1,5 @@
 $Name = 'Prefetch - Parse'
-$Description = 'Parses Windows Prefetch files natively (no tools needed, like PECmd): executable name, path hash, run count, the last eight run times, volume serial numbers and creation times, and the number of files and folders referenced. Handles Windows 8 to 11 compressed (MAM) and uncompressed formats. IncludeFiles set to yes adds the list of files each program loaded (long). ExeContains keeps only prefetch entries whose executable name contains that text. Prefetch is usually disabled on servers. Needs administrator rights.'
+$Description = 'Parses Windows Prefetch files natively (no tools needed, like PECmd). Needs administrator rights.'
 $Dependencies = @()
 $Parameters = @('ExeContains?', 'IncludeFiles?')
 $Tags = @('execution', 'forensics', 'prefetch')

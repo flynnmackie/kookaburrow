@@ -1,5 +1,5 @@
 $Name = 'Persistence - Startup Items'
-$Description = 'Programs that start at logon from the Startup folders (all users and each profile) and the legacy Win32_StartupCommand list, with file hashes. Dropping a file or shortcut in a Startup folder is the simplest persistence.'
+$Description = 'Programs that start at logon from the Startup folders (all users and each profile) and the legacy Win32_StartupCommand list, with file hashes.'
 $Dependencies = @()
 $Tags = @('persistence', 'autoruns')
 

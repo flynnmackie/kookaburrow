@@ -1,14 +1,14 @@
 // ---- Burrow: Recurring ----
-// Two areas, recurring hunts and recurring responses. Each schedule is a dropdown: the header shows how many times it has run, when it
+// One list with a toggle for recurring hunts, actions (responses) and workflows. Each schedule is a dropdown: the header shows how many times it has run, when it
 // last ran and a live countdown to the next run; open it for the details. Pause holds it (Resume starts the cycle again); Delete stops it
 // for good (the runs it already made are kept).
 // Shares helpers with app.js: api, esc, $, toast, isActive.
-const rc = { list: [], skew: 0, open: new Set() };
+const rc = { list: [], skew: 0, open: new Set(), kind: 'hunt' };
 let rcPoll;
 
 async function loadRecurring() {
   let r;
-  try { r = await api('GET', '/api/schedules'); } catch (e) { $('rcHunts').innerHTML = `<p class="bad">${esc(e.message)}</p>`; $('rcResps').innerHTML = ''; return; }
+  try { r = await api('GET', '/api/schedules'); } catch (e) { $('rcList').innerHTML = `<p class="bad">${esc(e.message)}</p>`; return; }
   rc.skew = Date.parse(r.now) - Date.now(); // the server's clock decides when a run is due
   rc.list = r.schedules;
   renderRecurring();
@@ -44,11 +44,16 @@ function rcItem(s) {
       <span class="dim">${active && s.nextRun ? `Next run in <b data-next="${esc(s.nextRun)}">${esc(rcCountdown(s.nextRun))}</b>` : paused ? 'Paused: no runs until resumed' : 'No more runs'}</span>
       <span class="lg-btns">${s.status === 'finished' ? '' : `<a data-pause="${esc(s.id)}" data-paused="${paused ? '' : '1'}" data-perm="${s.kind === 'hunt' ? 'hunts.run' : 'actions.run'}" data-perm-what="pause recurring ${s.kind === 'hunt' ? 'hunts' : 'responses'}" title="${paused ? 'Resume: the next run is one interval from now' : 'Pause: nothing runs until you resume it'}">${paused ? 'Resume' : 'Pause'}</a>`}<a data-del="${esc(s.id)}" data-stop="1" class="bad" data-perm="${s.kind === 'hunt' ? 'hunts.run' : 'actions.run'}" data-perm-what="delete recurring ${s.kind === 'hunt' ? 'hunts' : 'responses'}" title="Stop and delete this recurring ${s.kind === 'hunt' ? 'hunt' : 'response'}">Delete</a></span></div>${body}</div>`;
 }
+const RC_NONE = {
+  hunt: 'No recurring hunts. Turn on Recurring in the New Hunt dialog to make one.',
+  response: 'No recurring actions. Turn on Recurring in the New Response dialog to make one.',
+  workflow: 'No recurring workflows. Scheduling workflows is not available yet.',
+};
 function renderRecurring() {
-  const area = (kind, none) => rc.list.filter((s) => s.kind === kind).map(rcItem).join('') || `<p class="dim" style="margin:0">${none}</p>`;
-  $('rcHunts').innerHTML = area('hunt', 'No recurring hunts. Turn on Recurring in the New Hunt dialog to make one.');
-  $('rcResps').innerHTML = area('response', 'No recurring responses. Turn on Recurring in the New Response dialog to make one.');
+  document.querySelectorAll('#rcKind button').forEach((b) => b.classList.toggle('on', b.dataset.kind === rc.kind));
+  $('rcList').innerHTML = rc.list.filter((s) => s.kind === rc.kind).map(rcItem).join('') || `<p class="dim" style="margin:0">${RC_NONE[rc.kind]}</p>`;
 }
+$('rcKind').onclick = (e) => { const b = e.target.closest('button[data-kind]'); if (b) { rc.kind = b.dataset.kind; renderRecurring(); } };
 const rcClick = async (e) => {
   const pz = e.target.closest('[data-pause]');
   if (pz) {
@@ -67,8 +72,8 @@ const rcClick = async (e) => {
   if (rc.open.has(id)) rc.open.delete(id); else rc.open.add(id);
   renderRecurring();
 };
-$('rcHunts').onclick = $('rcResps').onclick = rcClick;
-$('rcHunts').onkeydown = $('rcResps').onkeydown = (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-toggle]')) { e.preventDefault(); e.target.click(); } };
+$('rcList').onclick = rcClick;
+$('rcList').onkeydown = (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-toggle]')) { e.preventDefault(); e.target.click(); } };
 // the countdowns tick every second without redrawing the page
 setInterval(() => {
   if (!isActive('burrow/recurring')) return;

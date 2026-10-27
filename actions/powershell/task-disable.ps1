@@ -1,5 +1,5 @@
 $Name = 'Tasks - Disable'
-$Description = 'Disables a scheduled task so it no longer runs, without deleting it (reversible). TaskName is the task name; TaskPath is the folder, for example \Microsoft\Windows\Foo\ (default the root folder). Use Tasks - List to find the exact name and path.'
+$Description = 'Disables a scheduled task so it no longer runs, without deleting it (reversible).'
 $Dependencies = @()
 $Parameters = @('TaskName', 'TaskPath?')
 $Tags = @('persistence', 'scheduled-tasks', 'containment')

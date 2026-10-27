@@ -1,5 +1,5 @@
 $Name = 'Files - Shadow Copies'
-$Description = 'Volume shadow copies on the host with creation time, volume and device path. Attackers delete shadow copies before ransomware; an unexpected empty list on a server that normally has them, or a very recent single copy, matters. Existing copies are also a source of older file versions.'
+$Description = 'Volume shadow copies on the host with creation time, volume and device path.'
 $Dependencies = @()
 $Tags = @('filesystem', 'forensics', 'defense-evasion')
 

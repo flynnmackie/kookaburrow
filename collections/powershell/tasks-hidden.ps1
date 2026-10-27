@@ -1,5 +1,5 @@
 $Name = 'Tasks - Hidden'
-$Description = 'Finds scheduled tasks that are hidden from the Task Scheduler: tasks registered in the TaskCache registry whose definition file is missing, tasks with no security descriptor (a known way to hide a task from schtasks and the console), and task files that are not in the registry. Hidden tasks are a stealthy persistence technique. Needs administrator rights.'
+$Description = 'Finds scheduled tasks that are hidden from the Task Scheduler. Needs administrator rights.'
 $Dependencies = @()
 $Tags = @('persistence', 'scheduled-tasks', 'defense-evasion')
 

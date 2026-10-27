@@ -1,5 +1,5 @@
 $Name = 'Sysmon - Events'
-$Description = 'Events from the Sysmon log, if Sysmon is installed: process create (1), network connection (3), image loaded (7), process access (10), file create (11), registry (12 to 14), DNS query (22) and more. EventIds limits to the IDs you list (for example 1,3,22), Contains to text anywhere in the event. Set LastMinutes for the last N minutes or StartTime and EndTime (yyyy-MM-dd HH:mm) for a range; default is 60 minutes because Sysmon is busy.'
+$Description = 'Events from the Sysmon log, if Sysmon is installed.'
 $Dependencies = @()
 $Parameters = @('EventIds?', 'Contains?', 'LastMinutes?', 'StartTime?', 'EndTime?', 'MaxEvents?')
 $Tags = @('event-logs', 'sysmon', 'forensics', 'execution')

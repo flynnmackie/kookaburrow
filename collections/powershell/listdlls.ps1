@@ -1,5 +1,5 @@
 $Name = 'Processes - Loaded DLLs'
-$Description = 'DLLs loaded in each running process (base address, size, version and path), from Sysinternals ListDLLs. ProcessName limits to one process (name or PID). Injected or side-loaded DLLs from user folders or without a version stand out. Needs the listdlls64.exe single-file binary uploaded under Settings, Binaries. Needs administrator rights.'
+$Description = 'DLLs loaded in each running process (base address, size, version and path), from Sysinternals ListDLLs. Needs administrator rights.'
 $Dependencies = @('listdlls64.exe')
 $Parameters = @('ProcessName?')
 $Tags = @('processes', 'malware', 'defense-evasion')

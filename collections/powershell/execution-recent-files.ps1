@@ -1,5 +1,5 @@
 $Name = 'Execution - Recent Files'
-$Description = 'Shortcut (.lnk) files in every profile Recent folder: what each points to, its arguments, when the shortcut was created and last modified (roughly first and last time the file was opened) and the target size. Shows files a user opened, including on removable and network drives. Optional Days limits to shortcuts changed in the last N days (like Windows.Forensics.Lnk).'
+$Description = 'Shortcut (.lnk) files in every profile Recent folder.'
 $Dependencies = @()
 $Parameters = @('Days?')
 $Tags = @('execution', 'forensics', 'filesystem')

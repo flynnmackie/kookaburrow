@@ -1,5 +1,5 @@
 NAME='Systemd - Persistence'
-DESCRIPTION='Lists enabled services, systemd unit files created or changed in the last 30 days, timers, user-level units and legacy startup scripts (rc.local, init.d). New units are a common way to keep access on Linux.'
+DESCRIPTION='Lists enabled services, systemd unit files created or changed in the last 30 days, timers, user-level units and legacy startup scripts (rc.local, init.d).'
 DEPENDENCIES=()
 TAGS=(persistence systemd services)
 

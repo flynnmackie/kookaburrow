@@ -1,5 +1,5 @@
 NAME='System - Security Settings'
-DESCRIPTION='Security-relevant configuration in one place: kernel hardening sysctls (ASLR, ptrace scope, kptr and dmesg restrictions, core dumps), SELinux and AppArmor state, SSH daemon root and password login settings, sudo timestamp, umask defaults and password policy. Shows weakened or unusual settings.'
+DESCRIPTION='Security-relevant configuration in one place.'
 DEPENDENCIES=()
 TAGS=(inventory defense-evasion)
 

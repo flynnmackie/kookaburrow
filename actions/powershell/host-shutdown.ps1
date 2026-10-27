@@ -1,5 +1,5 @@
 $Name = 'Host - Shutdown'
-$Description = 'Powers the host off, optionally after DelaySeconds (default 30) with a message shown to logged-on users. The host will not come back until someone starts it, so use it only when you must stop a compromised machine, and collect volatile evidence first.'
+$Description = 'Powers the host off, optionally after DelaySeconds (default 30) with a message shown to logged-on users.'
 $Dependencies = @()
 $Parameters = @('DelaySeconds?', 'Message?')
 $Tags = @('containment', 'host')

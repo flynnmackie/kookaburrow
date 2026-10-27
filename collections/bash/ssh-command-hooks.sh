@@ -1,5 +1,5 @@
 NAME='SSH - Command Hooks'
-DESCRIPTION='SSH features that run commands, used for backdoors and persistence: AuthorizedKeysCommand, ForceCommand and Match blocks in the SSH daemon configuration, command= and other options on authorized_keys entries (a key forced to run a command, or allowed port forwarding), per-user ~/.ssh/rc and /etc/ssh/sshrc scripts that run at every login, and ProxyCommand and LocalCommand in client configs. Needs root, or an account with passwordless sudo, to read other homes.'
+DESCRIPTION='SSH features that run commands, used for backdoors and persistence. Needs root or passwordless sudo.'
 DEPENDENCIES=()
 TAGS=(ssh persistence privilege-escalation)
 

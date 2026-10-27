@@ -1,5 +1,5 @@
 $Name = 'Files - Writable Program Folders'
-$Description = 'Folders that ordinary users can write to inside a program location, found with Sysinternals AccessChk. A user-writable folder in a service or scheduled task path allows DLL planting and binary replacement for privilege escalation. ScanPath defaults to C:\Program Files. Needs the accesschk64.exe single-file binary uploaded under Settings, Binaries.'
+$Description = 'Folders that ordinary users can write to inside a program location, found with Sysinternals AccessChk.'
 $Dependencies = @('accesschk64.exe')
 $Parameters = @('ScanPath?')
 $Tags = @('privilege-escalation', 'filesystem', 'persistence')

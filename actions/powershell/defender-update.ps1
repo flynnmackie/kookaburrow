@@ -1,5 +1,5 @@
 $Name = 'Defender - Update Signatures'
-$Description = 'Updates Microsoft Defender antimalware signatures now and reports the signature version before and after. Run it before a scan so new detections are available.'
+$Description = 'Updates Microsoft Defender antimalware signatures now and reports the signature version before and after.'
 $Dependencies = @()
 $Tags = @('antivirus', 'recovery')
 

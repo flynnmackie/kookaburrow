@@ -1,5 +1,5 @@
 $Name = 'Software - Installed'
-$Description = 'Installed programs from the machine-wide and per-user Uninstall keys (64-bit and 32-bit), with version, publisher, install date and location. Look for remote access tools, packers and anything installed around the time of an incident (like Windows.Sys.Programs).'
+$Description = 'Installed programs from the machine-wide and per-user Uninstall keys (64-bit and 32-bit), with version, publisher, install date and location.'
 $Dependencies = @()
 $Tags = @('inventory', 'software', 'execution')
 

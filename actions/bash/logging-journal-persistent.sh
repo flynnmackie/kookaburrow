@@ -1,5 +1,5 @@
 NAME='Logging - Make Journal Persistent'
-DESCRIPTION='Makes the systemd journal survive reboots by creating /var/log/journal and restarting journald, so logs are no longer lost when the host restarts (many distributions keep the journal in memory only). Useful as early incident readiness because an attacker reboot otherwise wipes recent logs.'
+DESCRIPTION='Makes the systemd journal survive reboots by creating /var/log/journal and restarting journald, so logs are no longer lost when the host restarts.'
 DEPENDENCIES=()
 TAGS=(hardening event-logs)
 

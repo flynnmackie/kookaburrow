@@ -1,5 +1,5 @@
 NAME='Kernel - Modules and Preload'
-DESCRIPTION='Checks for rootkit style persistence: loaded kernel modules, the kernel taint flag, /etc/ld.so.preload and LD_PRELOAD set in running processes. Preloaded libraries and unknown modules can hide files, processes and connections.'
+DESCRIPTION='Checks for rootkit style persistence: loaded kernel modules, the kernel taint flag, /etc/ld.so.preload and LD_PRELOAD set in running processes.'
 DEPENDENCIES=()
 TAGS=(persistence rootkit defense-evasion)
 

@@ -1,5 +1,5 @@
 $Name = 'Logging - Enable Process Auditing'
-$Description = 'Turns on process creation auditing (Security event 4688) with the full command line in each event, and logon auditing, so program execution and logons are recorded from now on. Needed before Event Logs - Process Creation shows anything useful.'
+$Description = 'Turns on process creation auditing (Security event 4688) with the full command line in each event, and logon auditing, so program execution and logons are recorded from now on.'
 $Dependencies = @()
 $Tags = @('hardening', 'event-logs', 'execution')
 

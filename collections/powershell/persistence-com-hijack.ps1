@@ -1,5 +1,5 @@
 $Name = 'Persistence - COM Hijacks'
-$Description = 'Per-user COM class registrations (HKCU Software\Classes\CLSID) that point at a DLL or EXE. A user-level InprocServer32 or LocalServer32 overrides the machine one without admin rights, so it is a favourite stealth persistence method. Any entry here is worth checking; legitimate ones are rare. Offline user hives are loaded for the run (like Windows.Persistence.* COM artifacts).'
+$Description = 'Per-user COM class registrations (HKCU Software\Classes\CLSID) that point at a DLL or EXE.'
 $Dependencies = @()
 $Tags = @('persistence', 'defense-evasion', 'registry')
 

@@ -1,5 +1,5 @@
 NAME='Files - World Writable'
-DESCRIPTION='Files and folders that any user can write to (excluding sticky-bit temp folders and /proc, /sys and /dev). SEARCH_PATH defaults to /. Writable scripts run by root, writable systemd units and writable library folders are privilege escalation paths, and attackers drop payloads in writable places.'
+DESCRIPTION='Files and folders that any user can write to (excluding sticky-bit temp folders and /proc, /sys and /dev).'
 DEPENDENCIES=()
 PARAMETERS=(SEARCH_PATH?)
 TAGS=(filesystem privilege-escalation persistence)

@@ -1,5 +1,5 @@
 $Name = 'Security - Network Hardening'
-$Description = 'Name-resolution and protocol settings that enable relay and spoofing attacks: LLMNR, NetBIOS over TCP/IP per adapter, mDNS, WPAD auto-proxy, SMBv1, IPv6 router advertisements, Remote Desktop NLA, WinRM listeners and unencrypted traffic, and whether Windows Firewall is on for each profile. LLMNR and NetBIOS poisoning (Responder) is a leading way to capture credentials.'
+$Description = 'Name-resolution and protocol settings that enable relay and spoofing attacks.'
 $Dependencies = @()
 $Tags = @('inventory', 'network', 'lateral-movement', 'security')
 

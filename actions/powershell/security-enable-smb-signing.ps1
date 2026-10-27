@@ -1,5 +1,5 @@
 $Name = 'Security - Require SMB Signing'
-$Description = 'Requires SMB signing on both the SMB server and client of this host, which stops SMB relay attacks (NTLM relay to SMB). Connections from or to hosts that do not support signing will fail, so check older devices and appliances first.'
+$Description = 'Requires SMB signing on both the SMB server and client of this host, which stops SMB relay attacks (NTLM relay to SMB).'
 $Dependencies = @()
 $Tags = @('hardening', 'smb', 'lateral-movement')
 

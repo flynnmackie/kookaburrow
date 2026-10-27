@@ -28,6 +28,11 @@ const GROUPS = [
     P('hunts.run', 'Run hunts', 'Create and run hunts on hosts and delete hunt records.', ['hunts.view']),
     P('hunts.export', 'Export results', 'Export logs and collected data and download output files.', ['hunts.view']),
   ] },
+  { id: 'workflows', name: 'Workflows', permissions: [
+    P('workflows.view', 'View workflows', 'See the saved workflows and their results.'),
+    P('workflows.manage', 'Manage workflows', 'Create, edit and delete workflows.', ['workflows.view']),
+    P('workflows.run', 'Run workflows', 'Run a workflow on hosts.', ['workflows.view']),
+  ] },
   { id: 'shell', name: 'Shell', permissions: [
     P('shell.open', 'Open shells', 'Open an interactive shell on a host and run commands in it.'),
     P('shell.files', 'Transfer files', 'Send files to hosts and pull files from them through a shell.', ['shell.open']),

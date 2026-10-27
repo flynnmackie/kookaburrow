@@ -1,5 +1,5 @@
 NAME='Software - Remove Package'
-DESCRIPTION='Removes an installed package with the host package manager (apt, dnf, yum or zypper), non-interactively. PACKAGE_NAME is the exact package name shown by Packages - Installed. Use it to remove unwanted remote access tools, network scanners or packages an attacker installed. Refuses to remove anything that would also remove essential system packages (the package manager decides).'
+DESCRIPTION='Removes an installed package with the host package manager (apt, dnf, yum or zypper), non-interactively.'
 DEPENDENCIES=()
 PARAMETERS=(PACKAGE_NAME)
 TAGS=(software remediation)

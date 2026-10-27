@@ -1,5 +1,5 @@
 NAME='Files - Secrets Exposure'
-DESCRIPTION='Finds files that contain credentials or key material and lists only their paths, owner, permissions and what kind of secret matched, never the secret itself: private keys, AWS access keys, password and token assignments in configuration files, .netrc and .pgpass files and world-readable key files. SEARCH_PATH is a colon separated list (default /home:/root:/opt:/srv:/var/www:/etc). Shows what an attacker who lands on this host could steal. Needs root, or an account with passwordless sudo, to read other homes.'
+DESCRIPTION='Finds files that contain credentials or key material and lists only their paths, owner, permissions and what kind of secret matched, never the secret itself. Needs root or passwordless sudo.'
 DEPENDENCIES=()
 PARAMETERS=(SEARCH_PATH?)
 TAGS=(accounts privilege-escalation discovery filesystem)

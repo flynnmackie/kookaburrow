@@ -1,5 +1,5 @@
 $Name = 'Network - Packet Capture'
-$Description = 'Captures network traffic on the host for a short time using the built-in Windows pktmon tool and brings back a pcapng file for Wireshark. Seconds is the capture length (default 30, maximum 600). Port limits the capture to one TCP or UDP port (for example 443 or 53) and Address to one IP address; with neither, all traffic is captured. Needs Windows 10 version 2004 or later or Server 2022, and administrator rights. Comes back over SMB, which is switched on for this collection only.'
+$Description = 'Captures network traffic on the host for a short time using the built-in Windows pktmon tool and brings back a pcapng file for Wireshark. Needs administrator rights.'
 $Dependencies = @()
 $Parameters = @('Seconds?', 'Port?', 'Address?')
 $Tags = @('network', 'forensics', 'c2')

@@ -1,5 +1,5 @@
 NAME='Accounts - Password Status'
-DESCRIPTION='Password and account state for every account: locked, no password, password last changed, expiry, and whether the account has a login shell. Also flags any account other than root with UID 0 and accounts with an empty password field. Needs root, or an account with passwordless sudo, to read the shadow file.'
+DESCRIPTION='Password and account state for every account: locked, no password, password last changed, expiry, and whether the account has a login shell. Needs root or passwordless sudo.'
 DEPENDENCIES=()
 TAGS=(accounts privilege-escalation persistence)
 

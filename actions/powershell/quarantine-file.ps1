@@ -1,5 +1,5 @@
 $Name = 'Files - Quarantine'
-$Description = 'Moves a file into C:\ProgramData\Kookaburrow\Quarantine under a timestamped name, recording its SHA-256 first. The original is not deleted.'
+$Description = 'Moves a file into C:\ProgramData\Kookaburrow\Quarantine under a timestamped name, recording its SHA-256 first.'
 $Dependencies = @()
 $Parameters = @('FilePath')
 $Tags = @('filesystem', 'malware', 'containment')

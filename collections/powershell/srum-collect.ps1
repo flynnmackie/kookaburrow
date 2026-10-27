@@ -1,5 +1,5 @@
 $Name = 'SRUM - Collect'
-$Description = 'Copies the System Resource Usage Monitor database (SRUDB.dat) and the SOFTWARE hive it needs for parsing. SRUM records per-application CPU, network bytes sent and received and energy use for about 30 days, which is excellent evidence of what ran and how much data it moved (use SrumECmd or srum-dump offline). The database is copied from a volume shadow. Needs administrator rights. Comes back over SMB, which is switched on for this collection only.'
+$Description = 'Copies the System Resource Usage Monitor database (SRUDB.dat) and the SOFTWARE hive it needs for parsing. Needs administrator rights.'
 $Dependencies = @()
 $Tags = @('forensics', 'execution', 'network')
 $Footprint = 'transient'

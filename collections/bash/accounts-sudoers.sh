@@ -1,5 +1,5 @@
 NAME='Accounts - Sudoers'
-DESCRIPTION='Who can use sudo: the sudoers file and every file in sudoers.d (active lines only), members of the sudo, wheel, admin and root groups, and every NOPASSWD or ALL rule highlighted. A new sudoers entry or group membership is a standard privilege escalation and persistence step. Needs root, or an account with passwordless sudo.'
+DESCRIPTION='Who can use sudo: the sudoers file and every file in sudoers.d (active lines only), members of the sudo, wheel, admin and root groups, and every NOPASSWD or ALL rule highlighted. Needs root or passwordless sudo.'
 DEPENDENCIES=()
 TAGS=(accounts privilege-escalation persistence)
 

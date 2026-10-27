@@ -1,5 +1,5 @@
 $Name = 'Host - Release'
-$Description = 'Undoes Host - Isolate: removes the isolation allow rules, restores the firewall profile defaults and switches the saved allow rules back on, and cancels any automatic release. Safe to run when the host is not isolated.'
+$Description = 'Undoes Host - Isolate: removes the isolation allow rules, restores the firewall profile defaults and switches the saved allow rules back on, and cancels any automatic release.'
 $Dependencies = @()
 $Tags = @('containment', 'network', 'recovery')
 

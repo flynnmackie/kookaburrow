@@ -1,5 +1,5 @@
 NAME='Accounts - Kill Sessions'
-DESCRIPTION='Ends every login session and process of one account without locking it: terminates its logind sessions and kills its remaining processes. Use it to throw an attacker out of a compromised account; follow with Accounts - Lock User or a password reset to keep them out. Refuses root.'
+DESCRIPTION='Ends every login session and process of one account without locking it: terminates its logind sessions and kills its remaining processes.'
 DEPENDENCIES=()
 PARAMETERS=(USER_NAME)
 TAGS=(accounts containment)

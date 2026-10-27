@@ -1,5 +1,5 @@
 $Name = 'Files - Collect'
-$Description = 'Copies chosen files back to the server, keeping their folder structure. SourcePath is a file, a folder or a wildcard path (for example C:\Users\*\Downloads\*.zip). Recurse set to yes includes subfolders. MaxFileMB skips files bigger than that (default 200), and ModifiedDays only takes files changed in the last N days. Each file is hashed and the copy checked. Comes back over SMB, which is switched on for this collection only.'
+$Description = 'Copies chosen files back to the server, keeping their folder structure.'
 $Dependencies = @()
 $Parameters = @('SourcePath', 'Recurse?', 'MaxFileMB?', 'ModifiedDays?')
 $Tags = @('filesystem', 'forensics', 'malware')

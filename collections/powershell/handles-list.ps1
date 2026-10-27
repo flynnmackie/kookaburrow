@@ -1,5 +1,5 @@
 $Name = 'Processes - Open Handles'
-$Description = 'Open handles (files, registry keys, mutexes, pipes, events) for running processes, from Sysinternals Handle. ProcessName limits to one process; Contains keeps handles whose name contains that text (for example a file path, a mutex name or a pipe). Mutex names identify malware families, and an open handle shows which process has a file or key. Needs the handle64.exe single-file binary uploaded under Settings, Binaries. Needs administrator rights.'
+$Description = 'Open handles (files, registry keys, mutexes, pipes, events) for running processes, from Sysinternals Handle. Needs administrator rights.'
 $Dependencies = @('handle64.exe')
 $Parameters = @('ProcessName?', 'Contains?')
 $Tags = @('processes', 'forensics', 'malware')

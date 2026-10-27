@@ -1,5 +1,5 @@
 NAME='Logs - Search'
-DESCRIPTION='Searches log files for a text pattern (a regular expression, case insensitive). PATTERN is required. LOG_PATH defaults to /var/log; DAYS limits to log files changed in the last N days (default 14). MAX_LINES defaults to 2000. Compressed rotated logs (.gz) are searched too. Use it to find an IP address, an account, a command or a file name across every log on the host. Needs root, or an account with passwordless sudo, to read protected logs.'
+DESCRIPTION='Searches log files for a text pattern (a regular expression, case insensitive). Needs root or passwordless sudo.'
 DEPENDENCIES=()
 PARAMETERS=(PATTERN LOG_PATH? DAYS? MAX_LINES?)
 TAGS=(event-logs forensics)

@@ -1,5 +1,5 @@
 NAME='Cron - Remove Entry'
-DESCRIPTION='Removes every line of a user crontab that contains CRON_TEXT (part of the command), after saving a backup of the crontab to /var/quarantine-kookaburrow. The removed lines are reported. Use Cron - All Jobs to find the exact text.'
+DESCRIPTION='Removes every line of a user crontab that contains CRON_TEXT (part of the command), after saving a backup of the crontab to /var/quarantine-kookaburrow.'
 DEPENDENCIES=()
 PARAMETERS=(USER_NAME CRON_TEXT)
 TAGS=(persistence cron remediation)

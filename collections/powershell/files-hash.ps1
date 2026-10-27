@@ -1,5 +1,5 @@
 $Name = 'Files - Hash'
-$Description = 'Computes hashes (SHA-256 by default; MD5, SHA1, SHA384 or SHA512 with Algorithm) of one file or every file in a folder, with size and modified time. Use it to check a file against a known-bad list or to confirm a binary is the same on every host. TargetPath is required; set Recurse to yes to include subfolders.'
+$Description = 'Computes hashes (SHA-256 by default; MD5, SHA1, SHA384 or SHA512 with Algorithm) of one file or every file in a folder, with size and modified time.'
 $Dependencies = @()
 $Parameters = @('TargetPath', 'Algorithm?', 'Recurse?')
 $Tags = @('filesystem', 'forensics', 'malware')

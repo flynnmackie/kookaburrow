@@ -1,5 +1,5 @@
 $Name = 'PowerShell - Collect History'
-$Description = 'Copies each user PSReadLine history file (ConsoleHost_history.txt) and any PowerShell transcript files found in Documents and the common transcript locations, as raw evidence of commands typed and run. Comes back over SMB, which is switched on for this collection only.'
+$Description = 'Copies each user PSReadLine history file (ConsoleHost_history.txt) and any PowerShell transcript files found in Documents and the common transcript locations, as raw evidence of commands typed and run.'
 $Dependencies = @()
 $Tags = @('powershell', 'execution', 'history', 'forensics')
 $Footprint = 'transient'

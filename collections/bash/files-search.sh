@@ -1,5 +1,5 @@
 NAME='Files - Search'
-DESCRIPTION='Finds files under a folder by name pattern (wildcards, for example *.sh or id_rsa*), optionally only those changed in the last N days, with a size range, and with SHA-256 hashes. Returns modified time, size, owner, permissions and path. SEARCH_PATH is required. MAX_RESULTS defaults to 5000. Set HASH to yes to add hashes.'
+DESCRIPTION='Finds files under a folder by name pattern (wildcards, for example *.sh or id_rsa*), optionally only those changed in the last N days, with a size range, and with SHA-256 hashes.'
 DEPENDENCIES=()
 PARAMETERS=(SEARCH_PATH NAME_PATTERN? MODIFIED_DAYS? MIN_SIZE_KB? MAX_SIZE_KB? HASH? MAX_RESULTS?)
 TAGS=(filesystem forensics discovery)

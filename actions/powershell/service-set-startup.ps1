@@ -1,5 +1,5 @@
 $Name = 'Services - Set Startup Type'
-$Description = 'Sets how a service starts: Automatic, Manual or Disabled. Setting a suspicious service to Disabled stops it coming back after a reboot without deleting it. Does not stop a service that is already running (use Services - Stop and Disable for that).'
+$Description = 'Sets how a service starts: Automatic, Manual or Disabled.'
 $Dependencies = @()
 $Parameters = @('ServiceName', 'StartupType')
 $Tags = @('services', 'remediation')

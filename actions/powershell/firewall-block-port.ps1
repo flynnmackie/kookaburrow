@@ -1,5 +1,5 @@
 $Name = 'Firewall - Block Port'
-$Description = 'Adds a Windows Firewall rule that blocks one TCP or UDP port in one direction (Inbound by default), for example 3389 to stop RDP or 445 to stop SMB while you contain a host. Protocol is TCP or UDP (default TCP); Direction is Inbound or Outbound.'
+$Description = 'Adds a Windows Firewall rule that blocks one TCP or UDP port in one direction (Inbound by default), for example 3389 to stop RDP or 445 to stop SMB while you contain a host.'
 $Dependencies = @()
 $Parameters = @('Port', 'Protocol?', 'Direction?')
 $Tags = @('network', 'firewall', 'containment')

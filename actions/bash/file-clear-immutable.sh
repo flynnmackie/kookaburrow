@@ -1,5 +1,5 @@
 NAME='Files - Clear Immutable'
-DESCRIPTION='Clears the immutable flag (chattr -i) from a file so it can be changed or deleted again. Attackers set the flag on files they plant, which makes them impossible to remove until it is cleared.'
+DESCRIPTION='Clears the immutable flag (chattr -i) from a file so it can be changed or deleted again.'
 DEPENDENCIES=()
 PARAMETERS=(FILE_PATH)
 TAGS=(filesystem recovery remediation)

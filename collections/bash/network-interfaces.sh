@@ -1,5 +1,5 @@
 NAME='Network - Interfaces'
-DESCRIPTION='Network configuration: interfaces and addresses, routing table, neighbour (ARP) cache, DNS resolvers and search domains, the hosts file and proxy environment. Shows unexpected tunnels, extra addresses, rogue DNS servers and entries added to hosts.'
+DESCRIPTION='Network configuration: interfaces and addresses, routing table, neighbour (ARP) cache, DNS resolvers and search domains, the hosts file and proxy environment.'
 DEPENDENCIES=()
 TAGS=(network inventory dns)
 

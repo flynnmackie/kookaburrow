@@ -1,5 +1,5 @@
 $Name = 'Persistence - Remove Run Entry'
-$Description = 'Removes one entry from a Run or RunOnce key. Hive is HKLM (machine), HKLM32 (machine, 32-bit view) or HKCU (the account running this action; for another user use Registry - Delete Value); Key is Run (default) or RunOnce; EntryName is the value name shown by Persistence - Run Keys. The key is backed up to C:\ProgramData\Kookaburrow\Quarantine first.'
+$Description = 'Removes one entry from a Run or RunOnce key.'
 $Dependencies = @()
 $Parameters = @('Hive', 'EntryName', 'Key?')
 $Tags = @('persistence', 'registry', 'remediation')

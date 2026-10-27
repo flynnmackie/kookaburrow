@@ -39,12 +39,12 @@ const DEFAULT_ROLES = [
   {
     id: 'user', name: 'user', builtin: false,
     description: 'Day-to-day hunting: add hosts, run hunts, use shells. No user, role, library or system changes, and no running actions.',
-    permissions: ['hosts.manage', 'hunts.run', 'hunts.export', 'shell.files', 'collections.view', 'actions.view', 'system.view'],
+    permissions: ['hosts.manage', 'hunts.run', 'hunts.export', 'shell.files', 'collections.view', 'actions.view', 'workflows.run', 'system.view'],
   },
   {
     id: 'privileged-user', name: 'Privileged User', builtin: false,
     description: 'Everything an admin can do except add, edit or delete users and roles and change system settings. Those can still be viewed.',
-    permissions: ['users.view', 'hosts.manage', 'collections.manage', 'actions.manage', 'actions.run', 'hunts.run', 'hunts.export', 'shell.files', 'system.view'],
+    permissions: ['users.view', 'hosts.manage', 'collections.manage', 'actions.manage', 'actions.run', 'hunts.run', 'hunts.export', 'workflows.manage', 'workflows.run', 'shell.files', 'system.view'],
   },
 ];
 db.seededRoles = Array.isArray(db.seededRoles) ? db.seededRoles : [];

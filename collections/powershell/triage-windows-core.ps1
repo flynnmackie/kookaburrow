@@ -1,5 +1,5 @@
 $Name = 'Triage - Windows Core'
-$Description = 'A native KAPE-style quick triage with no extra tools: Prefetch, shortcuts and Jump Lists, scheduled task XML, SRUM database, the registry hives (SYSTEM, SOFTWARE, SAM, SECURITY, Amcache and every NTUSER.DAT and UsrClass.dat), PowerShell history, the hosts file, and the Security, System, Application, PowerShell and Sysmon event logs for the last EventDays days (default 7). Locked files are copied from a volume shadow. Typically 100 to 600 MB. Includes credential material (SAM, SECURITY), so treat the output as sensitive. Needs administrator rights. Comes back over SMB, which is switched on for this collection only.'
+$Description = 'A native KAPE-style quick triage with no extra tools. Needs administrator rights.'
 $Dependencies = @()
 $Parameters = @('EventDays?')
 $Tags = @('forensics', 'triage', 'filesystem', 'event-logs')

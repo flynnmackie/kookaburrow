@@ -1,5 +1,5 @@
 $Name = 'Services - Start'
-$Description = 'Starts a service by its short name, for example to bring back a security agent or logging service that was stopped. Optionally StartupType (Automatic, Manual or Disabled) sets how it starts at boot first.'
+$Description = 'Starts a service by its short name, for example to bring back a security agent or logging service that was stopped.'
 $Dependencies = @()
 $Parameters = @('ServiceName', 'StartupType?')
 $Tags = @('recovery', 'services')

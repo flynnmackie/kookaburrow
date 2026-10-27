@@ -1,5 +1,5 @@
 NAME='Shell - History'
-DESCRIPTION='Prints the last 100 lines of bash, zsh and sh history for every account with a readable home directory. Command history often shows attacker reconnaissance and tooling. Empty or missing history for an active account can itself be a sign of tampering.'
+DESCRIPTION='Prints the last 100 lines of bash, zsh and sh history for every account with a readable home directory.'
 DEPENDENCIES=()
 TAGS=(execution history forensics defense-evasion)
 

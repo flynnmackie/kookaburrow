@@ -1,5 +1,5 @@
 $Name = 'Network - Proxy Settings'
-$Description = 'WinHTTP and per-user Internet proxy settings and auto-config scripts. A proxy or PAC file set by malware redirects traffic through an attacker or hides it.'
+$Description = 'WinHTTP and per-user Internet proxy settings and auto-config scripts.'
 $Dependencies = @()
 $Tags = @('network', 'c2', 'persistence')
 

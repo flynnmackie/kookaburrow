@@ -1,5 +1,5 @@
 NAME='Accounts - Force Password Change'
-DESCRIPTION='Expires an account password so the user must choose a new one at the next login (chage -d 0). Use it after a suspected credential exposure when you cannot reset the password yourself. Key-based logins are not affected.'
+DESCRIPTION='Expires an account password so the user must choose a new one at the next login (chage -d 0).'
 DEPENDENCIES=()
 PARAMETERS=(USER_NAME)
 TAGS=(accounts remediation)

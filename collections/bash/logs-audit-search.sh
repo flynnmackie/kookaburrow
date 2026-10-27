@@ -1,5 +1,5 @@
 NAME='Logs - Audit Search'
-DESCRIPTION='Searches the Linux audit log (auditd) with ausearch: AUDIT_SINCE is recent, today, yesterday, this-week or a date and time such as "10/22/2026 08:00:00" (default today); MESSAGE_TYPE limits to a record type such as EXECVE, USER_LOGIN, USER_AUTH, USER_CMD, SYSCALL, ADD_USER or ANOM_ABEND; AUDIT_KEY to a rule key; CONTAINS to text anywhere in the record. Needs auditd to be installed and running, and root, or an account with passwordless sudo.'
+DESCRIPTION='Searches the Linux audit log (auditd) with ausearch. Needs auditd to be installed and running, and root, or an account with passwordless sudo.'
 DEPENDENCIES=()
 PARAMETERS=(AUDIT_SINCE? MESSAGE_TYPE? AUDIT_KEY? CONTAINS? MAX_LINES?)
 TAGS=(event-logs forensics execution accounts)

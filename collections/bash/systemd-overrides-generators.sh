@@ -1,5 +1,5 @@
 NAME='Systemd - Overrides and Generators'
-DESCRIPTION='Quiet systemd persistence: drop-in override folders (*.service.d) that change what a service runs, systemd generators (programs run at every boot and daemon-reload), environment generators, user-level units and systemd tmpfiles and sysusers entries added outside packages. Attackers use drop-ins to add ExecStartPre commands to legitimate services. Shows each with its modification time and any command it runs.'
+DESCRIPTION='Quiet systemd persistence: drop-in override folders.'
 DEPENDENCIES=()
 TAGS=(persistence systemd)
 

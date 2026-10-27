@@ -1,5 +1,5 @@
 $Name = 'Files - Recycle Bin'
-$Description = 'Deleted files still in the Recycle Bin, read from the $I metadata files: original path, size and the time it was deleted, per user SID. Attackers often delete tools and logs and forget to empty the bin; the $R file with the same name holds the content.'
+$Description = 'Deleted files still in the Recycle Bin, read from the $I metadata files: original path, size and the time it was deleted, per user SID.'
 $Dependencies = @()
 $Tags = @('forensics', 'filesystem', 'defense-evasion')
 

@@ -1,5 +1,5 @@
 $Name = 'Persistence - Run Keys'
-$Description = 'Everything that starts from a Run, RunOnce, RunServices or Policies\Explorer\Run key, for the machine (64-bit and 32-bit) and every user profile (loading offline NTUSER.DAT files for the duration of the run). The classic persistence locations, listed with the value and what it points at.'
+$Description = 'Everything that starts from a Run, RunOnce, RunServices or Policies\Explorer\Run key, for the machine.'
 $Dependencies = @()
 $Tags = @('persistence', 'registry', 'autoruns')
 

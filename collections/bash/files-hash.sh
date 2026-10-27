@@ -1,5 +1,5 @@
 NAME='Files - Hash'
-DESCRIPTION='Computes hashes (SHA-256 by default; md5, sha1, sha256 or sha512 with ALGORITHM) of one file or every file in a folder, with size and modified time. Use it to check a file against a known-bad list or to confirm a binary is the same on every host. TARGET_PATH is required; set RECURSE to yes to include subfolders.'
+DESCRIPTION='Computes hashes (SHA-256 by default; md5, sha1, sha256 or sha512 with ALGORITHM) of one file or every file in a folder, with size and modified time.'
 DEPENDENCIES=()
 PARAMETERS=(TARGET_PATH ALGORITHM? RECURSE?)
 TAGS=(filesystem forensics malware)

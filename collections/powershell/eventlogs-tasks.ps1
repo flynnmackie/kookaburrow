@@ -1,5 +1,5 @@
 $Name = 'Event Logs - Task Changes'
-$Description = 'Scheduled task created, deleted, enabled, disabled or updated (Security 4698 to 4702) and task registered, started or failed (TaskScheduler Operational 106, 140, 141, 200, 201). Set LastMinutes for the last N minutes or StartTime and EndTime (yyyy-MM-dd HH:mm) for a range; default is 24 hours. Contains filters on task name or content.'
+$Description = 'Scheduled task created, deleted, enabled, disabled or updated (Security 4698 to 4702) and task registered, started or failed (TaskScheduler Operational 106, 140, 141, 200, 201).'
 $Dependencies = @()
 $Parameters = @('LastMinutes?', 'StartTime?', 'EndTime?', 'Contains?', 'MaxEvents?')
 $Tags = @('event-logs', 'persistence', 'scheduled-tasks')

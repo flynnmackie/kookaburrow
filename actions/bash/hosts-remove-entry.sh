@@ -1,5 +1,5 @@
 NAME='Hosts File - Remove Entry'
-DESCRIPTION='Removes every /etc/hosts line for a domain name, for example to undo Hosts File - Add Entry. /etc/hosts is backed up to /var/quarantine-kookaburrow first. Lines for localhost are never removed.'
+DESCRIPTION='Removes every /etc/hosts line for a domain name, for example to undo Hosts File - Add Entry. /etc/hosts is backed up to /var/quarantine-kookaburrow first.'
 DEPENDENCIES=()
 PARAMETERS=(DOMAIN_NAME)
 TAGS=(dns network recovery)

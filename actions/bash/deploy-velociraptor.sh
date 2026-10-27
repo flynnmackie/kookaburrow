@@ -1,5 +1,5 @@
 NAME='Deploy - Velociraptor (Linux)'
-DESCRIPTION='Installs the Velociraptor client on a Debian or Ubuntu host from your own client package (the repackaged .deb that already contains your server address and certificates) with dpkg, then checks that the client service is running. The package is copied to a temporary folder that is removed afterwards. Nothing is changed if a Velociraptor client service is already installed. Needs velociraptor-client.deb uploaded under Settings, Binaries, and root or passwordless sudo. The client stays installed and keeps running.'
+DESCRIPTION='Installs the Velociraptor client on a Debian or Ubuntu host from your own client package. Needs root or passwordless sudo.'
 DEPENDENCIES=(velociraptor-client.deb)
 PARAMETERS=()
 TAGS=(deploy velociraptor agent persistence)

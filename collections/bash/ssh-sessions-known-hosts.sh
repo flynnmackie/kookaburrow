@@ -1,5 +1,5 @@
 NAME='SSH - Sessions and Known Hosts'
-DESCRIPTION='Current SSH sessions and connections, the known_hosts file of every user (hosts each account has connected to, shown by name when not hashed), and each user SSH client config (ProxyJump, forwards, identity files). Shows where an account on this host has been connecting out to. Needs root, or an account with passwordless sudo, to read other homes.'
+DESCRIPTION='Current SSH sessions and connections, the known_hosts file of every user. Needs root or passwordless sudo.'
 DEPENDENCIES=()
 TAGS=(ssh lateral-movement accounts)
 

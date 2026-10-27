@@ -1,5 +1,5 @@
 $Name = 'WMI - Remove Subscription'
-$Description = 'Removes a permanent WMI event subscription (the filter, the consumer and the binding between them) by name, the way malware keeps fileless persistence. SubscriptionName is the name shown by WMI - Persistence. Everything removed is reported with its command or script so you can record it first.'
+$Description = 'Removes a permanent WMI event subscription (the filter, the consumer and the binding between them) by name, the way malware keeps fileless persistence.'
 $Dependencies = @()
 $Parameters = @('SubscriptionName')
 $Tags = @('wmi', 'persistence', 'remediation')

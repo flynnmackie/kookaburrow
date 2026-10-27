@@ -1,5 +1,5 @@
 NAME='Packages - Repositories'
-DESCRIPTION='Software sources and the keys that trust them: apt sources and trusted keys, yum and dnf repositories (enabled, gpgcheck), zypper repositories, pip and npm configuration pointing at other indexes, and Snap and Flatpak remotes. Attackers add a repository or key to push malicious packages that look like normal updates, and apt hooks run code during updates. Shows what changed recently.'
+DESCRIPTION='Software sources and the keys that trust them.'
 DEPENDENCIES=()
 TAGS=(persistence software inventory)
 

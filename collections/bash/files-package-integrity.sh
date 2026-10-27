@@ -1,5 +1,5 @@
 NAME='Files - Package Integrity'
-DESCRIPTION='Verifies installed files against what their packages shipped (dpkg --verify on Debian and Ubuntu, rpm -Va on Red Hat and SUSE) and lists files that were changed, which finds replaced system binaries and tampered configuration. Configuration files changed by an administrator also appear, so concentrate on binaries in /bin, /sbin, /usr/bin, /usr/sbin and libraries. Can take several minutes. Needs root, or an account with passwordless sudo.'
+DESCRIPTION='Verifies installed files against what their packages shipped. Needs root or passwordless sudo.'
 DEPENDENCIES=()
 TAGS=(filesystem malware defense-evasion forensics)
 

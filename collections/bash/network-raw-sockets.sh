@@ -1,5 +1,5 @@
 NAME='Network - Raw and Packet Sockets'
-DESCRIPTION='Programs that sniff or craft network traffic: raw sockets, packet sockets (what tcpdump and sniffers open), interfaces in promiscuous mode, and running capture tools. Backdoors that answer to magic packets, ICMP tunnels and password sniffers use raw and packet sockets, and are invisible to normal port listings. Needs root, or an account with passwordless sudo, to name the owning processes.'
+DESCRIPTION='Programs that sniff or craft network traffic. Needs root or passwordless sudo.'
 DEPENDENCIES=()
 TAGS=(network c2 rootkit malware)
 

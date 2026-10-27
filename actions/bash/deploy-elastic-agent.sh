@@ -1,5 +1,5 @@
 NAME='Deploy - Elastic Agent (Linux)'
-DESCRIPTION='Installs the Elastic Agent on a Linux host and enrols it in your Fleet Server: the agent tarball is copied to a temporary folder, unpacked, and elastic-agent install is run with FLEET_URL and ENROLLMENT_TOKEN (both are used for this run only and are never stored by Kookaburrow; the token is hidden in the output). Set INSECURE to Yes only for a lab Fleet Server with a self-signed certificate. Nothing is changed if an Elastic Agent service is already installed. Needs elastic-agent-linux.tar.gz (the official linux-x86_64 tarball) uploaded under Settings, Binaries, and root or passwordless sudo. The agent stays installed and keeps running.'
+DESCRIPTION='Installs the Elastic Agent on a Linux host and enrols it in your Fleet Server. Needs root or passwordless sudo.'
 DEPENDENCIES=(elastic-agent-linux.tar.gz)
 PARAMETERS=(FLEET_URL ENROLLMENT_TOKEN INSECURE?)
 TAGS=(deploy elastic agent persistence)

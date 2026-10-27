@@ -1,0 +1,270 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Kookaburrow installer (WiX Toolset 3). Built by scripts/build-msi.js, which supplies:
+    Version   product version (from package.json)
+    CaDll     the packaged custom actions (installer/KbCustomActions.cs)
+    SvcExe    the service wrapper (installer/KookaburrowService.cs)
+  Everything is inside the .msi (Node.js, the WinRM engine, the web app), so installing needs no internet access.
+
+  Program files   C:\Program Files\Kookaburrow
+  Data            C:\ProgramData\Kookaburrow   (database, keys, results, uploaded tools; kept on uninstall and upgrade)
+  Service         "Kookaburrow", automatic start, LocalSystem
+
+  Silent install:
+    msiexec /i Kookaburrow-1.0.0.msi /qn ADMINLOGIN=admin ADMINPASS=...                      quickstart: this PC only, port 46200
+    msiexec /i Kookaburrow-1.0.0.msi /qn SETUPMODE=custom LISTENIP=0.0.0.0 PORT=46200 ALLOWFROM=10.0.0.0/24 ADMINLOGIN=admin ADMINPASS=...
+-->
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi"
+     xmlns:fire="http://schemas.microsoft.com/wix/FirewallExtension"
+     xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
+
+  <Product Id="*" Name="Kookaburrow" Language="1033" Version="$(var.Version)" Manufacturer="Kookaburrow"
+           UpgradeCode="6F1A3B52-8C4E-4D7B-9A21-5E0C7D3B94A8">
+    <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine" Platform="x64"
+             Description="Kookaburrow threat hunting platform" Comments="Offline installer" />
+    <MajorUpgrade DowngradeErrorMessage="A newer version of Kookaburrow is already installed." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <Condition Message="Kookaburrow needs 64-bit Windows 10 or Windows Server 2016 or later.">Installed OR VersionNT64 &gt;= 603</Condition>
+
+    <!-- ===== Settings (all can be given on the msiexec command line) ===== -->
+    <Property Id="SETUPMODE" Value="quick" Secure="yes" />      <!-- quick = this PC only, port 46200; custom = the values below -->
+    <Property Id="LISTENIP" Value="0.0.0.0" Secure="yes" />
+    <Property Id="PORT" Value="46200" Secure="yes" />
+    <Property Id="ALLOWFROM" Secure="yes" />
+    <Property Id="ADMINLOGIN" Value="admin" Secure="yes" />
+    <Property Id="ADMINPASS" Hidden="yes" Secure="yes" />
+    <Property Id="ADMINPASS2" Hidden="yes" Secure="yes" />
+    <Property Id="EXISTINGDATA" Secure="yes" />                 <!-- set when an earlier installation left its data behind -->
+    <Property Id="KBERR" Secure="yes" />
+    <Property Id="ARPNOREPAIR" Value="1" />
+    <Icon Id="KbIcon.ico" SourceFile="installer\kookaburrow.ico" />
+    <Property Id="ARPPRODUCTICON" Value="KbIcon.ico" />
+    <SetProperty Id="ARPINSTALLLOCATION" Value="[INSTALLFOLDER]" After="CostFinalize" />
+
+    <!-- ===== Files ===== -->
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFiles64Folder">
+        <Directory Id="INSTALLFOLDER" Name="Kookaburrow" />
+      </Directory>
+      <Directory Id="CommonAppDataFolder">
+        <Directory Id="HOMEDIR" Name="Kookaburrow" />
+      </Directory>
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="MenuDir" Name="Kookaburrow" />
+      </Directory>
+    </Directory>
+
+    <DirectoryRef Id="INSTALLFOLDER">
+      <Component Id="ServiceComponent" Guid="*">
+        <File Id="IconFile" Source="installer\kookaburrow.ico" Name="kookaburrow.ico" />
+        <File Id="ServiceExe" Source="$(var.SvcExe)" Name="KookaburrowService.exe" KeyPath="yes" />
+        <ServiceInstall Id="KookaburrowSvc" Name="Kookaburrow" DisplayName="Kookaburrow"
+                        Description="Kookaburrow threat hunting platform (web interface and hunt runner)."
+                        Type="ownProcess" Start="auto" ErrorControl="normal" Account="LocalSystem" />
+        <ServiceControl Id="KookaburrowCtl" Name="Kookaburrow" Start="install" Stop="both" Remove="uninstall" Wait="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <DirectoryRef Id="HOMEDIR">
+      <Component Id="HomeComponent" Guid="*">
+        <CreateFolder />
+        <RegistryValue Root="HKLM" Key="SOFTWARE\Kookaburrow" Name="Data" Type="string" Value="[HOMEDIR]" KeyPath="yes" />
+      </Component>
+      <Component Id="FirewallComponent" Guid="*">
+        <RegistryValue Root="HKLM" Key="SOFTWARE\Kookaburrow" Name="Firewall" Type="integer" Value="1" KeyPath="yes" />
+        <Condition>KBOPEN = "1"</Condition>
+        <fire:FirewallException Id="KookaburrowPort" Name="Kookaburrow web interface (TCP [KBPORT])" Port="[KBPORT]" Protocol="tcp" Scope="any" IgnoreFailure="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <DirectoryRef Id="MenuDir">
+      <Component Id="ShortcutComponent" Guid="*">
+        <util:InternetShortcut Id="OpenKookaburrow" Name="Kookaburrow" Target="http://127.0.0.1:[KBPORT]/" IconFile="[INSTALLFOLDER]kookaburrow.ico" IconIndex="0" />
+        <RemoveFolder Id="RemoveMenuDir" On="uninstall" />
+        <RegistryValue Root="HKLM" Key="SOFTWARE\Kookaburrow" Name="Shortcut" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <Feature Id="Main" Title="Kookaburrow" Level="1" Absent="disallow">
+      <ComponentGroupRef Id="AppFiles" />
+      <ComponentRef Id="ServiceComponent" />
+      <ComponentRef Id="HomeComponent" />
+      <ComponentRef Id="FirewallComponent" />
+      <ComponentRef Id="ShortcutComponent" />
+    </Feature>
+
+    <!-- ===== Custom actions ===== -->
+    <Binary Id="KbCA" SourceFile="$(var.CaDll)" />
+    <CustomAction Id="DetectAddresses" BinaryKey="KbCA" DllEntry="DetectAddresses" Execute="immediate" Return="check" />
+    <CustomAction Id="ValidateNetwork" BinaryKey="KbCA" DllEntry="ValidateNetwork" Execute="immediate" Return="check" />
+    <CustomAction Id="ValidateAdmin" BinaryKey="KbCA" DllEntry="ValidateAdmin" Execute="immediate" Return="check" />
+    <CustomAction Id="ValidateAll" BinaryKey="KbCA" DllEntry="ValidateAll" Execute="immediate" Return="check" />
+    <CustomAction Id="ResolveSettings" BinaryKey="KbCA" DllEntry="ResolveSettings" Execute="immediate" Return="check" />
+    <CustomAction Id="StopOnBadInput" Error="[KBERR]" />
+
+    <!-- Writes the admin account and Server Settings with the bundled Node.js. The values are wrapped in one extra character each side
+         (see scripts/install-setup.js); HideTarget keeps the password out of the install log. -->
+    <CustomAction Id="RunSetup" Directory="INSTALLFOLDER" Execute="deferred" Impersonate="no" Return="check" HideTarget="yes"
+                  ExeCommand="&quot;[INSTALLFOLDER]runtime\node.exe&quot; &quot;[INSTALLFOLDER]scripts\install-setup.js&quot; &quot;--host=x[KBHOST]x&quot; &quot;--port=x[KBPORT]x&quot; &quot;--allow=x[KBALLOW]x&quot; &quot;--user=x[ADMINLOGIN]x&quot; &quot;--pass=x[ADMINPASS]x&quot;" />
+    <!-- The data folder holds the database and encryption key: only SYSTEM and Administrators. -->
+    <CustomAction Id="LockData" Directory="TARGETDIR" Execute="deferred" Impersonate="no" Return="ignore"
+                  ExeCommand="&quot;[System64Folder]icacls.exe&quot; &quot;[HOMEDIR].&quot; /inheritance:r /grant:r *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F" />
+    <CustomAction Id="OpenBrowser" Directory="TARGETDIR" ExeCommand="explorer.exe &quot;http://127.0.0.1:[KBPORT]/&quot;" Return="asyncNoWait" />
+
+    <InstallExecuteSequence>
+      <Custom Action="DetectAddresses" After="LaunchConditions">NOT Installed</Custom>
+      <Custom Action="ValidateAll" After="DetectAddresses">NOT Installed</Custom>
+      <Custom Action="StopOnBadInput" After="ValidateAll">NOT Installed AND KBERR &lt;&gt; ""</Custom>
+      <Custom Action="ResolveSettings" After="StopOnBadInput">NOT Installed</Custom>
+      <Custom Action="LockData" After="CreateFolders">NOT REMOVE</Custom>
+      <Custom Action="RunSetup" Before="StartServices">NOT Installed AND EXISTINGDATA = ""</Custom>
+    </InstallExecuteSequence>
+    <InstallUISequence>
+      <Custom Action="DetectAddresses" After="LaunchConditions">NOT Installed</Custom>
+    </InstallUISequence>
+
+    <!-- ===== Wizard ===== -->
+    <WixVariable Id="WixUIBannerBmp" Value="installer\banner.bmp" />
+    <WixVariable Id="WixUIDialogBmp" Value="installer\dialog.bmp" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Open Kookaburrow in the browser" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
+
+    <UI Id="KbUI">
+      <TextStyle Id="WixUI_Font_Normal" FaceName="Segoe UI" Size="8" />
+      <TextStyle Id="WixUI_Font_Bigger" FaceName="Segoe UI" Size="12" />
+      <TextStyle Id="WixUI_Font_Title" FaceName="Segoe UI" Size="9" Bold="yes" />
+      <Property Id="DefaultUIFont" Value="WixUI_Font_Normal" />
+      <Property Id="WixUI_Mode" Value="InstallDir" />
+
+      <DialogRef Id="ErrorDlg" />
+      <DialogRef Id="FatalError" />
+      <DialogRef Id="FilesInUse" />
+      <DialogRef Id="MsiRMFilesInUse" />
+      <DialogRef Id="PrepareDlg" />
+      <DialogRef Id="ProgressDlg" />
+      <DialogRef Id="ResumeDlg" />
+      <DialogRef Id="UserExit" />
+      <DialogRef Id="CancelDlg" />
+      <DialogRef Id="WaitForCostingDlg" />
+      <DialogRef Id="WelcomeDlg" />
+      <DialogRef Id="ExitDialog" />
+      <DialogRef Id="VerifyReadyDlg" />
+      <DialogRef Id="MaintenanceWelcomeDlg" />
+      <DialogRef Id="MaintenanceTypeDlg" />
+
+      <!-- Setup type -->
+      <Dialog Id="ModeDlg" Width="370" Height="270" Title="[ProductName] Setup">
+        <Control Id="Banner" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="WixUI_Bmp_Banner" />
+        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+        <Control Id="Title" Type="Text" X="15" Y="6" Width="340" Height="15" Transparent="yes" NoPrefix="yes" Text="{\WixUI_Font_Title}Setup type" />
+        <Control Id="Sub" Type="Text" X="25" Y="23" Width="340" Height="15" Transparent="yes" NoPrefix="yes" Text="Choose how Kookaburrow is made available." />
+        <Control Id="Group" Type="RadioButtonGroup" X="25" Y="58" Width="320" Height="150" Property="SETUPMODE">
+          <RadioButtonGroup Property="SETUPMODE">
+            <RadioButton Value="quick" X="0" Y="0" Width="320" Height="18" Text="{\WixUI_Font_Title}Quickstart (recommended to try it out)" />
+            <RadioButton Value="custom" X="0" Y="78" Width="320" Height="18" Text="{\WixUI_Font_Title}Custom" />
+          </RadioButtonGroup>
+        </Control>
+        <Control Id="QuickText" Type="Text" X="43" Y="76" Width="300" Height="50" Transparent="yes" NoPrefix="yes"
+                 Text="This PC only, at http://127.0.0.1:46200. Just create the admin account." />
+        <Control Id="CustomText" Type="Text" X="43" Y="154" Width="300" Height="50" Transparent="yes" NoPrefix="yes"
+                 Text="Choose the listening address, port and allowed computers. Opens the Windows Firewall port." />
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)">
+          <Publish Event="NewDialog" Value="WelcomeDlg">1</Publish>
+        </Control>
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)">
+          <Publish Event="NewDialog" Value="NetworkDlg">SETUPMODE = "custom"</Publish>
+          <Publish Event="NewDialog" Value="AdminDlg">SETUPMODE &lt;&gt; "custom"</Publish>
+        </Control>
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
+          <Publish Event="SpawnDialog" Value="CancelDlg">1</Publish>
+        </Control>
+      </Dialog>
+
+      <!-- Custom: address, port, who may connect -->
+      <Dialog Id="NetworkDlg" Width="370" Height="270" Title="[ProductName] Setup">
+        <Control Id="Banner" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="WixUI_Bmp_Banner" />
+        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+        <Control Id="Title" Type="Text" X="15" Y="6" Width="340" Height="15" Transparent="yes" NoPrefix="yes" Text="{\WixUI_Font_Title}Network" />
+        <Control Id="Sub" Type="Text" X="25" Y="23" Width="340" Height="15" Transparent="yes" NoPrefix="yes" Text="Where Kookaburrow listens and who may connect." />
+        <Control Id="HostLabel" Type="Text" X="25" Y="58" Width="200" Height="12" Transparent="yes" NoPrefix="yes" Text="Listening address" />
+        <Control Id="HostEdit" Type="Edit" X="25" Y="72" Width="150" Height="15" Property="LISTENIP" Text="{15}" />
+        <Control Id="PortLabel" Type="Text" X="200" Y="58" Width="100" Height="12" Transparent="yes" NoPrefix="yes" Text="Port" />
+        <Control Id="PortEdit" Type="Edit" X="200" Y="72" Width="60" Height="15" Property="PORT" Text="{5}" />
+        <Control Id="HostHelp" Type="Text" X="25" Y="90" Width="320" Height="36" Transparent="yes" NoPrefix="yes"
+                 Text="0.0.0.0 = every interface, 127.0.0.1 = this PC only. This PC has: [KBLOCALIPS]" />
+        <Control Id="AllowLabel" Type="Text" X="25" Y="130" Width="320" Height="12" Transparent="yes" NoPrefix="yes" Text="Computers allowed to connect (besides this PC)" />
+        <Control Id="AllowEdit" Type="Edit" X="25" Y="144" Width="320" Height="15" Property="ALLOWFROM" Text="{250}" />
+        <Control Id="AllowHelp" Type="Text" X="25" Y="162" Width="320" Height="40" Transparent="yes" NoPrefix="yes"
+                 Text="IPv4 addresses or ranges, comma separated (e.g. 10.0.0.5, 192.168.50.0/24). Empty = this PC only." />
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)">
+          <Publish Event="NewDialog" Value="ModeDlg">1</Publish>
+        </Control>
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)">
+          <Publish Event="DoAction" Value="ValidateNetwork" Order="1">1</Publish>
+          <Publish Event="SpawnDialog" Value="KbErrorDlg" Order="2">KBERR &lt;&gt; ""</Publish>
+          <Publish Event="NewDialog" Value="AdminDlg" Order="3">KBERR = ""</Publish>
+        </Control>
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
+          <Publish Event="SpawnDialog" Value="CancelDlg">1</Publish>
+        </Control>
+      </Dialog>
+
+      <!-- Admin account -->
+      <Dialog Id="AdminDlg" Width="370" Height="270" Title="[ProductName] Setup">
+        <Control Id="Banner" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="WixUI_Bmp_Banner" />
+        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+        <Control Id="Title" Type="Text" X="15" Y="6" Width="340" Height="15" Transparent="yes" NoPrefix="yes" Text="{\WixUI_Font_Title}Administrator account" />
+        <Control Id="Sub" Type="Text" X="25" Y="23" Width="340" Height="15" Transparent="yes" NoPrefix="yes" Text="Full access, including user management." />
+        <Control Id="UserLabel" Type="Text" X="25" Y="62" Width="200" Height="12" Transparent="yes" NoPrefix="yes" Text="User name" />
+        <Control Id="UserEdit" Type="Edit" X="25" Y="76" Width="200" Height="15" Property="ADMINLOGIN" Text="{64}" />
+        <Control Id="PassLabel" Type="Text" X="25" Y="104" Width="200" Height="12" Transparent="yes" NoPrefix="yes" Text="Password (at least 8 characters)" />
+        <Control Id="PassEdit" Type="Edit" X="25" Y="118" Width="200" Height="15" Property="ADMINPASS" Password="yes" Text="{128}" />
+        <Control Id="Pass2Label" Type="Text" X="25" Y="146" Width="200" Height="12" Transparent="yes" NoPrefix="yes" Text="Confirm password" />
+        <Control Id="Pass2Edit" Type="Edit" X="25" Y="160" Width="200" Height="15" Property="ADMINPASS2" Password="yes" Text="{128}" />
+        <Control Id="Note" Type="Text" X="25" Y="190" Width="320" Height="30" Transparent="yes" NoPrefix="yes"
+                 Text="Stored only as a salted hash." />
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)">
+          <Publish Event="NewDialog" Value="NetworkDlg" Order="1">SETUPMODE = "custom"</Publish>
+          <Publish Event="NewDialog" Value="ModeDlg" Order="2">SETUPMODE &lt;&gt; "custom"</Publish>
+        </Control>
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)">
+          <Publish Event="DoAction" Value="ValidateAdmin" Order="1">1</Publish>
+          <Publish Event="SpawnDialog" Value="KbErrorDlg" Order="2">KBERR &lt;&gt; ""</Publish>
+          <Publish Event="NewDialog" Value="VerifyReadyDlg" Order="3">KBERR = ""</Publish>
+        </Control>
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
+          <Publish Event="SpawnDialog" Value="CancelDlg">1</Publish>
+        </Control>
+      </Dialog>
+
+      <!-- A problem with what was entered -->
+      <Dialog Id="KbErrorDlg" Width="290" Height="90" Title="[ProductName] Setup">
+        <Control Id="Message" Type="Text" X="20" Y="14" Width="250" Height="40" NoPrefix="yes" Text="[KBERR]" />
+        <Control Id="Ok" Type="PushButton" X="117" Y="64" Width="56" Height="17" Default="yes" Cancel="yes" Text="!(loc.WixUIOK)">
+          <Publish Event="EndDialog" Value="Return">1</Publish>
+        </Control>
+      </Dialog>
+
+      <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="ResolveSettings" Order="1">WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed</Publish>
+      <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="OpenBrowser" Order="2">WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed</Publish>
+      <Publish Dialog="ExitDialog" Control="Finish" Event="EndDialog" Value="Return" Order="999">1</Publish>
+
+      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="ModeDlg" Order="1">NOT Installed AND EXISTINGDATA = ""</Publish>
+      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" Order="2">NOT Installed AND EXISTINGDATA &lt;&gt; ""</Publish>
+
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="AdminDlg" Order="1">NOT Installed AND EXISTINGDATA = ""</Publish>
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" Order="2">NOT Installed AND EXISTINGDATA &lt;&gt; ""</Publish>
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="MaintenanceTypeDlg" Order="3">Installed</Publish>
+
+      <Publish Dialog="MaintenanceWelcomeDlg" Control="Next" Event="NewDialog" Value="MaintenanceTypeDlg">1</Publish>
+      <Publish Dialog="MaintenanceTypeDlg" Control="RepairButton" Event="NewDialog" Value="VerifyReadyDlg">1</Publish>
+      <Publish Dialog="MaintenanceTypeDlg" Control="RemoveButton" Event="NewDialog" Value="VerifyReadyDlg">1</Publish>
+      <Publish Dialog="MaintenanceTypeDlg" Control="Back" Event="NewDialog" Value="MaintenanceWelcomeDlg">1</Publish>
+    </UI>
+    <UIRef Id="WixUI_Common" />
+  </Product>
+</Wix>

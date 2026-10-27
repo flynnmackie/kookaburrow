@@ -1,5 +1,5 @@
 NAME='Host - Reboot'
-DESCRIPTION='Reboots the host after DELAY_MINUTES (default 1) with a message to logged-in users. Rebooting clears memory, so collect volatile evidence first. Cancel it with Host - Cancel Shutdown before the delay ends.'
+DESCRIPTION='Reboots the host after DELAY_MINUTES (default 1) with a message to logged-in users.'
 DEPENDENCIES=()
 PARAMETERS=(DELAY_MINUTES?)
 TAGS=(containment recovery host)

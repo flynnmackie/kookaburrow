@@ -1,5 +1,5 @@
 $Name = 'Execution - Amcache'
-$Description = 'Programs recorded in the Amcache hive (InventoryApplicationFile): full path, SHA-1, publisher, product, version, size and compile (link) date. Shows executables that were present or run, with hashes you can look up. The hive is copied with its transaction logs from a volume shadow if it is locked, then loaded for the run (like Windows.Forensics.Amcache). Needs administrator rights. Optional PathContains keeps only paths containing that text.'
+$Description = 'Programs recorded in the Amcache hive (InventoryApplicationFile): full path, SHA-1, publisher, product, version, size and compile (link) date. Needs administrator rights.'
 $Dependencies = @()
 $Parameters = @('PathContains?')
 $Tags = @('execution', 'forensics', 'registry')

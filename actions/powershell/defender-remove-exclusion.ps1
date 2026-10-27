@@ -1,5 +1,5 @@
 $Name = 'Defender - Remove Exclusion'
-$Description = 'Removes a Microsoft Defender exclusion that an attacker (or a mistake) added, so the location, extension or process is scanned again. ExclusionType is Path, Extension or Process; Value is the exact exclusion shown by Defender - Status. The existing exclusions are listed first.'
+$Description = 'Removes a Microsoft Defender exclusion that an attacker (or a mistake) added, so the location, extension or process is scanned again.'
 $Dependencies = @()
 $Parameters = @('ExclusionType', 'Value')
 $Tags = @('antivirus', 'defense-evasion', 'remediation')

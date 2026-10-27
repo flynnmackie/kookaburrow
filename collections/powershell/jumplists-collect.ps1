@@ -1,5 +1,5 @@
 $Name = 'Jump Lists - Collect'
-$Description = 'Copies every user Jump List file (AutomaticDestinations and CustomDestinations) for parsing with JLECmd. They record files recently opened with each application, including from removable and network locations. Set Days to copy only files changed in the last N days. Comes back over SMB, which is switched on for this collection only.'
+$Description = 'Copies every user Jump List file (AutomaticDestinations and CustomDestinations) for parsing with JLECmd.'
 $Dependencies = @()
 $Parameters = @('Days?')
 $Tags = @('execution', 'forensics', 'filesystem')

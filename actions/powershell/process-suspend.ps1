@@ -1,5 +1,5 @@
 $Name = 'Processes - Suspend'
-$Description = 'Freezes a process (all its threads stop running) without ending it, by process id. The process stays in memory with its connections, so you can image or inspect it, and continue it with Processes - Resume. Refuses system PIDs (4 and below).'
+$Description = 'Freezes a process (all its threads stop running) without ending it, by process id.'
 $Dependencies = @()
 $Parameters = @('ProcessId')
 $Tags = @('containment', 'process')

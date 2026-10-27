@@ -1,5 +1,5 @@
 $Name = 'Logging - Set Log Size'
-$Description = 'Sets the maximum size of an event log in MB so important logs are not overwritten during an incident, for example Security or Microsoft-Windows-PowerShell/Operational. The log name is the full name shown by Event Logs - Summary. MaxSizeMB must be from 1 to 4096.'
+$Description = 'Sets the maximum size of an event log in MB so important logs are not overwritten during an incident, for example Security or Microsoft-Windows-PowerShell/Operational.'
 $Dependencies = @()
 $Parameters = @('LogName', 'MaxSizeMB')
 $Tags = @('hardening', 'event-logs')

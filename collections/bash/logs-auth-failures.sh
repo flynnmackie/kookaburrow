@@ -1,5 +1,5 @@
 NAME='Logs - Auth Failures'
-DESCRIPTION='Summary of authentication activity over the last N days (DAYS, default 7): failed SSH logins counted by source address and by account, invalid user names tried, successful logins with method and source, and failed sudo attempts. Shows password spraying and brute force, and which accounts then got in. Reads the auth log or secure log, or the journal. Needs root, or an account with passwordless sudo.'
+DESCRIPTION='Summary of authentication activity over the last N days (DAYS, default 7). Needs root or passwordless sudo.'
 DEPENDENCIES=()
 PARAMETERS=(DAYS?)
 TAGS=(brute-force logons accounts event-logs)

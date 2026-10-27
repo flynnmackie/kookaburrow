@@ -1,5 +1,5 @@
 NAME='Containers - Docker and Podman'
-DESCRIPTION='Containers on the host: running and stopped containers with image, command, ports and creation time, images, volumes and networks, and a security check of each container (privileged mode, host network or PID namespace, mounted Docker socket, added capabilities, bind mounts of sensitive host paths). A container with the Docker socket or a privileged flag is root on the host. Works for Docker and Podman. Needs root, an account in the docker group, or passwordless sudo.'
+DESCRIPTION='Containers on the host: running and stopped containers with image, command, ports and creation time, images, volumes and networks, and a security check of each container. Needs root or passwordless sudo.'
 DEPENDENCIES=()
 TAGS=(inventory privilege-escalation persistence containers)
 

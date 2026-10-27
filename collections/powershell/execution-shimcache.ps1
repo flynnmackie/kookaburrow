@@ -1,5 +1,5 @@
 $Name = 'Execution - Shimcache'
-$Description = 'Application Compatibility Cache (Shimcache) entries from the SYSTEM hive: file paths Windows has seen executed or browsed, with the file last-modified time, newest first. Parsed here for Windows 10 and 11 and Server 2016 and later. Evidence a file existed on the host (like Windows.Registry.AppCompatCache).'
+$Description = 'Application Compatibility Cache (Shimcache) entries from the SYSTEM hive.'
 $Dependencies = @()
 $Tags = @('execution', 'forensics', 'registry')
 

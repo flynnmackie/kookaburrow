@@ -1,5 +1,5 @@
 $Name = 'Hosts File - Remove Entry'
-$Description = 'Removes every hosts file line for a hostname, for example to undo Hosts File - Add Entry. The hosts file is backed up to C:\ProgramData\Kookaburrow\Quarantine first.'
+$Description = 'Removes every hosts file line for a hostname, for example to undo Hosts File - Add Entry.'
 $Dependencies = @()
 $Parameters = @('Hostname')
 $Tags = @('dns', 'network', 'recovery')

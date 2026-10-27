@@ -1,5 +1,5 @@
 NAME='Files - Restore Quarantined'
-DESCRIPTION='Moves a file out of /var/quarantine-kookaburrow back to a location you choose. QUARANTINED_NAME is the file name in the quarantine folder (for example 20261022-101500_payload.quarantined) and RESTORE_PATH the full path to put it at. Refuses to overwrite an existing file. Permissions are set to 600; restore the original mode yourself if needed.'
+DESCRIPTION='Moves a file out of /var/quarantine-kookaburrow back to a location you choose.'
 DEPENDENCIES=()
 PARAMETERS=(QUARANTINED_NAME RESTORE_PATH)
 TAGS=(filesystem recovery)

@@ -1,5 +1,5 @@
 $Name = 'Files - USN Journal'
-$Description = 'Recent file system changes from the NTFS USN change journal: file created, deleted, renamed, overwritten and the time of each. Shows what happened to files even after they were deleted. ReadMB is how much of the end of the journal to read (default 20 MB, roughly 200000 records); Contains keeps only file names containing that text; LastMinutes keeps only changes in the last N minutes; Drive defaults to C:. Needs administrator rights (like Windows.Forensics.Usn).'
+$Description = 'Recent file system changes from the NTFS USN change journal: file created, deleted, renamed, overwritten and the time of each. Needs administrator rights.'
 $Dependencies = @()
 $Parameters = @('Drive?', 'Contains?', 'LastMinutes?', 'ReadMB?')
 $Tags = @('filesystem', 'forensics', 'defense-evasion')

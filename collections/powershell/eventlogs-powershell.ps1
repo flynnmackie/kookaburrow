@@ -1,5 +1,5 @@
 $Name = 'Event Logs - PowerShell'
-$Description = 'PowerShell script block logging (4104), module and pipeline logging (4103) and classic engine start events (400, 403 in the Windows PowerShell log). Contains keeps only script text containing that text (for example Invoke-Expression, FromBase64String, DownloadString, Mimikatz). Set LastMinutes for the last N minutes or StartTime and EndTime (yyyy-MM-dd HH:mm) for a range; default is 24 hours. Script block logging must have been enabled on the host.'
+$Description = 'PowerShell script block logging (4104), module and pipeline logging (4103) and classic engine start events (400, 403 in the Windows PowerShell log).'
 $Dependencies = @()
 $Parameters = @('LastMinutes?', 'StartTime?', 'EndTime?', 'Contains?', 'MaxEvents?')
 $Tags = @('event-logs', 'powershell', 'execution')

@@ -362,7 +362,7 @@ window.pinPath = bbTogglePin; window.isPinned = (p) => !!bbPinFor(p);
 function renderPins() {
   const box = $('bbPinned'); if (!box) return;
   const open = true, pins = bb.pins;
-  box.innerHTML = `<div class="bp-head" id="bpToggle"><h2>Pinned</h2><span class="grp-count">${pins.length}</span></div>${pins.length ? '' : '<p class="dim bp-hint">Nothing is pinned yet. In Browse > Files, press Pin on a file or folder (or the star on a row) and it is kept here with a note. A run can also be pinned from Diff, and a hunt from IOC.</p>'}
+  box.innerHTML = `<div class="bp-head" id="bpToggle"><h2>Pinned</h2><span class="grp-count">${pins.length}</span></div>${pins.length ? '' : '<p class="dim bp-hint">Nothing pinned. Pin a file, folder or run to keep it here with a note.</p>'}
     ${open && pins.length ? `<div class="bp-list">${pins.map((p) => `<div class="bp-item ${p.exists ? '' : 'gone'}" data-pid="${esc(p.id)}">
       <div class="bp-main"><a class="bp-link" data-pgo="${esc(p.path)}" data-pdir="${p.dir ? 1 : 0}">${bbIcon(p.dir)} ${esc(p.path.slice(p.path.lastIndexOf('/') + 1))}</a><span class="bb-desc">${esc(bbDirOf(p.path))}</span>${p.exists ? '' : '<span class="bad" style="font-size:11px; margin-left:6px">no longer exists</span>'}
         <span class="bp-acts"><a data-pnote="${esc(p.id)}">${p.note ? 'Edit note' : 'Add note'}</a><a data-punpin="${esc(p.id)}">Unpin</a></span></div>
@@ -394,7 +394,7 @@ async function loadDiff() {
   $('dfA').innerHTML = $('dfB').innerHTML = `<option value="">Choose a run…</option>${html('hunt', 'Hunts')}${html('response', 'Responses')}`;
   if (keepA) $('dfA').value = keepA; if (keepB) $('dfB').value = keepB;
   if (!df.runs.length) $('dfOut').innerHTML = '<p class="dim" style="margin:0">There are no hunts or responses to compare yet.</p>';
-  else if (!df.res) $('dfOut').innerHTML = '<p class="dim" style="margin:0">Choose two runs and press Compare. Files are matched by their path inside the run, so the same hunt run twice lines up file for file, and you see what is only in A and what is only in B.</p>';
+  else if (!df.res) $('dfOut').innerHTML = '<p class="dim" style="margin:0">Choose two runs and press Compare. Files are matched by path.</p>';
 }
 // Each side is a run and, optionally, one file of it. Both sides on a file compares just those two files; both on "Whole run" compares everything.
 df.files = { A: [], B: [] }; df.label = {};

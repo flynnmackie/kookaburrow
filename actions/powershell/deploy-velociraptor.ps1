@@ -1,5 +1,5 @@
 $Name = 'Deploy - Velociraptor (Windows)'
-$Description = 'Installs the Velociraptor client on the host from your own client MSI (the repackaged installer that already contains your server address and certificates). The MSI is copied to a temporary folder, installed silently as SYSTEM through a one-off scheduled task, and the Velociraptor service is checked afterwards. Nothing is changed if a Velociraptor service is already installed. Needs velociraptor-client.msi uploaded under Settings, Binaries, and administrator rights. The client stays installed and keeps running.'
+$Description = 'Installs the Velociraptor client on the host from your own client MSI (the repackaged installer that already contains your server address and certificates). Needs administrator rights.'
 $Dependencies = @('velociraptor-client.msi')
 $Parameters = @()
 $Tags = @('deploy', 'velociraptor', 'agent', 'persistence')
