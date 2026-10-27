@@ -92,7 +92,7 @@ document.addEventListener('mousedown', (e) => { const el = lockedTarget(e); if (
 
 // Which permission each page needs. The top-bar tab for an area is locked when every page in it is.
 const PAGE_PERM = {
-  'settings/user-management': 'users.view', 'settings/shell-settings': 'system.view', 'settings/health-settings': 'system.view', 'settings/run-settings': 'system.view', 'settings/server-settings': 'system.view',
+  'settings/user-management': 'users.view', 'settings/shell-settings': 'system.view', 'settings/health-settings': 'system.view', 'settings/run-settings': 'system.view', 'settings/server-settings': 'system.view', 'settings/certificate': 'system.view',
   'settings/view-collections': 'collections.view', 'settings/add-collections': 'collections.manage', 'settings/binaries': 'collections.manage',
   'settings/view-actions': 'actions.view', 'settings/add-actions': 'actions.manage',
   'hosts/view-hosts': 'hosts.view', 'hosts/profiles': 'hosts.view', 'hosts/groups': 'hosts.view', 'hosts/discover': 'hosts.manage', 'hosts/manual': 'hosts.manage',
@@ -117,7 +117,7 @@ const NAV = [
   // A third entry puts a page under a titled dropdown in the side menu (the titles are not pages).
   // { heading: 'Name' } is a titled dropdown with no pages yet.
   { id: 'settings', label: 'Settings', pages: [
-    ['user-management', 'User Management', 'System'], ['shell-settings', 'Shell Settings', 'System'], ['health-settings', 'Health Settings', 'System'], ['run-settings', 'Run Settings', 'System'], ['server-settings', 'Server Settings', 'System'],
+    ['user-management', 'User Management', 'System'], ['shell-settings', 'Shell Settings', 'System'], ['health-settings', 'Health Settings', 'System'], ['run-settings', 'Run Settings', 'System'], ['server-settings', 'Server Settings', 'System'], ['certificate', 'Certificate', 'System'],
     ['view-collections', 'View Collections', 'Collections'], ['add-collections', 'Add Collections', 'Collections'],
     ['view-actions', 'View Actions', 'Actions'], ['add-actions', 'Add Actions', 'Actions'],
     ['binaries', 'Upload Binaries'],
@@ -162,6 +162,7 @@ const loaders = {
   'settings/health-settings': loadHealthSettings,
   'settings/run-settings': loadRunSettings,
   'settings/server-settings': loadServerSettings,
+  'settings/certificate': loadCertificate,
   'settings/shell-settings': loadShellSettings,
   'settings/add-collections': () => addCollections(),
   'settings/add-actions': () => addActions(),
@@ -2185,6 +2186,74 @@ $('svSave').onclick = async () => {
   catch (e) { $('svMsg').textContent = e.message; $('svMsg').className = 'um-msg bad'; $('svSave').disabled = false; }
 };
 
+// ---- Certificate: HTTPS for the server ----
+// Generates a private certificate authority (CA) and a server certificate for the names typed here, turns HTTPS on or off (the server
+// restarts) and downloads the CA so other machines can trust it. Plain HTTP requests from other machines are redirected to HTTPS; this PC
+// (localhost) keeps working over plain HTTP whatever the certificate is.
+const ce = { st: null, addrs: [] };
+const ceDate = (iso) => new Date(iso).toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' });
+async function loadCertificate() {
+  let st;
+  try { st = await api('GET', '/api/settings/certificate'); } catch (e) { $('ceMsg').textContent = e.message; $('ceMsg').className = 'um-msg bad'; return; }
+  try { ce.addrs = (await api('GET', '/api/settings/server')).addresses.map((a) => a.address); } catch { ce.addrs = []; }
+  ce.st = st;
+  const editable = can('system.manage');
+  setSwitch('ceEnabled', st.enabled);
+  $('ceEnabledLabel').textContent = `HTTPS: ${st.enabled ? 'On' : 'Off'}`;
+  $('ceEnabledNote').textContent = st.enabled ? 'Other machines are redirected to https://. This PC can still use plain http://.' : st.hasCert ? 'Turn it on to serve the certificate below.' : 'Generate a certificate first.';
+  $('ceNames').value = (st.names.length ? st.names : ce.addrs).join('\n');
+  $('ceNames').disabled = !editable;
+  const c = st.cert, ca = st.ca;
+  $('ceInfo').innerHTML = c
+    ? `<div class="bd-facts"><div><span>Names and addresses</span>${esc(c.names.join(', '))}</div><div><span>Valid until</span>${esc(ceDate(c.notAfter))} <span class="dim" style="display:inline;text-transform:none">(${c.daysLeft} days)</span></div><div><span>Certificate fingerprint</span><code style="font-size:11px;word-break:break-all">${esc(c.fingerprint)}</code></div>${ca ? `<div><span>CA (trust this one)</span>${esc(ca.subject)}, until ${esc(ceDate(ca.notAfter))}<br><code style="font-size:11px;word-break:break-all">${esc(ca.fingerprint)}</code></div>` : ''}</div>`
+    : '<p class="dim" style="margin:0">No certificate yet. Check the names below and press Generate.</p>';
+  $('ceAdvice').innerHTML = [...st.warnings.map((t) => `<div class="rs-adv warn">\u26A0 ${esc(t)}</div>`), ...(st.loadError ? [`<div class="rs-adv bad">${esc(st.loadError)}</div>`] : []), ...(!st.engine ? ['<div class="rs-adv bad">The bundled Python is not installed, so certificates cannot be generated. Run: npm run setup-winrm</div>'] : [])].join('');
+  $('ceCa').hidden = !ca;
+  $('ceGen').disabled = $('ceNewCa').disabled = $('ceAddMine').disabled = !editable || !st.engine;
+  $('ceMsg').textContent = '';
+}
+$('ceAddMine').onclick = () => {
+  const have = new Set($('ceNames').value.split(/[\s,;]+/).filter(Boolean).map((x) => x.toLowerCase()));
+  for (const a of [...ce.addrs, location.hostname.replace(/^\[|\]$/g, '')]) if (a && !['localhost', '127.0.0.1', '::1'].includes(a)) have.add(a.toLowerCase());
+  $('ceNames').value = [...have].join('\n');
+};
+async function ceGenerate(newCa) {
+  if (newCa && !confirm('Make a NEW certificate authority? Every machine that trusts the current one must import the new CA, or it gets a certificate error.')) return;
+  $('ceMsg').className = 'um-msg dim'; $('ceMsg').textContent = 'Generating…';
+  try {
+    const r = await api('POST', '/api/settings/certificate/generate', { names: $('ceNames').value, newCa });
+    toast(r.reusedCa ? 'Certificate generated (same CA)' : 'Certificate and CA generated');
+    await loadCertificate();
+    $('ceMsg').className = 'um-msg dim';
+    $('ceMsg').textContent = ce.st.enabled ? 'Restart the server (turn HTTPS off and on) to use the new certificate.' : 'Done. Download the CA, trust it on the machines you browse from, then turn HTTPS on.';
+  } catch (e) { $('ceMsg').textContent = e.message; $('ceMsg').className = 'um-msg bad'; }
+}
+$('ceGen').onclick = () => ceGenerate(false);
+$('ceNewCa').onclick = () => ceGenerate(true);
+$('ceEnabled').onclick = async () => {
+  if (!can('system.manage')) return;
+  const to = !ce.st.enabled;
+  if (to && !ce.st.hasCert) { $('ceMsg').textContent = 'Generate a certificate first.'; $('ceMsg').className = 'um-msg bad'; return; }
+  const msg = to
+    ? 'Turn HTTPS on and restart the server? Other machines are redirected to https://, so each must trust the CA (or click through the certificate warning). This PC keeps working over plain http://.'
+    : 'Turn HTTPS off and restart the server? Everything goes back to plain HTTP.';
+  if (!confirm(msg)) return;
+  const running = [...bh.runs, ...br.runs].filter((x) => x.status === 'running').length;
+  if (running && !confirm(`${running} hunt/response${running === 1 ? ' is' : 's are'} still running. Restarting stops ${running === 1 ? 'it' : 'them'}. Restart anyway?`)) return;
+  try { await api('PUT', '/api/settings/certificate', { enabled: to }); } catch (e) { $('ceMsg').textContent = e.message; $('ceMsg').className = 'um-msg bad'; return; }
+  // wait for the server (plain HTTP answers either way: other machines just get a redirect), then move to the right scheme
+  const here = new URL(location.href), local = ['localhost', '127.0.0.1', '[::1]'].includes(here.hostname);
+  const httpUrl = `http://${here.host}`, goto = to ? (local ? httpUrl : `https://${here.host}`) : httpUrl;
+  $('ceMsg').className = 'um-msg dim';
+  await new Promise((r) => setTimeout(r, 2500));
+  for (const t0 = Date.now(); Date.now() - t0 < 40000; await new Promise((r) => setTimeout(r, 1000))) {
+    $('ceMsg').textContent = 'Restarting the server…';
+    try { await fetch(`${httpUrl}/login.html`, { mode: 'no-cors', cache: 'no-store', redirect: 'manual' }); location.href = `${goto}/#settings/certificate`; return; } catch { /* not up yet */ }
+  }
+  $('ceMsg').className = 'um-msg bad';
+  $('ceMsg').textContent = `The server did not answer. From the server PC, open http://127.0.0.1:${here.port || 46200} (localhost always works).`;
+};
+
 // ---- Health: monitor ----
 // One box per saved host. Host is the ping result (checked every minute); Remote is the WinRM or SSH port (checked every
 // 5 minutes). Green is up, red is not responding, grey is not checked yet. The checks run in the server (src/monitor.js);
@@ -2441,7 +2510,7 @@ async function loadShell() {
 function newTerminal(hostId) {
   const term = new Terminal({
     cursorBlink: true, fontFamily: "'Cascadia Mono', Consolas, monospace", fontSize: 13, scrollback: 5000,
-    theme: { background: '#06070a', foreground: '#e7eaf0', cursor: '#00c8ff', selectionBackground: '#1d4a5c' },
+    theme: { background: '#0a0e14', foreground: '#e6eaf0', cursor: '#4d8cf5', selectionBackground: '#2a4a7c' },
   });
   const fit = new FitAddon.FitAddon();
   term.loadAddon(fit);
@@ -2630,23 +2699,22 @@ async function loadHome() {
   const rows = [], stats = [];
   try {
     const a = await api('GET', '/api/about');
-    const split = (c) => `${c.standard} standard · ${c.custom} custom`;
-    rows.push({ section: 'System' }, ['Server', esc(a.hostname) + (a.dnsDomain ? `<span class="dim">.${esc(a.dnsDomain.toLowerCase())}</span>` : '')],
-      ['Listening on', `${esc(a.bind)} <span class="dim">(this PC only)</span>`],
-      ['IP addresses', a.addresses.length ? a.addresses.slice(0, 4).map(esc).join('<br>') : '<span class="dim">none found</span>'],
-      ['Version', esc(a.version)],
-      ['Runtime', `Node ${esc(a.node)}`],
-      ['WinRM engine', esc(a.winrm)],
-      ['System', esc(a.os)],
+    const split = (c) => `${c.standard}${c.custom ? ` + ${c.custom} custom` : ''}`;
+    const engine = String(a.winrm || '').replace(/^pypsrp \(bundled, (pypsrp [\d.]+).*$/, '$1 (bundled)');
+    const ips = a.addresses.slice(0, 3).map(esc).join('<br>') + (a.addresses.length > 3 ? `<br><span class="dim">+${a.addresses.length - 3} more</span>` : '');
+    rows.push({ section: 'Server' }, ['Name', esc(a.hostname) + (a.dnsDomain ? `<span class="dim">.${esc(a.dnsDomain.toLowerCase())}</span>` : '')],
+      ['Listening', `${esc(a.bind)}${a.bindHost === '127.0.0.1' ? ' <span class="dim">this PC only</span>' : a.bindHost === '0.0.0.0' ? ' <span class="dim">all interfaces</span>' : ''}`],
+      ['Addresses', a.addresses.length ? ips : '<span class="dim">none found</span>'],
+      ['Version', `${esc(a.version)} <span class="dim">Node ${esc(String(a.node).replace(/^v/, ''))}</span>`],
+      ['WinRM', esc(engine)],
+      ['OS', esc(String(a.os).replace(/^Windows /, 'Win ').replace(/ \(x64\)$/, ''))],
       ['Uptime', fmtUptime(a.uptimeSec)],
-      ['Storage', a.storage ? `${fmtBytes(a.storage.used)} used / ${fmtBytes(a.storage.free)} available` : '<span class="dim">unknown</span>'],
-      ['Timezone', `${esc(a.timezone.name)} <span class="dim">(${esc(a.timezone.offset)})</span>`],
-      { section: 'System artefacts' },
-      ['Users', String(a.users)],
-      ['Roles', String(a.roles)],
-      ['Hunts (collections)', split(a.collections)],
-      ['Responses (actions)', split(a.actions)],
-      ['Binaries uploaded', `${a.binaries.uploaded}${a.binaries.missing ? ` <span class="dim">(${a.binaries.missing} still needed)</span>` : ''}`]);
+      ['Disk', a.storage ? `${fmtBytes(a.storage.used)} used <span class="dim">${fmtBytes(a.storage.free)} free</span>` : '<span class="dim">unknown</span>'],
+      { section: 'Library' },
+      ['Hunts', split(a.collections)],
+      ['Responses', split(a.actions)],
+      ['Binaries', `${a.binaries.uploaded} uploaded${a.binaries.missing ? ` <span class="dim">${a.binaries.missing} needed</span>` : ''}`],
+      ['Users', `${a.users} <span class="dim">${a.roles} roles</span>`]);
     stats.push(['Saved hosts', a.hosts], ['Profiles', a.profiles], ['Hunts ran', a.huntsRan], ['Actions ran', a.responsesRan]);
   } catch (e) { rows.push(['Server', `<span class="bad">${esc(e.message)}</span>`]); }
   try {
@@ -2664,10 +2732,11 @@ function renderHomeAccess(me, groups) {
   const list = (items, cls, mark, empty) => (items.length ? items.map((p) => `<li class="${cls}" title="${esc(p.desc)}"><i>${mark}</i>${esc(p.label)}</li>`).join('') : `<li class="dim">${empty}</li>`);
   $('homePerms').innerHTML = `<div class="hp-title">Your access</div>
     <div class="hp-roles">${me.roleNames.length ? me.roleNames.map((r) => `<span class="um-chip">${esc(r)}</span>`).join('') : '<span class="dim">No roles</span>'}</div>
-    <div class="hp-head can">Permissions${me.all ? ' <span class="dim">(full access)</span>' : ''}</div>
-    <ul>${list(can, 'can', '✓', 'Nothing')}</ul>
-    <div class="hp-head cant">Restrictions</div>
-    <ul>${list(cant, 'cant', '✗', 'Nothing is restricted')}</ul>`;
+    ${me.all
+      ? `<div class="hp-line"><span class="sdot ok"></span>Full access <span class="dim">${can.length} of ${options.length} permissions</span></div>
+         <details class="hp-more"><summary>Show permissions</summary><ul>${list(can, 'can', '✓', 'Nothing')}</ul></details>`
+      : `<div class="hp-head can">Permissions <span class="dim">${can.length}</span></div><ul>${list(can, 'can', '✓', 'Nothing')}</ul>
+         <div class="hp-head cant">Restrictions <span class="dim">${cant.length}</span></div><ul>${list(cant, 'cant', '✗', 'Nothing is restricted')}</ul>`}`;
 }
 // ---- Change your own password ----
 // A dialog on the Home page (and from your own row in User Management). It asks for the current password; everywhere else you

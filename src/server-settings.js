@@ -99,7 +99,8 @@ async function check(body, ctx = {}) {
   }
   if (!errors.length) {
     const open = !isLoopbackHost(host);
-    if (open) warnings.push('The server will be open to the network over plain HTTP: sign-in passwords and everything the server shows cross the network unencrypted. Only do this on a network you trust (a lab or management network).');
+    const httpsOn = !!(db.settings && db.settings.tls && db.settings.tls.enabled);
+    if (open && !httpsOn) warnings.push('The server will be open to the network over plain HTTP: sign-in passwords and everything the server shows cross the network unencrypted. Only do this on a network you trust (a lab or management network), or turn on HTTPS under Settings > System > Certificate.');
     if (port < 1024) warnings.push(`Port ${port} is a privileged port: on Linux the server needs root to use it, and on Windows other programs may already expect it.`);
     if (open && !ranges.length) warnings.push('No allowed addresses are set, so only this PC can connect even though the server listens on the network. Add the addresses or ranges that may connect.');
     if (!open && ranges.length) warnings.push(`The server only listens on this PC (${host}), so the allowed addresses below cannot reach it. Choose "All network interfaces" or one of this machine's addresses to let them in.`);
@@ -125,6 +126,7 @@ async function check(body, ctx = {}) {
 
 let restarter = null;
 const onRestart = (fn) => { restarter = fn; };
+const restart = () => { if (restarter) restarter(); };
 async function setSettings(body, ctx) {
   const c = await check(body, ctx);
   if (c.errors.length) throw err(c.errors[0]);
@@ -144,4 +146,4 @@ function noteFallback(reason, used) {
 const fallback = () => (db.settings && db.settings.serverFallback) || null;
 const dismissFallback = () => { if (db.settings && db.settings.serverFallback) { delete db.settings.serverFallback; save(); } };
 
-module.exports = { DEFAULTS, settings, hasSaved, localAddresses, clientAllowed, allowedHosts, check, setSettings, onRestart, noteFallback, fallback, dismissFallback, isLoopbackHost, clean };
+module.exports = { DEFAULTS, settings, hasSaved, localAddresses, clientAllowed, allowedHosts, check, setSettings, onRestart, restart, noteFallback, fallback, dismissFallback, isLoopbackHost, isLoopbackAddr, clean };

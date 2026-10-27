@@ -325,7 +325,7 @@ document.addEventListener('mouseover', (e) => {
   const st = $('bbColStyle') || document.head.appendChild(Object.assign(document.createElement('style'), { id: 'bbColStyle' }));
   if (!td || td.classList.contains('rn') || td.classList.contains('cp-hc') || td.closest('.cp-hosts')) { st.textContent = ''; return; }
   const sel = td.closest('table').id === 'bbTbl' ? '#bbTbl' : '.cp-tbl', i = td.cellIndex + 1;
-  st.textContent = `${sel} td:nth-child(${i}), ${sel} th:nth-child(${i}) { background:rgba(0,200,255,.09) !important; }`;
+  st.textContent = `${sel} td:nth-child(${i}), ${sel} th:nth-child(${i}) { background:rgba(77,140,245,.10) !important; }`;
 });
 document.addEventListener('mouseout', (e) => { if (!e.relatedTarget || !e.relatedTarget.closest?.('#bbTbl, .cp-tbl')) { const st = $('bbColStyle'); if (st) st.textContent = ''; } });
 

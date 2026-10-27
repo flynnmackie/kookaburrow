@@ -11,7 +11,7 @@ npm install
 npm start        # http://127.0.0.1:46200
 ```
 
-Env vars: `KB_HOST` (default 127.0.0.1), `KB_PORT` (default 46200). These are only the starting values: Settings > System > Server Settings sets the listen address, the port and which other addresses may connect (this PC is always allowed), checks the values for mistakes, and restarts the server when saved. If the saved settings cannot be used at start-up (port taken, address gone) the server falls back to localhost and says why on that page.
+Env vars: `KB_HOST` (default 127.0.0.1), `KB_PORT` (default 46200). These are only the starting values: Settings > System > Server Settings sets the listen address, the port and which other addresses may connect (this PC is always allowed), checks the values for mistakes, and restarts the server when saved. Settings > System > Certificate turns on HTTPS: it generates a private CA and a server certificate for the names you list (using the bundled Python), serves the CA for download so other machines can trust it, and redirects plain HTTP from other machines to HTTPS; this PC always keeps plain HTTP so a certificate problem cannot lock you out. If the saved settings cannot be used at start-up (port taken, address gone) the server falls back to localhost and says why on that page.
 
 ## Flow
 

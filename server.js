@@ -20,6 +20,7 @@ const monitor = require('./src/monitor');
 const quarantine = require('./src/quarantine');
 const auth = require('./src/auth');
 const serverSettings = require('./src/server-settings');
+const tls = require('./src/tls');
 const permissions = require('./src/permissions');
 const routePerms = require('./src/route-perms');
 
@@ -50,7 +51,7 @@ const access = (u) => {
 // ---- Sign-in ------------------------------------------------------------------------------
 // Everything except the sign-in page (and the images and fonts it uses) needs a session. Pages redirect to /login.html;
 // API calls and other files answer 401, which the app turns into a redirect to the sign-in page.
-const PUBLIC_FILES = new Set(['/login.html', '/fonts.css', '/favicon.ico', '/logo.png', '/logo-sm.png', '/bg-kookaburrow.png']);
+const PUBLIC_FILES = new Set(['/login.html', '/fonts.css', '/tokens.css', '/favicon.ico', '/logo.png', '/logo-sm.png']);
 app.use((req, res, next) => {
   if (PUBLIC_FILES.has(req.path) || req.path.startsWith('/fonts/') || req.path === '/api/auth/login') return next();
   const s = auth.sessionFrom(req);
@@ -61,10 +62,10 @@ app.use((req, res, next) => {
 app.post('/api/auth/login', async (req, res) => {
   try {
     const r = await auth.login(req.body?.username, req.body?.password);
-    res.set('Set-Cookie', r.cookie).json({ ok: true, username: r.user });
+    res.set('Set-Cookie', r.cookie + (req.socket.encrypted ? '; Secure' : '')).json({ ok: true, username: r.user });
   } catch (e) { res.status(e.status || 400).json({ error: e.message }); }
 });
-app.post('/api/auth/logout', (req, res) => { res.set('Set-Cookie', auth.logout(req)).json({ ok: true }); });
+app.post('/api/auth/logout', (req, res) => { res.set('Set-Cookie', auth.logout(req) + (req.socket.encrypted ? '; Secure' : '')).json({ ok: true }); });
 // Who is signed in, with their roles and what those roles allow (the Home page shows this).
 app.get('/api/auth/me', (req, res) => {
   const u = db.users.find((x) => x.username === req.user);
@@ -631,7 +632,7 @@ app.get('/api/about', (req, res) => {
   res.json({
     version: require('./package.json').version, node: process.version, winrm: require('./src/remote/winrm').engine(),
     hostname: os.hostname(), dnsDomain: process.env.USERDNSDOMAIN || '',
-    bind: `${running.host === '0.0.0.0' ? 'all interfaces' : running.host}:${running.port}`, addresses,
+    bind: `${running.host}:${running.port}`, bindHost: running.host, addresses,
     os: `${os.version()} ${os.release()} (${os.arch()})`,
     uptimeSec: Math.round(process.uptime()), started: new Date(Date.now() - process.uptime() * 1000).toISOString(),
     // the library: "standard" is a script that still matches the shipped, verified version; "custom" is anything added or edited
@@ -928,6 +929,25 @@ app.put('/api/settings/server', wrap(async (req, res) => {
 }));
 app.delete('/api/settings/server/fallback', wrap((req, res) => { serverSettings.dismissFallback(); res.json({ ok: true }); }));
 
+// ---- Certificate: HTTPS for this server (Settings > System > Certificate) ----
+// Generates a private CA and a server certificate for the names given, turns HTTPS on or off (the server restarts), and serves the CA
+// certificate so other machines can trust it. The private keys never leave the server.
+app.get('/api/settings/certificate', (req, res) => res.json(tls.status({ hostHeader: req.headers.host })));
+app.post('/api/settings/certificate/generate', wrap(async (req, res) => {
+  const r = await tls.generate(req.body?.names, { newCa: req.body?.newCa === true });
+  res.json({ ok: true, ...r, status: tls.status({ hostHeader: req.headers.host }) });
+}));
+app.put('/api/settings/certificate', wrap((req, res) => {
+  tls.setEnabled(req.body?.enabled === true);
+  serverSettings.restart();
+  res.json({ ok: true, restarting: true });
+}));
+app.get('/api/settings/certificate/ca.pem', (req, res) => {
+  const pem = tls.caPem();
+  if (!pem) return res.status(404).json({ error: 'No certificate authority yet. Generate a certificate first.' });
+  res.set({ 'Content-Type': 'application/x-pem-file', 'Content-Disposition': 'attachment; filename="kookaburrow-ca.pem"' }).send(pem);
+});
+
 // ---- Shell Settings: shell access on or off, which hosts, how many at once and the idle timeout (Settings > System > Shell Settings) ----
 app.get('/api/settings/shell', (req, res) => res.json({
   settings: shell.settings(), defaults: shell.DEFAULTS, limits: shell.LIMITS, active: shell.config().active,
@@ -964,8 +984,37 @@ console.log(`WinRM engine: ${require('./src/remote/winrm').engine()}`);
 // address is no longer on this machine) the server falls back to localhost and the settings page says why, so it can always be reached.
 // localhost (127.0.0.1 and ::1) is always listened on, even when the server is set to one network address.
 const servers = [];
+// With HTTPS on (Settings > System > Certificate) a listener serves both on its one port: a connection that begins with a TLS handshake
+// (first byte 0x16) is the HTTPS app, a plain HTTP request from another machine is redirected to HTTPS, and plain HTTP from this PC is
+// served as it is so localhost can never be locked out by a certificate problem.
+function makeServer() {
+  const opts = tls.loadOptions();
+  if (!opts) return require('http').createServer(app);
+  const http = require('http'), https = require('https'), netMod = require('net');
+  const secure = https.createServer(opts, app);
+  const local = http.createServer(app);
+  const redirect = http.createServer((req, res) => {
+    if (!serverSettings.clientAllowed(req.socket.remoteAddress)) return res.writeHead(403, { 'Content-Type': 'text/plain' }).end('Forbidden: this address is not allowed to use this server.');
+    const host = String(req.headers.host || '').toLowerCase();
+    if (!serverSettings.allowedHosts(running).has(host)) return res.writeHead(400, { 'Content-Type': 'text/plain' }).end('Bad Host header');
+    res.writeHead(308, { Location: `https://${host}${req.url}`, 'Content-Type': 'text/plain' }).end('This server uses HTTPS: https://' + host + req.url);
+  });
+  const mux = netMod.createServer((socket) => {
+    socket.setTimeout(15000, () => socket.destroy());
+    socket.on('error', () => socket.destroy());
+    socket.once('data', (buf) => {
+      socket.setTimeout(0);
+      socket.pause(); socket.unshift(buf); // give the bytes back, then hand the connection to the right server
+      const target = buf[0] === 0x16 ? secure : serverSettings.isLoopbackAddr(socket.remoteAddress) ? local : redirect;
+      target.emit('connection', socket);
+      process.nextTick(() => socket.resume());
+    });
+  });
+  mux.closeAllConnections = () => { for (const x of [secure, local, redirect]) x.closeAllConnections?.(); };
+  return mux;
+}
 const listenOn = (cfg) => new Promise((resolve, reject) => {
-  const s = app.listen(cfg.port, cfg.host);
+  const s = makeServer().listen(cfg.port, cfg.host);
   s.once('listening', () => { servers.push(s); resolve(s); });
   s.once('error', reject);
 });
@@ -994,7 +1043,7 @@ async function startListening() {
   // this PC is always reachable: a specific network address does not include 127.0.0.1, and ::1 is what "localhost" resolves to on some systems
   if (running.host !== '0.0.0.0' && running.host !== '127.0.0.1') listenOn({ host: '127.0.0.1', port: running.port }).catch(() => {});
   listenOn({ host: '::1', port: running.port }).catch(() => {});
-  console.log(`Kookaburrow running at http://${running.host === '0.0.0.0' ? '127.0.0.1' : running.host}:${running.port}${running.host === '0.0.0.0' ? ' (all network interfaces)' : ''}${serverSettings.settings().allowFrom.length ? `, also allowed from ${serverSettings.settings().allowFrom.join(', ')}` : ''}`);
+  console.log(`Kookaburrow running at ${tls.enabled() && !tls.status().loadError ? 'https' : 'http'}://${running.host === '0.0.0.0' ? '127.0.0.1' : running.host}:${running.port}${running.host === '0.0.0.0' ? ' (all network interfaces)' : ''}${serverSettings.settings().allowFrom.length ? `, also allowed from ${serverSettings.settings().allowFrom.join(', ')}` : ''}`);
   monitor.start();
   quarantine.start();
   scheduler.start();

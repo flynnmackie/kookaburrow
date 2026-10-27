@@ -1,0 +1,47 @@
+/* Kookaburrow design tokens. Shared by the app (app.css) and the sign-in page.
+   A calm, low-saturation dark theme for long hunting sessions: layered cool-grey surfaces (never pure black), one restrained blue for
+   everything interactive, and status colours used only to mean something (green ok, amber caution, red failure). Text is stepped in three
+   levels so hierarchy comes from tone and weight, not from colour. Sizes are tuned for the app's 75% display scale (see app.css). */
+:root {
+  color-scheme: dark;
+
+  /* surfaces, back to front */
+  --bg:#0d1117;            /* canvas behind everything */
+  --panel:#151b23;         /* cards, dialogs, side menu */
+  --panel2:#1b232d;        /* raised: table headers, hovered rows, menus */
+  --hover:#212b37;         /* hover on any surface */
+  --inset:#0a0e14;         /* wells: inputs, code, terminal */
+  --line:#242d39;          /* hairlines inside a surface */
+  --line-hi:#323d4c;       /* control borders, outlines */
+
+  /* text, three steps */
+  --text:#e6eaf0;
+  --dim:#a3adba;
+  --faint:#7b8696;
+
+  /* interactive blue */
+  --blue:#4d8cf5;          /* links, active tab marks, focus */
+  --blue-d:#33619e;        /* tinted borders */
+  --blue-soft:rgba(77,140,245,.13);
+  --blue-line:rgba(77,140,245,.38);
+  --accent-fill:#2f6fe4;   /* solid buttons */
+  --accent-hover:#4a83ec;
+  --accent-active:#2a62cc;
+  --accent-text:#8fb6fb;   /* blue text on dark surfaces where --blue is too dim */
+  --on-accent:#fff;
+
+  /* status */
+  --ok:#3fb984;   --ok-text:#7dd6ad;   --ok-soft:rgba(63,185,132,.13);   --ok-line:rgba(63,185,132,.4);
+  --orange:#d6a041; --orange-d:#7a5d24; --orange-soft:rgba(214,160,65,.12); --orange-line:rgba(214,160,65,.42);
+  --bad:#e5645a;  --bad-soft:rgba(229,100,90,.12);  --bad-line:rgba(229,100,90,.45);
+
+  /* shape and depth: small radii, shadows only on things that float */
+  --r:6px; --r-m:4px; --r-s:3px;
+  --shadow-pop:0 8px 24px rgba(0,0,0,.45), 0 0 0 1px rgba(0,0,0,.25);
+
+  /* type */
+  --f-ui:'Inter', 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --f-head:var(--f-ui); --f-body:var(--f-ui); --f-label:var(--f-ui);
+  --f-mono:'JetBrains Mono', 'Cascadia Mono', Consolas, 'SFMono-Regular', 'Courier New', monospace;
+  --ease:140ms ease-out;
+}

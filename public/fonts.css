@@ -1,5 +1,4 @@
-/* Self-hosted fonts (latin subset) so the UI looks the same on isolated networks. */
-@font-face { font-family:'Cinzel'; font-style:normal; font-weight:400 600; font-display:swap; src:url('fonts/Cinzel.woff2') format('woff2'); }
-@font-face { font-family:'Cormorant Garamond'; font-style:normal; font-weight:400 600; font-display:swap; src:url('fonts/CormorantGaramond.woff2') format('woff2'); }
-@font-face { font-family:'Crimson Pro'; font-style:italic; font-weight:400 500; font-display:swap; src:url('fonts/CrimsonPro-italic.woff2') format('woff2'); }
-@font-face { font-family:'Crimson Pro'; font-style:normal; font-weight:400 600; font-display:swap; src:url('fonts/CrimsonPro.woff2') format('woff2'); }
+/* Self-hosted fonts (latin subset, variable weight) so the UI looks the same on isolated networks.
+   Inter for the interface, JetBrains Mono for code, hashes and paths. Both are SIL Open Font License. */
+@font-face { font-family:'Inter'; font-style:normal; font-weight:100 900; font-display:swap; src:url('fonts/Inter.woff2') format('woff2'); }
+@font-face { font-family:'JetBrains Mono'; font-style:normal; font-weight:100 800; font-display:swap; src:url('fonts/JetBrainsMono.woff2') format('woff2'); }
