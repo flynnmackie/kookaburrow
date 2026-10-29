@@ -6,6 +6,7 @@
 
 - [Requirements](#requirements)
 - [Installing with the MSI](#installing-with-the-msi)
+- [The setup .exe](#the-setup-exe)
 - [Silent installation](#silent-installation)
 - [What gets installed](#what-gets-installed)
 - [Managing the service](#managing-the-service)
@@ -34,7 +35,7 @@ Run `Kookaburrow-<version>-x64.msi`. Windows asks for administrator approval.
 
 1. **Welcome.**
 2. **Setup type.** Choose one:
-   - **Quickstart.** The server listens on `127.0.0.1:46200`, so only this PC can open it. You only create the admin account. Nothing is opened in the firewall.
+   - **Quickstart.** The server listens on `127.0.0.1:46200`, so only this PC can open it. You only create the admin account. The firewall is not changed.
    - **Custom.** You choose the listening address, the port and which other computers may connect, then create the admin account.
 3. **Network** (Custom only):
 
@@ -44,7 +45,7 @@ Run `Kookaburrow-<version>-x64.msi`. Windows asks for administrator approval.
    | Port | 1 to 65535, default 46200. |
    | Computers allowed to connect | IPv4 addresses or ranges, comma separated, for example `10.0.0.5, 192.168.50.0/24`. Empty means this PC only. This PC can always connect whatever is listed. |
 
-   Windows Firewall gets an inbound rule for the port when the address is not `127.0.0.1`.
+   When the address is not `127.0.0.1` and computers are allowed, the server opens the port in Windows Firewall for exactly those computers when it starts ([Server Settings](08-settings.md#server-settings)).
 4. **Administrator account.** User name (letters, digits and `. _ @ -`, up to 64 characters) and a password of at least 8 characters that does not contain a double quote. The password is stored only as a salted hash.
 5. **Ready to install**, then install.
 6. **Finish.** Tick *Open Kookaburrow in the browser* to open the sign-in page.
@@ -52,6 +53,15 @@ Run `Kookaburrow-<version>-x64.msi`. Windows asks for administrator approval.
 Every page checks what you typed before moving on and tells you what to fix.
 
 If an earlier installation left its data behind, the wizard skips the setup-type, network and account pages and keeps the existing users and settings.
+
+## The setup .exe
+
+`Kookaburrow-Setup-<version>-x64.exe` is the same installer in one file. It carries the .msi, asks for administrator rights once, and then shows the same wizard.
+
+- Everything after its name is passed on to the installer, so silent installs work the same way: `Kookaburrow-Setup-1.0.0-x64.exe /qn ADMINLOGIN=admin ADMINPASS=...` (see below for the properties).
+- It always writes a detailed Windows Installer log to `%TEMP%\Kookaburrow-install.log` (unless you give your own `/l*v file`), and a failed install says where the log is. For an account-step failure, `C:\ProgramData\Kookaburrow\install-setup.log` may say why.
+- Exit codes are the installer's: 0 success, 3010 success but restart needed, 1602 cancelled.
+- It is signed the same way as the .msi ([Signing and trust](#signing-and-trust)). Use whichever you prefer; they install the same thing.
 
 ## Silent installation
 
@@ -92,7 +102,7 @@ Invalid values fail the install with the same message the wizard would show. The
 | Hunt and response results | `C:\ProgramData\Kookaburrow\output\` |
 | Uploaded tools | `C:\ProgramData\Kookaburrow\binaries\` |
 | Start menu | A *Kookaburrow* shortcut that opens the web interface |
-| Firewall | An inbound TCP rule for the chosen port (when not localhost only) |
+| Firewall | One inbound TCP rule, *Kookaburrow web interface*, created and removed by the server itself while it listens on the network with allowed computers listed |
 | Apps list | An entry with the Kookaburrow icon |
 
 Shipped collections and actions live in the program folder (`collections\`, `actions\`). Custom ones you add are saved next to them.
@@ -109,7 +119,7 @@ Get-Content C:\ProgramData\Kookaburrow\data\server.log -Tail 50
 
 - Changing the address or port in **Settings > System > Server Settings** restarts the server. Under the service, the wrapper starts the new copy by itself.
 - If the server exits unexpectedly the service restarts it (after 10 seconds if it keeps dying immediately).
-- The firewall rule is created at install time for the port you chose. If you change the port later, add a rule for it yourself.
+- The firewall rule is managed by the server and follows Server Settings: changing the port, the address or the allowed computers changes the rule when the server restarts. The 1.0 installer made its own rule (*Kookaburrow web interface (TCP <port>)*); the server replaces it on its first start.
 
 ## Upgrading
 
@@ -123,7 +133,7 @@ Use **Settings > Apps > Installed apps > Kookaburrow > Uninstall**, or:
 msiexec /x Kookaburrow-1.0.0-x64.msi
 ```
 
-This removes the program, the service and the firewall rule. **The data folder is kept** so a later install can reuse it. For a complete removal, delete `C:\ProgramData\Kookaburrow` afterwards (this deletes all collected results and saved credentials).
+This removes the program, the service and the firewall rule (*Kookaburrow web interface*). **The data folder is kept** so a later install can reuse it. For a complete removal, delete `C:\ProgramData\Kookaburrow` afterwards (this deletes all collected results and saved credentials).
 
 ## Signing and trust
 
@@ -180,7 +190,7 @@ On Windows, with Node.js:
 
 ```powershell
 npm install
-node scripts/build-msi.js        # writes build\Kookaburrow-<version>-x64.msi
+node scripts/build-msi.js        # writes build\Kookaburrow-<version>-x64.msi and build\Kookaburrow-Setup-<version>-x64.exe
 ```
 
 The script:

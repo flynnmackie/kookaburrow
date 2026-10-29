@@ -1,4 +1,4 @@
-// Builds the offline Windows installer:  node scripts/build-msi.js     ->  build/Kookaburrow-<version>-x64.msi
+// Builds the offline Windows installer:  node scripts/build-msi.js     ->  build/Kookaburrow-<version>-x64.msi  and  build/Kookaburrow-Setup-<version>-x64.exe (the same installer in one file)
 // Signing (optional, see scripts/sign-msi.ps1):  --sign-self | --sign-pfx=<file> (password in KB_SIGN_PFX_PASSWORD) | --sign-thumbprint=<hash>
 // Needs Windows, Node.js and the .NET Framework compiler that ships with Windows. The WiX Toolset 3 binaries are downloaded once into
 // build/tools/wix. The installer carries everything it needs: this Node.js (runtime/node.exe), the production node_modules, and the
@@ -45,7 +45,7 @@ function copyTree(from, to, skip = () => false) {
   fs.rmSync(stage, { recursive: true, force: true });
   fs.mkdirSync(stage, { recursive: true });
   for (const f of ['server.js', 'package.json', 'package-lock.json', 'README.md']) fs.copyFileSync(path.join(root, f), path.join(stage, f));
-  for (const d of ['src', 'public', 'collections', 'actions', 'processors']) copyTree(path.join(root, d), path.join(stage, d));
+  for (const d of ['src', 'public', 'collections', 'actions', 'processors', 'docs', 'elastic']) copyTree(path.join(root, d), path.join(stage, d));
   fs.mkdirSync(path.join(stage, 'scripts'));
   for (const f of ['install-setup.js', 'verify-collections.js']) fs.copyFileSync(path.join(root, 'scripts', f), path.join(stage, 'scripts', f));
 
@@ -84,11 +84,19 @@ function copyTree(from, to, skip = () => false) {
   run(path.join(wix, 'light.exe'), ['-nologo', '-sval', '-spdb', ...ext, '-ext', 'WixUIExtension', '-cultures:en-us', '-out', msi, path.join(out, 'Kookaburrow.wixobj'), path.join(out, 'files.wixobj')]);
   const arg = (n) => { const a = process.argv.find((x) => x === n || x.startsWith(n + '=')); return a === undefined ? null : a.includes('=') ? a.slice(a.indexOf('=') + 1) : true; };
   const sign = arg('--sign-self') ? ['-SelfSigned'] : arg('--sign-pfx') ? ['-Pfx', arg('--sign-pfx')] : arg('--sign-thumbprint') ? ['-Thumbprint', arg('--sign-thumbprint')] : null;
+  const signFile = (file) => console.log(run('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'RemoteSigned', '-File', path.join(root, 'scripts', 'sign-msi.ps1'), '-Msi', file, ...sign]).trim());
+  if (sign) { step('Signing the .msi'); signFile(msi); }
+  // the same installer in one .exe: it carries the (signed) .msi and runs it with Windows Installer
+  step('Building the setup .exe');
+  const exeOut = path.join(build, `Kookaburrow-Setup-${version}-x64.exe`);
+  const info = path.join(out, 'SetupAssemblyInfo.cs');
+  fs.writeFileSync(info, `using System.Reflection;\n[assembly: AssemblyTitle("Kookaburrow Setup")]\n[assembly: AssemblyProduct("Kookaburrow")]\n[assembly: AssemblyCompany("Kookaburrow")]\n[assembly: AssemblyVersion("${version}.0")]\n[assembly: AssemblyFileVersion("${version}.0")]\n`);
+  run(csc, ['/nologo', '/target:winexe', '/optimize+', `/win32icon:${path.join(root, 'installer', 'kookaburrow.ico')}`, `/win32manifest:${path.join(root, 'installer', 'KookaburrowSetup.manifest')}`,
+    `/resource:${msi},Kookaburrow.msi`, `/out:${exeOut}`, '/r:System.Windows.Forms.dll', path.join(root, 'installer', 'KookaburrowSetup.cs'), info]);
+  if (sign) { step('Signing the .exe'); signFile(exeOut); }
   if (sign) {
-    step('Signing the .msi');
-    console.log(run('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'RemoteSigned', '-File', path.join(root, 'scripts', 'sign-msi.ps1'), '-Msi', msi, ...sign]).trim());
     const cer = path.join(build, 'signing', 'Kookaburrow-signing.cer');
     if (arg('--sign-self') && exists(cer)) { fs.copyFileSync(cer, path.join(build, 'Kookaburrow-signing.cer')); console.log('Public certificate for the machines that should trust it: ' + path.join(build, 'Kookaburrow-signing.cer')); }
   } else console.log('\n(not signed: add --sign-self, --sign-pfx=<file> or --sign-thumbprint=<hash>)');
-  console.log(`\nBuilt ${msi} (${(fs.statSync(msi).size / 1048576).toFixed(1)} MB)`);
+  console.log(`\nBuilt ${msi} (${(fs.statSync(msi).size / 1048576).toFixed(1)} MB)\nBuilt ${exeOut} (${(fs.statSync(exeOut).size / 1048576).toFixed(1)} MB)`);
 })().catch((e) => { console.error(e.message); process.exit(1); });

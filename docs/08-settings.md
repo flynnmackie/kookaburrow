@@ -12,10 +12,11 @@
 - [Run Settings](#run-settings)
 - [Server Settings](#server-settings)
 - [Certificate](#certificate)
-- [Elastic](#elastic)
 - [Collections and Actions](#collections-and-actions)
-- [Dependencies](#dependencies)
-- [Binaries](#binaries)
+- [External: Binaries](#binaries)
+- [External: Dependencies](#dependencies)
+- [External: Elastic](#elastic)
+- [External: Single Sign-On](#single-sign-on)
 - [Permission reference](#permission-reference)
 
 ## Users and roles
@@ -102,9 +103,11 @@ The page checks what you enter before saving. **Errors** block saving (a bad add
 - a range that is not on any network the server is directly connected to
 - you are connected from an address that will not be allowed after the restart
 - the address you are using this page on will stop working
-- Windows Firewall may block the port from other machines
+- (from source, not as a service) Kookaburrow may be unable to change the Windows Firewall: it does so only as a service or as administrator
 
 **Fallback:** if the saved settings cannot be used at start-up (the port is taken, the address is gone) the server falls back to localhost and the page says why. Fix the settings and save, or dismiss the notice.
+
+**Windows Firewall follows these settings.** When the server listens on the network (not only on this PC) **and** computers are listed under *Allowed to connect*, it keeps one inbound rule, *Kookaburrow web interface*, for the port, open to exactly those addresses. Otherwise there is no rule, and Windows' default (block inbound) applies. The rule is set each time the server starts, so saving the settings (which restarts it) applies the change. The page shows one line with what the firewall is doing now, and any error (for example when the server is run from source without administrator rights, with the command to run by hand). On Linux nothing is changed; the line shows the `ufw` commands for the allowed computers.
 
 Other computers are also checked against the `Host` and `Origin` headers, which blocks DNS-rebinding attacks.
 
@@ -125,10 +128,6 @@ HTTPS, the same idea as Velociraptor: Kookaburrow makes its **own certificate au
    | Firefox | Has its own store: Settings, Privacy and Security, Certificates, View Certificates, Authorities, Import |
 
 The page warns when the certificate has expired or expires within 30 days, when it does not name an address you are using, and when HTTPS is on with no certificate. Generating needs the bundled Python engine (it is part of the MSI). The keys in `data\tls` are not encrypted, like `data\secret.key`: protect the data folder.
-
-## Elastic
-
-Forwards hunt rows to Elasticsearch. Fully documented in [Elastic](10-elastic.md).
 
 ## Collections and Actions
 
@@ -158,6 +157,52 @@ Some collections and actions need an external tool. Tools are **not shipped**: u
 - Needs `collections.manage`.
 
 The standard set: Sysinternals `sigcheck64.exe`, `handle64.exe`, `listdlls64.exe`, `accesschk64.exe`, `procdump64.exe`, `autorunsc.exe`; `winpmem.exe`; `yara64.exe` (with your rules as `kb-rules.yar`); NirSoft `BrowsingHistoryView.exe`; `kape.zip` and `uac.tar.gz`; and the deploy installers listed in [Responses](05-responses.md#deploy-actions).
+
+## Elastic
+
+**Settings > External > Elastic** forwards hunt rows to Elasticsearch. Fully documented in [Elastic](10-elastic.md).
+
+## Single Sign-On
+
+**Settings > External > Single Sign-On** lets people sign in through an OpenID Connect (OIDC) provider: authentik, Keycloak, Entra ID, Okta, Google, ADFS or any other that publishes `/.well-known/openid-configuration`. Local accounts keep working beside it.
+
+| Setting | Meaning |
+|---|---|
+| **Single sign-on** switch | When on and saved, the sign-in page shows **Sign in with <provider name>** |
+| **Provider** | The issuer address, for example `https://authentik.lab.local/application/o/kookaburrow/`. The provider's configuration is found from it |
+| **Client ID**, **Client secret** | From the provider's application. The secret is stored encrypted and never shown again: leave the box blank to keep it |
+| **This server's address** | How browsers reach Kookaburrow, for example `https://kookaburrow.lab.local:46200` (no path). Must be https, except for localhost |
+| **Redirect address** | Shown read-only: this server's address plus `/api/auth/sso/callback`. Register exactly this at the provider |
+| **Provider name** | The text in "Sign in with ..." (default SSO) |
+| **Scopes** | Default `openid profile email` (must include `openid`) |
+| **Claim that holds the user name** | Default `preferred_username`. `email` or `upn` also work. If the ID token lacks it, the provider's userinfo address is asked |
+| **Users** | See below |
+| **CA certificate** | Only for a provider with an internal or self-signed certificate: paste the CA (PEM) so Kookaburrow trusts it |
+
+**Test provider** reads the provider's configuration and signing keys using the values on the form (nothing is saved) and warns about problems: no RS256 signing, no PKCE, missing scopes. The client ID and secret are only checked when someone signs in.
+
+### Who a sign-in becomes
+
+1. A user already **linked** to that provider identity (its issuer and subject) signs in as that user, even if the name has changed at the provider.
+2. Otherwise a Kookaburrow user with the **same name** (case ignored) is signed in and linked to the identity from then on, when *Sign in as the existing user with the same name* is on. A user already linked to a different identity is never taken over: the sign-in is refused. **Take care:** anyone who can choose their own user name at the provider can claim a Kookaburrow user of that name, including `admin`. Turn this off if the provider lets users pick names.
+3. Otherwise a new user is **created** with the role **No Access** (no permissions), when *Create a user when there is none* is on. They can sign in and see the Home page, which tells them to ask an administrator; **User Management** shows them with **(SSO)**, and an administrator gives them a real role there. The role is created the first time it is needed (and again if deleted). Created users have no password.
+
+Linked users keep their password, if they had one, so a local sign-in still works. Users created by single sign-on cannot sign in with a password until an administrator sets one.
+
+### Setting up authentik
+
+1. **Applications > Providers > Create > OAuth2/OpenID Provider.** Client type **Confidential**. Under **Redirect URIs** add the redirect address from the page (strict).
+2. **Signing Key:** choose a certificate (for example *authentik Self-signed Certificate*). Without one, authentik signs tokens with the client secret (HS256) and Kookaburrow refuses them with a message saying so.
+3. Scopes: `openid`, `profile` and `email` (the defaults). The user name arrives in `preferred_username`.
+4. **Applications > Create:** attach the provider, then assign the users or groups who may use it.
+5. Copy the issuer (the provider's **OpenID Configuration Issuer**), the client ID and the secret into Kookaburrow, set **This server's address**, **Test provider**, tick the switch and **Save**.
+6. If authentik uses an internal CA, paste the CA certificate into **CA certificate**.
+
+### What it checks
+
+Each sign-in uses the authorization code flow with PKCE (S256), a one-time `state` kept in a short-lived cookie, and a `nonce`. The ID token's signature is checked against the provider's published keys (RS256/384/512, PS256/384/512 and ES256/384/512 only; `none` and HMAC are refused), as are its issuer, audience, expiry and nonce. A sign-in attempt can be completed once. Changes are logged to the server log (`Single sign-on: <user> signed in`).
+
+Not done: group-to-role mapping (roles are managed in User Management), single sign-out (signing out of Kookaburrow does not sign you out of the provider), SAML.
 
 ## Permission reference
 

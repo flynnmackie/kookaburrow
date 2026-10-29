@@ -32,7 +32,7 @@ Browser ──HTTP(S)──▶ Express server (Node.js)
 ```
 
 - **Server**: Node.js 20+ with Express. The MSI bundles Node.js in `runtime\node.exe`.
-- **Front end**: plain HTML, CSS and JavaScript in `public/` (no build step), served by the same server. Self-hosted fonts (Inter, JetBrains Mono) and xterm.js for shells.
+- **Front end**: plain HTML, CSS and JavaScript in `public/` (no build step), served by the same server. Self-hosted fonts (Inter, JetBrains Mono), xterm.js for shells and marked (MIT) for the offline documentation viewer (`docs.js`), which renders the markdown in `docs/` served by `/api/docs`. The installer carries `docs/` and `README.md`.
 - **Store**: one JSON file loaded into memory and saved atomically (debounced 100 ms). Simple and fast at this scale; not for huge inventories.
 - **Library**: scripts in `collections/` (197) and `actions/` (122), read as text, never executed on the server.
 
@@ -162,6 +162,7 @@ Generated from `src/route-perms.js`, in the order the rules are evaluated.
 | `src/config.js` | Paths, defaults and limits |
 | `src/store.js` | The JSON database |
 | `src/auth.js`, `crypto.js` | Users, sessions, password hashing; secret encryption |
+| `src/sso.js` | Single sign-on with OpenID Connect: settings, the browser round trip, ID token checks, finding or creating the user |
 | `src/permissions.js`, `route-perms.js` | Permission definitions and the route map |
 | `src/collections.js`, `collection-files.js`, `binaries.js`, `binary-sources.js` | The library, metadata parsing, uploads and imports |
 | `src/hunt-runner.js`, `response-runner.js`, `scheduler.js`, `cancel.js`, `run-settings.js` | Running, scheduling, cancelling and concurrency |
@@ -170,7 +171,8 @@ Generated from `src/route-perms.js`, in the order the rules are evaluated.
 | `src/report.js`, `diff.js`, `compare.js`, `iocs.js`, `browse.js` | Analysis |
 | `src/scanner.js`, `monitor.js`, `quarantine.js`, `shell.js` | Discovery, health, containment, shells |
 | `src/server-settings.js`, `tls.js`, `tls_gen.py` | Listening, allow-list, HTTPS |
-| `src/elastic.js` | Elastic forwarding (rows, and processor output files) |
+| `src/elastic.js` | Elastic forwarding (rows, and processor output files); the index template |
+| `src/kibana.js`, `elastic/kibana/` | Importing the shipped Kibana dashboards (saved objects NDJSON, written by `elastic/kibana/build.js`) with Kibana's saved objects API |
 | `src/workflows.js`, `processors.js`, `workflow-runner.js` | Workflow definitions and the shipped default, processor manifests and running tools, post-processing of a hunt |
 | `processors/*.json` | Processor manifests (shipped: Hayabusa) |
 | `public/` | The interface: `index.html`, `app.js` and per-area scripts, `tokens.css`, `app.css`, `polish.css` |

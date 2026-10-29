@@ -2,6 +2,7 @@ const net = require('net');
 const http = require('http');
 const https = require('https');
 const dns = require('dns').promises;
+const { execFile } = require('child_process');
 const { scan: cfg } = require('./config');
 const { id, db } = require('./store');
 
@@ -71,16 +72,33 @@ function parseTargets(spec) {
   return ips;
 }
 
-function probe(ip, port) {
-  return new Promise((resolve) => {
-    const s = net.connect({ host: ip, port });
-    const done = (ok) => { s.destroy(); resolve(ok); };
-    s.setTimeout(cfg.timeoutMs);
-    s.once('connect', () => done(true));
-    s.once('timeout', () => done(false));
-    s.once('error', () => done(false));
+// One TCP connect. 'open' (it answered), 'refused' (a reset: the host is up but nothing listens), 'timeout' (no answer: down, filtered, or the packet was lost)
+// or 'error' (no route, unreachable). Replaceable in tests.
+let probeImpl = (ip, port, timeoutMs) => new Promise((resolve) => {
+  const s = net.connect({ host: ip, port });
+  const done = (v) => { s.destroy(); resolve(v); };
+  s.setTimeout(timeoutMs);
+  s.once('connect', () => done('open'));
+  s.once('timeout', () => done('timeout'));
+  s.once('error', (e) => done(e.code === 'ECONNREFUSED' || e.code === 'ECONNRESET' ? 'refused' : 'error'));
+});
+const probe = (ip, port, timeoutMs) => probeImpl(ip, port, timeoutMs);
+
+// The machines this one has recently talked to on its own network (ARP table / neighbour table). A connect attempt makes the OS look a host up, so a
+// host that is up on the same network appears here even when every port we tried stayed silent (a firewall dropping packets). Empty for routed ranges.
+let neighbourImpl = () => new Promise((resolve) => {
+  const win = process.platform === 'win32';
+  execFile(win ? 'arp' : 'ip', win ? ['-a'] : ['neigh'], { timeout: 5000, windowsHide: true }, (e, so) => {
+    const out = new Set();
+    if (e) return resolve(out);
+    for (const line of String(so).split(/\r?\n/)) {
+      let m;
+      if (win) { m = /^\s*(\d+\.\d+\.\d+\.\d+)\s+((?:[0-9a-f]{2}-){5}[0-9a-f]{2})\s+dynamic/i.exec(line); if (m && !/^(ff-ff-ff-ff-ff-ff|01-00-5e)/i.test(m[2])) out.add(m[1]); }
+      else { m = /^(\d+\.\d+\.\d+\.\d+)\s.*lladdr\s+(?:[0-9a-f]{2}:){5}[0-9a-f]{2}\s+(\w+)/i.exec(line); if (m && !/^(FAILED|INCOMPLETE)$/i.test(m[2])) out.add(m[1]); }
+    }
+    resolve(out);
   });
-}
+});
 
 // Heuristic only; the real OS is verified once a credentialed connection succeeds.
 function guessOs(open) {
@@ -141,40 +159,99 @@ async function checkRemote(r) {
   return { protocol, available: false, port: null, detail: last.map((t) => t.detail).join('; ') };
 }
 
-async function scanHost(ip) {
-  const results = await Promise.all(cfg.ports.map(async (p) => ((await probe(ip, p)) ? p : null)));
-  const open = results.filter(Boolean);
-  if (!open.length) return null;
-  let hostname = null;
-  try { hostname = (await dns.reverse(ip))[0] || null; } catch { /* no PTR record */ }
-  return { ip, hostname, openPorts: open, osGuess: guessOs(open) };
+// ---- scanning ----
+// A TCP connect that gets no answer does not mean the host is down: it may be busy, behind a firewall that drops packets, or the packet may have
+// been lost, and a scan that moves on after one short wait misses hosts. So a scan is done in steps, each slower and more careful than the last:
+//   1. every address, every port, one try with a generous wait (cfg.timeoutMs)
+//   2. addresses that showed signs of life (a reset, or an entry in the ARP / neighbour table) and hosts where only some ports answered: the ports that
+//      stayed silent are tried again with a much longer wait, twice (cfg.recheckTimeoutMs)
+//   3. every address that is still silent: the ports that matter most, once more with a long wait (cfg.lastChanceTimeoutMs)
+// Then each host found is asked whether its remote protocol really answers (below). Hosts that are up but showed none of the management ports are counted
+// separately (a firewall may be blocking them), so a missing host can be told apart from a host that is not there.
+const LAST_CHANCE_PORTS = [5985, 445, 22];
+const newState = () => ({ open: new Set(), refused: false, timeout: new Set(), error: false });
+function record(st, port, result) {
+  if (result === 'open') { st.open.add(port); st.timeout.delete(port); }
+  else if (result === 'refused') { st.refused = true; st.timeout.delete(port); }
+  else if (result === 'timeout') { if (!st.open.has(port)) st.timeout.add(port); }
+  else st.error = true;
+}
+// Runs `fn(item)` for every item with at most `width` at a time; stops early when `stop()` says so.
+async function pool(items, width, fn, stop) {
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.max(1, width) }, async () => {
+    while (next < items.length && !stop()) await fn(items[next++]);
+  }));
 }
 
 function startScan(spec) {
   const ips = parseTargets(spec);
-  const job = { id: id(), cidr: String(spec), status: 'running', phase: 'scan', total: ips.length, done: 0, found: [], startedAt: new Date().toISOString() };
+  const job = { id: id(), cidr: String(spec), status: 'running', phase: 'scan', total: ips.length, done: 0, recheckTotal: 0, recheckDone: 0, found: [], alive: [], startedAt: new Date().toISOString() };
   jobs.set(job.id, job);
 
   (async () => {
-    // Each worker scans one host at a time; the ports within a host are probed in parallel.
-    const workers = Math.max(1, Math.floor(cfg.concurrency / cfg.ports.length));
-    let next = 0;
-    const checks = []; // the remote protocol check of every host found, started as soon as it is found
-    await Promise.all(Array.from({ length: workers }, async () => {
-      while (next < ips.length && job.status === 'running') {
-        const ip = ips[next++];
-        const r = await scanHost(ip).catch(() => null);
-        job.done++;
-        if (r) {
-          // already authenticated and saved under Hosts? the page shows it as such instead of asking again
-          const saved = db.hosts.find((h) => h.address === r.ip);
-          if (saved) r.known = { protocol: saved.protocol, hostname: saved.hostname || saved.name, os: saved.os };
-          job.found.push(r);
-          checks.push(checkRemote(r).then((x) => { r.remote = x; }).catch(() => { r.remote = { protocol: /^Windows/.test(r.osGuess) ? 'winrm' : 'ssh', available: false, port: null, detail: 'the check failed' }; }));
-        }
+    const running = () => job.status === 'running';
+    const states = new Map(ips.map((ip) => [ip, newState()]));
+    const records = new Map(); // ip -> the entry in job.found
+    const list = (ip) => {
+      const st = states.get(ip);
+      if (!st.open.size) return;
+      const open = [...st.open].sort((a, b) => a - b);
+      let r = records.get(ip);
+      if (!r) {
+        r = { ip, hostname: null, openPorts: open, osGuess: guessOs(open) };
+        // already authenticated and saved under Hosts? the page shows it as such instead of asking again
+        const saved = db.hosts.find((h) => h.address === ip);
+        if (saved) r.known = { protocol: saved.protocol, hostname: saved.hostname || saved.name, os: saved.os };
+        records.set(ip, r);
+        job.found.push(r);
+      } else { r.openPorts = open; r.osGuess = guessOs(open); }
+    };
+    const tryPorts = async (ip, ports, timeoutMs, attempts = 1) => {
+      const st = states.get(ip);
+      let todo = ports.filter((p) => !st.open.has(p));
+      for (let a = 0; a < attempts && todo.length && running(); a++) {
+        const res = await Promise.all(todo.map(async (p) => [p, await probe(ip, p, timeoutMs)]));
+        for (const [p, r] of res) record(st, p, r);
+        todo = todo.filter((p) => states.get(ip).timeout.has(p));
       }
-    }));
-    if (job.status === 'running') job.phase = 'remote';
+      list(ip);
+    };
+
+    // 1. everything, once. Each worker takes one address; its ports are tried together.
+    await pool(ips, Math.floor(cfg.concurrency / cfg.ports.length), async (ip) => {
+      await tryPorts(ip, cfg.ports, cfg.timeoutMs);
+      job.done++;
+    }, () => !running());
+
+    if (running()) {
+      job.phase = 'recheck';
+      const neighbours = await neighbourImpl().catch(() => new Set());
+      // 2. hosts that showed a sign of life, or answered on only some ports
+      const careful = ips.filter((ip) => { const st = states.get(ip); return st.open.size ? st.timeout.size > 0 : (st.refused || neighbours.has(ip)); });
+      const quiet = ips.filter((ip) => { const st = states.get(ip); return !st.open.size && !st.refused && !neighbours.has(ip) && st.timeout.size > 0; });
+      job.recheckTotal = careful.length + quiet.length;
+      await pool(careful, Math.floor(cfg.concurrency / cfg.ports.length), async (ip) => {
+        const st = states.get(ip);
+        const ports = st.open.size ? [...st.timeout] : cfg.ports;
+        await tryPorts(ip, ports, cfg.recheckTimeoutMs, 2);
+        job.recheckDone++;
+      }, () => !running());
+      // 3. everything still silent: the ports that matter, once more, slowly
+      await pool(quiet, Math.floor(cfg.concurrency / LAST_CHANCE_PORTS.length), async (ip) => {
+        await tryPorts(ip, LAST_CHANCE_PORTS.filter((p) => cfg.ports.includes(p)), cfg.lastChanceTimeoutMs);
+        if (states.get(ip).open.size) await tryPorts(ip, cfg.ports, cfg.recheckTimeoutMs, 2); // it is there after all: look at its other ports properly
+        job.recheckDone++;
+      }, () => !running());
+      job.alive = ips.filter((ip) => { const st = states.get(ip); return !st.open.size && (st.refused || neighbours.has(ip)); });
+    }
+
+    // the remote protocol check of every host found, and its name
+    if (running()) job.phase = 'remote';
+    const checks = job.found.map(async (r) => {
+      try { r.hostname = (await dns.reverse(r.ip))[0] || null; } catch { /* no PTR record */ }
+      try { r.remote = await checkRemote(r); } catch { r.remote = { protocol: /^Windows/.test(r.osGuess) ? 'winrm' : 'ssh', available: false, port: null, detail: 'the check failed' }; }
+    });
     await Promise.all(checks);
     job.found.sort((a, b) => ipToInt(a.ip) - ipToInt(b.ip));
     job.phase = 'done';
@@ -192,4 +269,6 @@ function cancelScan(jobId) {
   return j;
 }
 
-module.exports = { startScan, getScan, cancelScan, parseTargets, checkRemote };
+// for tests: replace the network calls
+const _hooks = { probe: (f) => { probeImpl = f; }, neighbours: (f) => { neighbourImpl = f; } };
+module.exports = { startScan, getScan, cancelScan, parseTargets, checkRemote, _hooks };

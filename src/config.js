@@ -16,8 +16,10 @@ module.exports = {
   publicDir: path.join(__dirname, '..', 'public'),
   scan: {
     ports: [22, 135, 445, 3389, 5985, 5986],
-    timeoutMs: 800,
-    concurrency: 256,
+    timeoutMs: 2000,           // step 1: one try per port
+    recheckTimeoutMs: 5000,    // step 2: hosts that showed a sign of life, two tries on the silent ports
+    lastChanceTimeoutMs: 3500, // step 3: every host still silent, the key ports once more
+    concurrency: 192,          // connections in flight at once (a lower number loses fewer packets)
     maxHosts: 4096,
   },
   runConcurrency: 4,

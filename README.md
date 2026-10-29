@@ -31,6 +31,8 @@ Details, silent installs, upgrades, signing and running from source: [Installati
 
 ## Documentation
 
+These guides are also built into Kookaburrow and work offline: press **Documentation** on the Home page (click the logo) for a searchable viewer, or open the guides straight from the Elastic and Single Sign-On settings pages.
+
 | Guide | What is in it |
 |---|---|
 | [1. Installation](docs/01-installation.md) | The MSI wizard, silent install, files and the service, upgrade and uninstall, running from source, building the installer |

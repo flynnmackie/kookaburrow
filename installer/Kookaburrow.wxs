@@ -71,11 +71,6 @@
         <CreateFolder />
         <RegistryValue Root="HKLM" Key="SOFTWARE\Kookaburrow" Name="Data" Type="string" Value="[HOMEDIR]" KeyPath="yes" />
       </Component>
-      <Component Id="FirewallComponent" Guid="*">
-        <RegistryValue Root="HKLM" Key="SOFTWARE\Kookaburrow" Name="Firewall" Type="integer" Value="1" KeyPath="yes" />
-        <Condition>KBOPEN = "1"</Condition>
-        <fire:FirewallException Id="KookaburrowPort" Name="Kookaburrow web interface (TCP [KBPORT])" Port="[KBPORT]" Protocol="tcp" Scope="any" IgnoreFailure="yes" />
-      </Component>
     </DirectoryRef>
 
     <DirectoryRef Id="MenuDir">
@@ -90,7 +85,6 @@
       <ComponentGroupRef Id="AppFiles" />
       <ComponentRef Id="ServiceComponent" />
       <ComponentRef Id="HomeComponent" />
-      <ComponentRef Id="FirewallComponent" />
       <ComponentRef Id="ShortcutComponent" />
     </Feature>
 
@@ -110,6 +104,9 @@
     <!-- The data folder holds the database and encryption key: only SYSTEM and Administrators. -->
     <CustomAction Id="LockData" Directory="TARGETDIR" Execute="deferred" Impersonate="no" Return="ignore"
                   ExeCommand="&quot;[System64Folder]icacls.exe&quot; &quot;[HOMEDIR].&quot; /inheritance:r /grant:r *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F" />
+    <!-- The server opens and closes its own Windows Firewall rule (src/firewall.js); uninstalling removes it. -->
+    <CustomAction Id="RemoveFirewallRule" Directory="TARGETDIR" Execute="deferred" Impersonate="no" Return="ignore"
+                  ExeCommand="&quot;[System64Folder]netsh.exe&quot; advfirewall firewall delete rule name=&quot;Kookaburrow web interface&quot;" />
     <CustomAction Id="OpenBrowser" Directory="TARGETDIR" ExeCommand="explorer.exe &quot;http://127.0.0.1:[KBPORT]/&quot;" Return="asyncNoWait" />
 
     <InstallExecuteSequence>
@@ -119,6 +116,7 @@
       <Custom Action="ResolveSettings" After="StopOnBadInput">NOT Installed</Custom>
       <Custom Action="LockData" After="CreateFolders">NOT REMOVE</Custom>
       <Custom Action="RunSetup" Before="StartServices">NOT Installed AND EXISTINGDATA = ""</Custom>
+      <Custom Action="RemoveFirewallRule" Before="RemoveFiles">REMOVE="ALL"</Custom>
     </InstallExecuteSequence>
     <InstallUISequence>
       <Custom Action="DetectAddresses" After="LaunchConditions">NOT Installed</Custom>
@@ -169,7 +167,7 @@
         <Control Id="QuickText" Type="Text" X="43" Y="76" Width="300" Height="50" Transparent="yes" NoPrefix="yes"
                  Text="This PC only, at http://127.0.0.1:46200. Just create the admin account." />
         <Control Id="CustomText" Type="Text" X="43" Y="154" Width="300" Height="50" Transparent="yes" NoPrefix="yes"
-                 Text="Choose the listening address, port and allowed computers. Opens the Windows Firewall port." />
+                 Text="Choose the listening address, port and allowed computers. Kookaburrow opens the Windows Firewall port for them." />
         <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)">
           <Publish Event="NewDialog" Value="WelcomeDlg">1</Publish>
         </Control>

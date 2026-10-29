@@ -60,7 +60,12 @@ Windows uses the bundled WinRM engine (pypsrp), which speaks the protocol itself
    | Shorthand | `192.168.50.5,6,7` or `192.168.50.5,10-20` (a bare number reuses the previous address's first three octets) |
 
    A scan covers at most 4096 addresses (a /20).
-2. The scanner probes TCP 22, 135, 445, 3389, 5985 and 5986 on each address, then does a reverse DNS lookup and guesses the OS from the open ports.
+2. The scanner probes TCP 22, 135, 445, 3389, 5985 and 5986, then does a reverse DNS lookup and guesses the OS from the open ports. A silent address does not mean a host is down (a busy host, a firewall that drops packets, a lost packet), so it works in steps, each slower than the last:
+   - **Step 1:** every address and port once, waiting 2 seconds.
+   - **Step 2:** hosts that showed a sign of life (a reset, or an entry in this server's ARP/neighbour table for hosts on the same network) and hosts where only some ports answered: the silent ports are tried twice more, waiting 5 seconds.
+   - **Step 3:** every address that is still silent gets 5985, 445 and 22 once more, waiting 3.5 seconds. A host found this way has its other ports checked properly.
+   - The status line shows *re-checking addresses that did not answer* during steps 2 and 3. A large range therefore takes several times longer than before (a /24 takes about a minute, a /20 several minutes when most addresses are empty).
+   - Hosts that are up on the network but had none of those ports open (a firewall may be blocking them) are counted in the status line with their addresses, so a missing host can be told apart from a host that is not there.
 3. For hosts that answer, it checks the protocol for real instead of trusting the port: an unauthenticated POST to `/wsman` (a real WinRM service answers 401 and offers Negotiate) and the SSH banner (`SSH-2.0-...`). No credentials are sent. Each is tried twice.
 4. **Discovered hosts** lists Host, Hostname, OS (assumed), Open ports, Profile and Remote protocol. Pick a [profile](#credential-profiles) for a host and press **Authenticate**. On success the host is saved with its real hostname and OS.
 5. **Cancel** stops a scan, **Clear scan** empties the result list, and **Clear all** removes the discovered hosts.

@@ -92,7 +92,7 @@ document.addEventListener('mousedown', (e) => { const el = lockedTarget(e); if (
 
 // Which permission each page needs. The top-bar tab for an area is locked when every page in it is.
 const PAGE_PERM = {
-  'settings/user-management': 'users.view', 'settings/shell-settings': 'system.view', 'settings/health-settings': 'system.view', 'settings/run-settings': 'system.view', 'settings/server-settings': 'system.view', 'settings/certificate': 'system.view', 'settings/elastic': 'system.view', 'settings/dependencies': 'system.view',
+  'settings/user-management': 'users.view', 'settings/shell-settings': 'system.view', 'settings/health-settings': 'system.view', 'settings/run-settings': 'system.view', 'settings/server-settings': 'system.view', 'settings/certificate': 'system.view', 'settings/elastic': 'system.view', 'settings/dependencies': 'system.view', 'settings/sso': 'system.view',
   'settings/view-collections': 'collections.view', 'settings/add-collections': 'collections.manage', 'settings/binaries': 'collections.manage',
   'settings/view-actions': 'actions.view', 'settings/add-actions': 'actions.manage',
   'hosts/view-hosts': 'hosts.view', 'hosts/profiles': 'hosts.view', 'hosts/groups': 'hosts.view', 'hosts/discover': 'hosts.manage', 'hosts/manual': 'hosts.manage',
@@ -117,10 +117,10 @@ const NAV = [
   // A third entry puts a page under a titled dropdown in the side menu (the titles are not pages).
   // { heading: 'Name' } is a titled dropdown with no pages yet.
   { id: 'settings', label: 'Settings', pages: [
-    ['user-management', 'User Management', 'System'], ['shell-settings', 'Shell Settings', 'System'], ['health-settings', 'Health Settings', 'System'], ['run-settings', 'Run Settings', 'System'], ['server-settings', 'Server Settings', 'System'], ['certificate', 'Certificate', 'System'], ['elastic', 'Elastic', 'System'],
+    ['user-management', 'User Management', 'System'], ['shell-settings', 'Shell Settings', 'System'], ['health-settings', 'Health Settings', 'System'], ['run-settings', 'Run Settings', 'System'], ['server-settings', 'Server Settings', 'System'], ['certificate', 'Certificate', 'System'],
     ['view-collections', 'View Collections', 'Collections'], ['add-collections', 'Add Collections', 'Collections'],
     ['view-actions', 'View Actions', 'Actions'], ['add-actions', 'Add Actions', 'Actions'],
-    ['binaries', 'Binaries', 'External'], ['dependencies', 'Dependencies', 'External'],
+    ['binaries', 'Binaries', 'External'], ['dependencies', 'Dependencies', 'External'], ['elastic', 'Elastic', 'External'], ['sso', 'Single Sign-On', 'External'],
   ] },
   { id: 'hosts', label: 'Host Management', pages: [
     ['view-hosts', 'View Hosts', 'Hosts'], ['profiles', 'Profiles', 'Hosts'], ['groups', 'Groups', 'Hosts'],
@@ -165,6 +165,7 @@ const loaders = {
   'settings/server-settings': loadServerSettings,
   'settings/certificate': loadCertificate,
   'settings/elastic': loadElastic,
+  'settings/sso': () => window.loadSso?.(),
   'settings/dependencies': loadDependencies,
   'settings/shell-settings': loadShellSettings,
   'settings/add-collections': () => addCollections(),
@@ -295,7 +296,9 @@ $('scanBtn').onclick = async () => {
 };
 async function pollScan(id) {
   const j = await api('GET', `/api/scans/${id}`);
-  $('scanStatus').textContent = `${j.status}: ${j.done}/${j.total} scanned, ${j.found.length} found${j.status === 'running' && j.phase === 'remote' ? ', checking remote protocols…' : ''}`;
+  const more = j.phase === 'recheck' && j.status === 'running' ? `, re-checking addresses that did not answer (${j.recheckDone || 0}/${j.recheckTotal || 0})…` : j.status === 'running' && j.phase === 'remote' ? ', checking remote protocols…' : '';
+  const alive = j.alive && j.alive.length ? `. ${j.alive.length} more answered on the network but had none of the management ports open (a firewall may block them): ${j.alive.slice(0, 8).join(', ')}${j.alive.length > 8 ? ', …' : ''}` : '';
+  $('scanStatus').textContent = `${j.status}: ${j.done}/${j.total} scanned, ${j.found.length} found${more}${alive}`;
   $('scanBar').firstElementChild.style.width = `${(j.done / j.total) * 100}%`;
   addFound(j.found);
   if (j.status !== 'running') {
@@ -310,7 +313,12 @@ async function pollScan(id) {
 function addFound(found) {
   // the remote protocol check of a host finishes after the host is listed, so fill it in when it arrives
   let late = false;
-  for (const h of found) { const mine = discovered.find((d) => d.ip === h.ip); if (mine && h.remote && !mine.remote) { mine.remote = h.remote; late = true; } }
+  for (const h of found) {
+    const mine = discovered.find((d) => d.ip === h.ip);
+    if (mine && h.remote && !mine.remote) { mine.remote = h.remote; late = true; }
+    if (mine && mine.openPorts.join() !== h.openPorts.join()) { mine.openPorts = h.openPorts; mine.osGuess = h.osGuess; late = true; } // more ports answered on a later try
+    if (mine && h.hostname && !mine.hostname) { mine.hostname = h.hostname; late = true; }
+  }
   if (late) { setDiscovered(discovered); renderAuthHosts(); }
   const fresh = found.filter((h) => !scanSeen.has(h.ip));
   if (!fresh.length) return;
@@ -1653,13 +1661,13 @@ async function openHuntModal(quickHost, preWorkflow) {
   await hmLoadWorkflows(quickHost ? null : preWorkflow);
 }
 // "Workflow": a workflow runs its steps on what the hunt pulled back. Choosing one also picks the collections it is meant for.
-// "Send results to Elastic": decided per hunt. It starts at the default from Settings > System > Elastic and is unavailable until Elastic is set up.
+// "Send results to Elastic": decided per hunt. It starts at the default from Settings > External > Elastic and is unavailable until Elastic is set up.
 function hmSetElastic(on) {
   hm.sendElastic = !!on && !!hm.elastic.configured;
   hmEl('Elastic').setAttribute('aria-checked', hm.sendElastic);
   hmEl('Elastic').disabled = !hm.elastic.configured;
   hmEl('ElasticLabel').textContent = `Send results to Elastic: ${hm.sendElastic ? 'On' : 'Off'}`;
-  hmEl('ElNote').textContent = !hm.elastic.configured ? 'Elastic is not set up (Settings > System > Elastic).' : hm.sendElastic ? `The rows each host returns, and any workflow output, go to ${hm.elastic.target}.` : 'Nothing from this hunt is sent to Elastic.';
+  hmEl('ElNote').textContent = !hm.elastic.configured ? 'Elastic is not set up (Settings > External > Elastic).' : hm.sendElastic ? `The rows each host returns, and any workflow output, go to ${hm.elastic.target}.` : 'Nothing from this hunt is sent to Elastic.';
 }
 async function hmLoadElastic() {
   hm.elastic = { configured: false, default: false, target: '' };
@@ -1867,7 +1875,7 @@ function renderUserMgmt() {
   nb.classList.toggle('on', um.mode === 'new');
   decorateLocks(nb);
   $('umList').innerHTML = items.map((x) => `<div class="um-item ${um.mode === 'view' && x.id === um.sel[um.tab] ? 'on' : ''}" data-id="${esc(x.id)}">
-      <div class="um-name">${esc(x.name || x.username)}${x.username === access.username ? ' <span class="dim">(you)</span>' : ''}</div>
+      <div class="um-name">${esc(x.name || x.username)}${x.username === access.username ? ' <span class="dim">(you)</span>' : ''}${x.sso ? ' <span class="dim" title="Signs in through single sign-on">(SSO)</span>' : ''}</div>
       <div class="um-sub">${users ? (x.roles.length ? x.roles.map((r) => umChip(um.roles.find((q) => q.id === r)?.name || r)).join('') : '<span class="dim">No roles</span>')
         : `${x.members.length} member${x.members.length === 1 ? '' : 's'} · ${x.all ? 'full access' : `${x.permissions.length} permissions`}`}</div></div>`).join('')
     || `<p class="dim" style="margin:6px 10px">No ${um.tab} yet.</p>`;
@@ -2219,6 +2227,23 @@ async function svCheck() {
   catch (e) { if (n === sv.seq) { $('svAdvice').innerHTML = `<div class="rs-adv bad">${esc(e.message)}</div>`; $('svSave').disabled = true; } }
 }
 const svSoon = () => { clearTimeout(sv.timer); sv.timer = setTimeout(svCheck, 350); };
+// One line on what the firewall is doing. Windows: Kookaburrow keeps one rule for the port, open to the allowed computers only, while the server listens on the network.
+function svFirewallText(f) {
+  if (!f) return '';
+  const w = f.wanted, to = w.remote.join(', ');
+  if (!f.supported) {
+    return w.open ? `Firewall: not changed by Kookaburrow on this system. To let the allowed computers in, for example with ufw: <code>${f.hint.map(esc).join('</code> <code>')}</code>` : '';
+  }
+  const bad = f.last && f.last.ok === false ? `<span class="bad">Windows Firewall could not be updated: ${esc(f.last.error)}.</span> ` : '';
+  if (f.readError) return `${bad}Windows Firewall: could not be read (${esc(f.readError)}).`;
+  const mine = (f.rules || []).filter((x) => x.enabled === 'True' && x.action === 'Allow' && x.direction === 'Inbound' && String(x.port) === String(w.port));
+  if (w.open) {
+    return mine.length ? `${bad}Windows Firewall: <span class="ok">open</span> on port ${w.port} to ${esc(to)}. Kookaburrow keeps this rule in step with these settings.`
+      : `${bad}Windows Firewall: <span class="bad">no rule for port ${w.port}</span>. Saving these settings (or restarting the server) creates it for ${esc(to)}.`;
+  }
+  return (f.rules || []).length ? `${bad}Windows Firewall: a Kookaburrow rule still exists. It is removed when the server restarts.`
+    : `${bad}Windows Firewall: closed (no rule). A rule is created when the server listens on the network and allowed computers are listed.`;
+}
 async function loadServerSettings() {
   let r;
   try { r = await api('GET', '/api/settings/server'); } catch (e) { $('svMsg').textContent = e.message; $('svMsg').className = 'um-msg bad'; return; }
@@ -2234,6 +2259,7 @@ async function loadServerSettings() {
   $('svAddr').disabled = $('svPort').disabled = $('svAllow').disabled = !editable;
   $('svAddr').hidden = mode !== 'one';
   $('svNow').textContent = `Listening on ${r.running.host === '0.0.0.0' ? 'all interfaces' : r.running.host}:${r.running.port}. You are connected from ${r.you.address}.`;
+  $('svFirewall').innerHTML = svFirewallText(r.firewall);
   $('svFallback').hidden = !r.fallback;
   if (r.fallback) $('svFallbackText').textContent = `Saved settings failed (${r.fallback.reason}); started on ${r.fallback.used} instead.`;
   $('svMsg').textContent = '';
@@ -2321,6 +2347,7 @@ async function loadElastic() {
   for (const id of ['elUrl', 'elAuth', 'elKey', 'elUser', 'elPass', 'elIndex', 'elInsecure', 'elCa']) $(id).disabled = !editable;
   $('elAdvice').innerHTML = '';
   elStatusText(r.status);
+  window.loadElasticExtras?.(s);
   try {
     const runs = (await api('GET', '/api/runs')).filter((x) => x.kind === 'hunt' && x.status !== 'running').slice(0, 100);
     $('elRun').innerHTML = runs.length ? runs.map((x) => `<option value="${esc(x.id)}">${esc(x.name)} (${esc(new Date(x.startedAt).toLocaleString())}${x.elastic ? `, sent ${x.elastic.sent}${x.elastic.failed ? `, failed ${x.elastic.failed}` : ''}` : ''})</option>`).join('') : '<option value="">No finished hunts</option>';
@@ -2347,6 +2374,8 @@ $('elTest').onclick = async () => {
   const lines = [];
   if (t.version) lines.push(`<div class="rs-adv ok">\u2713 Connected to Elasticsearch ${esc(t.version)}${t.cluster ? ` (cluster ${esc(t.cluster)})` : ''}${t.security === false ? ', security is off' : ''}</div>`);
   if (t.canWrite === true && t.security) lines.push('<div class="rs-adv ok">\u2713 This account can create indexes and write documents</div>');
+  if (t.canTemplate === true) lines.push('<div class="rs-adv ok">\u2713 It can install the index template (for the dashboards)</div>');
+  else if (t.canTemplate === false) lines.push('<div class="rs-adv">It cannot install the index template (the cluster privilege manage_index_templates is missing). That is optional: see the Kibana dashboards part of the Elastic guide.</div>');
   if (t.note) lines.push(`<div class="rs-adv">${esc(t.note)}</div>`);
   if (t.error) lines.push(`<div class="rs-adv bad">${esc(t.error)}</div>`);
   $('elAdvice').innerHTML = lines.join('');
@@ -2897,6 +2926,7 @@ function renderHomeAccess(me, groups) {
   const list = (items, cls, mark, empty) => (items.length ? items.map((p) => `<li class="${cls}" title="${esc(p.desc)}"><i>${mark}</i>${esc(p.label)}</li>`).join('') : `<li class="dim">${empty}</li>`);
   $('homePerms').innerHTML = `<div class="hp-title">Your access</div>
     <div class="hp-roles">${me.roleNames.length ? me.roleNames.map((r) => `<span class="um-chip">${esc(r)}</span>`).join('') : '<span class="dim">No roles</span>'}</div>
+    ${!me.all && !can.length ? '<div class="hd-warn" style="margin:6px 0">Your account has no permissions yet. Ask an administrator to give you a role.</div>' : ''}
     ${me.all
       ? `<div class="hp-line"><span class="sdot ok"></span>Full access <span class="dim">${can.length} of ${options.length} permissions</span></div>
          <details class="hp-more"><summary>Show permissions</summary><ul>${list(can, 'can', '✓', 'Nothing')}</ul></details>`

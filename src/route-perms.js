@@ -6,6 +6,8 @@ const OPEN = 'open';
 const RULES = [
   ['*', /^\/api\/auth\/(login|logout|me)$/, OPEN],
   ['GET', /^\/api\/(permissions|about)$/, OPEN],
+  ['GET', /^\/api\/auth\/sso\/(status|login|callback)$/, OPEN],
+  ['GET', /^\/api\/docs(\/|$)/, OPEN], // the offline documentation is for everyone who is signed in
   ['*', /^\/api\/favourites(\/|$)/, OPEN], // your own list; the handler only touches the signed-in user
   ['PUT', /^\/api\/users\/[^/]+\/password$/, OPEN], // checked in the handler: your own needs the current password, others need Manage users
 
@@ -57,7 +59,7 @@ const RULES = [
   ['GET', /^\/api\/quarantine(\/log)?$/, ['system.view']],
   ['*', /^\/api\/quarantine\/[^/]+$/, ['actions.run']], // isolating a host runs the Host - Isolate action
   ['*', /^\/api\/monitor(\/|$)/, ['system.view']],
-  ['GET', /^\/api\/settings\/(health|shell|runs|server|elastic|certificate(\/ca\.pem)?)$/, ['system.view']],
+  ['GET', /^\/api\/settings\/(health|shell|runs|server|elastic|sso|certificate(\/ca\.pem)?)$/, ['system.view']],
   ['*', /^\/api\/settings(\/|$)/, ['system.manage']],
 
   ['GET', /^\/api\/(users|roles)$/, ['users.view']],

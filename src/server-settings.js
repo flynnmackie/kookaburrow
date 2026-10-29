@@ -118,7 +118,8 @@ async function check(body, ctx = {}) {
         warnings.push(`You are using this page as ${ctx.hostHeader}. After the restart that address will stop working; use ${use} instead.`);
       }
     }
-    if (open && process.platform === 'win32') warnings.push(`Windows Firewall may block connections to port ${port} from other machines; add an inbound rule for it if they cannot connect.`);
+    // as a service Kookaburrow manages the Windows Firewall rule itself (src/firewall.js); from source it can only do so when started as administrator
+    if (open && ranges.length && process.platform === 'win32' && !process.env.KB_SERVICE) warnings.push(`Kookaburrow changes the Windows Firewall rule for port ${port} only when it runs as a service or as administrator. If other machines cannot connect, run: New-NetFirewallRule -DisplayName "Kookaburrow web interface" -Direction Inbound -Protocol TCP -LocalPort ${port} -RemoteAddress ${ranges.map((r) => r.text).join(',')} -Action Allow`);
   }
   const addrs = host === '0.0.0.0' ? ['127.0.0.1', ...locals.map((a) => a.address)] : isLoopbackHost(host) ? ['127.0.0.1'] : ['127.0.0.1', host];
   return { errors, warnings, urls: errors.length ? [] : addrs.map((a) => `http://${a}:${port}`), normalized: { host, port, allowFrom: ranges.map((r) => r.text) } };

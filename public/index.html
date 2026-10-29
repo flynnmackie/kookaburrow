@@ -75,21 +75,21 @@
     <!-- Burrow -->
     <section class="page" id="burrow/hunt">
       <div class="card bh-top">
-        <div class="bh-bar"><h2>Previous hunts</h2><button class="act" id="bhNew" data-perm="hunts.run" data-perm-what="run hunts">New Hunt</button></div>
+        <div class="bh-bar"><h2>Previous hunts <a href="#" class="doclink" data-doc="04-hunts.md#following-a-hunt">Guide</a></h2><button class="act" id="bhNew" data-perm="hunts.run" data-perm-what="run hunts">New Hunt</button></div>
         <div id="bhList"></div>
       </div>
       <div class="card bh-detail" id="bhDetail"><p class="dim" style="margin:0">Click a hunt above to see what it ran, the files it pulled back, any errors, and to download its results.</p></div>
     </section>
     <section class="page" id="burrow/respond">
       <div class="card bh-top">
-        <div class="bh-bar"><h2>Previous responses</h2><button class="act" id="brNew" data-perm="actions.run" data-perm-what="run actions">New Response</button></div>
+        <div class="bh-bar"><h2>Previous responses <a href="#" class="doclink" data-doc="05-responses.md#running-a-response">Guide</a></h2><button class="act" id="brNew" data-perm="actions.run" data-perm-what="run actions">New Response</button></div>
         <div id="brList"></div>
       </div>
       <div class="card bh-detail" id="brDetail"><p class="dim" style="margin:0">Click a response above to see what it ran, its output files, any errors, and to download the results.</p></div>
     </section>
     <section class="page" id="burrow/workflow">
       <div class="card">
-        <div class="bh-bar"><h2>Workflows</h2><button class="act" id="wfNew" data-perm="workflows.manage" data-perm-what="create workflows">New Workflow</button></div>
+        <div class="bh-bar"><h2>Workflows <a href="#" class="doclink" data-doc="07-workflows-and-recurring.md#workflows">Guide</a></h2><button class="act" id="wfNew" data-perm="workflows.manage" data-perm-what="create workflows">New Workflow</button></div>
         <p class="dim hs-sub">Collect, process on the server, send on. Attach one to a hunt with <b>Workflow</b> on the Automation tab of New Hunt.</p>
         <div id="wfList"></div>
       </div>
@@ -101,7 +101,7 @@
     </section>
     <section class="page" id="burrow/recurring">
       <div class="card">
-        <div class="bh-bar"><h2>Recurring</h2><div class="toggle rc-kind" id="rcKind"><button type="button" data-kind="hunt" class="on">Hunts</button><button type="button" data-kind="response">Actions</button><button type="button" data-kind="workflow">Workflows</button></div></div>
+        <div class="bh-bar"><h2>Recurring <a href="#" class="doclink" data-doc="07-workflows-and-recurring.md#recurring-runs">Guide</a></h2><div class="toggle rc-kind" id="rcKind"><button type="button" data-kind="hunt" class="on">Hunts</button><button type="button" data-kind="response">Actions</button><button type="button" data-kind="workflow">Workflows</button></div></div>
         <div id="rcList"></div>
       </div>
     </section>
@@ -151,7 +151,7 @@
     </section>
     <section class="page" id="settings/user-management">
       <div class="card">
-        <div class="um-top"><h2>User Management</h2><p class="dim">Who can sign in, and what each role allows them to do.</p></div>
+        <div class="um-top"><h2>User Management <a href="#" class="doclink" data-doc="08-settings.md#users-and-roles">Guide</a></h2><p class="dim">Who can sign in, and what each role allows them to do.</p></div>
         <div class="um-bar"><span class="um-listtitle" id="umListTitle">Users:</span><div class="toggle" id="umTabs"><button type="button" data-t="users" class="on">Users</button><button type="button" data-t="roles">Roles</button></div><button class="act" id="umNew" type="button">New user</button></div>
         <div class="um-layout">
           <div class="um-list" id="umList"></div>
@@ -197,7 +197,7 @@
     </section>
     <section class="page" id="settings/server-settings">
       <div class="card">
-        <h2>Server Settings</h2>
+        <h2>Server Settings <a href="#" class="doclink" data-doc="08-settings.md#server-settings">Guide</a></h2>
         <p class="dim hs-sub">Listen address, port and allowed clients. Saving restarts the server. localhost is always allowed.</p>
         <div class="rs-adv warn" id="svFallback" hidden><span id="svFallbackText"></span> <a id="svFallbackDismiss" style="cursor:pointer">Dismiss</a></div>
         <p class="rs-server" id="svNow"></p>
@@ -214,13 +214,14 @@
           <textarea id="svAllow" rows="4" spellcheck="false" placeholder="One per line: an address (10.0.0.5) or a range (192.168.1.0/24)" style="width:360px;max-width:100%;background:var(--panel2,#11161d);color:var(--text);border:1px solid var(--line-hi);border-radius:6px;padding:6px 8px;font:12.5px var(--f-mono,monospace)"></textarea>
         </div>
         <div id="svAdvice"></div>
+        <p class="dim" id="svFirewall" style="font-size:12.5px;margin:8px 0 0"></p>
         <div class="hs-actions"><button class="act" id="svSave" type="button" data-perm="system.manage" data-perm-what="change server settings">Save and restart</button><button class="act sec" id="svReset" type="button" data-perm="system.manage" data-perm-what="change server settings">Reset to defaults</button><span class="um-msg" id="svMsg"></span></div>
       </div>
     </section>
     <section class="page" id="settings/elastic">
       <div class="card">
         <h2>Elastic</h2>
-        <p class="dim hs-sub">Connection to Elasticsearch (also SOF-ELK: use its Elasticsearch port, 9200). Each hunt chooses whether to send on its Automation tab; this sets the default.</p>
+        <p class="dim hs-sub">Connection to Elasticsearch (also SOF-ELK: use its Elasticsearch port, 9200). Each hunt chooses whether to send on its Automation tab; this sets the default. <a href="#" class="doclink" data-doc="10-elastic.md#setting-up-elasticsearch-on-ubuntu">Setup guide</a> · <a href="#" class="doclink" data-doc="10-elastic.md#creating-the-kookaburrow-data-view">Kibana data view</a></p>
         <div class="sw-row" data-perm="system.manage" data-perm-what="change whether hunts send by default"><button class="switch" id="elEnabled" type="button" role="switch" aria-checked="false" aria-label="Send hunts to Elastic by default"></button><b id="elEnabledLabel">Send hunts by default: Off</b><span class="dim" id="elEnabledNote"></span></div>
         <div class="hs-block">
           <span class="fl">Elasticsearch address</span>
@@ -242,11 +243,58 @@
         <p class="dim" style="font-size:12.5px;margin:0 0 6px">Sends all of a finished hunt's rows. Sending again replaces the same documents, so nothing is duplicated.</p>
         <div class="hs-row"><select id="elRun" style="max-width:420px"></select><button class="act sec" id="elSend" type="button" data-perm="system.manage" data-perm-what="send a hunt to Elastic">Send</button></div>
         <p class="dim" id="elStatus" style="font-size:12.5px;margin:10px 0 0"></p>
+        <h3 style="margin:18px 0 4px;font-size:13px">Index template <a href="#" class="doclink" data-doc="10-elastic.md#kibana-dashboards">Guide</a></h3>
+        <p class="dim" style="font-size:12.5px;margin:0 0 6px">Maps the fields the dashboards chart. Install it before the first hunt is sent: indexes that already exist keep their old mapping (delete them and send the hunts again).</p>
+        <p class="dim" id="elTemplate" style="font-size:12.5px;margin:0 0 6px"></p>
+        <div class="hs-row"><button class="act sec" id="elTmplInstall" type="button" data-perm="system.manage" data-perm-what="install the index template">Install index template</button><a href="#" class="doclink" id="elTmplShow">Show the request</a></div>
+        <pre class="code" id="elTmplReq" hidden style="max-height:220px;overflow:auto;font-size:11.5px;margin:6px 0 0"></pre>
+        <h3 style="margin:18px 0 4px;font-size:13px">Kibana dashboards</h3>
+        <p class="dim" style="font-size:12.5px;margin:0 0 6px" id="elDashInfo"></p>
+        <div class="hs-row"><button class="act sec" id="elDashOpen" type="button" data-perm="system.manage" data-perm-what="import dashboards into Kibana">Import dashboards…</button></div>
+      </div>
+    </section>
+    <section class="page" id="settings/sso">
+      <div class="card">
+        <h2>Single Sign-On</h2>
+        <p class="dim hs-sub">Sign in through an OpenID Connect provider such as authentik, Keycloak, Entra ID or Okta. Local accounts keep working. <a href="#" class="doclink" data-doc="08-settings.md#single-sign-on">Guide</a></p>
+        <div class="sw-row" data-perm="system.manage" data-perm-what="turn single sign-on on or off"><button class="switch" id="ssoEnabled" type="button" role="switch" aria-checked="false" aria-label="Single sign-on"></button><b id="ssoEnabledLabel">Single sign-on: Off</b><span class="dim" id="ssoEnabledNote"></span></div>
+        <div class="hs-block">
+          <span class="fl">Provider</span>
+          <div class="hs-row"><input id="ssoIssuer" type="text" spellcheck="false" placeholder="https://authentik.lab.local/application/o/kookaburrow/" style="width:420px;max-width:100%"></div>
+          <div class="dim" style="font-size:12px;margin:-2px 0 6px">The issuer address. The provider's /.well-known/openid-configuration is found from it.</div>
+          <span class="fl">Client ID</span>
+          <div class="hs-row"><input id="ssoClientId" type="text" spellcheck="false" autocomplete="off" style="width:320px;max-width:100%"></div>
+          <span class="fl">Client secret</span>
+          <div class="hs-row"><input id="ssoSecret" type="password" autocomplete="new-password" style="width:320px;max-width:100%"></div>
+          <span class="fl">This server's address</span>
+          <div class="hs-row"><input id="ssoPublicUrl" type="text" spellcheck="false" placeholder="https://kookaburrow.lab.local:46200" style="width:420px;max-width:100%"></div>
+          <span class="fl">Redirect address to register at the provider</span>
+          <div class="hs-row"><input id="ssoRedirect" type="text" readonly style="width:420px;max-width:100%"><button class="act sec" id="ssoCopy" type="button">Copy</button></div>
+          <span class="fl">Provider name on the sign-in button ("Sign in with ...")</span>
+          <div class="hs-row"><input id="ssoName" type="text" maxlength="40" style="width:240px"></div>
+          <span class="fl">Scopes</span>
+          <div class="hs-row"><input id="ssoScopes" type="text" spellcheck="false" style="width:320px;max-width:100%"></div>
+          <span class="fl">Claim that holds the user name</span>
+          <div class="hs-row"><input id="ssoClaim" type="text" spellcheck="false" style="width:240px"><span class="dim">for example preferred_username, email or upn</span></div>
+          <span class="fl">Users</span>
+          <label class="dim" style="display:block;margin:2px 0"><input type="checkbox" id="ssoLink"> Sign in as the existing user with the same name (and link them to the provider)</label>
+          <label class="dim" style="display:block;margin:2px 0"><input type="checkbox" id="ssoCreate"> Create a user when there is none. New users get the role <b>No Access</b> (no permissions) until an administrator gives them another.</label>
+          <span class="fl">CA certificate (only if the provider uses an internal or self-signed certificate)</span>
+          <textarea id="ssoCa" rows="3" spellcheck="false" placeholder="Paste the CA certificate (PEM) to trust" style="width:420px;max-width:100%;background:var(--panel2,#11161d);color:var(--text);border:1px solid var(--line-hi);border-radius:6px;padding:6px 8px;font:12.5px var(--f-mono,monospace)"></textarea>
+        </div>
+        <div id="ssoAdvice"></div>
+        <div class="hs-actions"><button class="act" id="ssoSave" type="button" data-perm="system.manage" data-perm-what="change single sign-on settings">Save</button><button class="act sec" id="ssoTest" type="button" data-perm="system.manage" data-perm-what="test the provider">Test provider</button><span class="um-msg" id="ssoMsg"></span></div>
+        <h3 style="margin:16px 0 4px;font-size:13px">At the provider</h3>
+        <ul class="dim" style="max-width:780px;font-size:12.5px;margin:0;padding-left:18px">
+          <li>Create an <b>OAuth2/OpenID</b> provider and an application. Client type <b>confidential</b>; add the redirect address above as an allowed redirect.</li>
+          <li>Choose a <b>signing key</b> (certificate) so tokens are signed with RS256. Without one, authentik signs with the client secret, which Kookaburrow does not accept.</li>
+          <li>Scopes <code>openid profile email</code> give the user name in <code>preferred_username</code>.</li>
+        </ul>
       </div>
     </section>
     <section class="page" id="settings/certificate">
       <div class="card">
-        <h2>Certificate</h2>
+        <h2>Certificate <a href="#" class="doclink" data-doc="08-settings.md#certificate">Guide</a></h2>
         <p class="dim hs-sub">HTTPS with a built-in CA. Import the CA on browsing machines to avoid warnings. Other machines are redirected to HTTPS; localhost keeps plain HTTP.</p>
         <div class="sw-row" data-perm="system.manage" data-perm-what="turn HTTPS on or off"><button class="switch" id="ceEnabled" type="button" role="switch" aria-checked="false" aria-label="HTTPS"></button><b id="ceEnabledLabel">HTTPS: Off</b><span class="dim" id="ceEnabledNote"></span></div>
         <div id="ceInfo" style="margin:10px 0"></div>
@@ -287,14 +335,14 @@
     </section>
     <section class="page" id="settings/dependencies">
       <div class="card">
-        <div style="display:flex; align-items:center; gap:10px"><h2 style="margin:0">Server Dependencies</h2><button class="act sec" id="depRecheck" type="button" style="margin-left:auto">Re-check</button></div>
+        <div style="display:flex; align-items:center; gap:10px"><h2 style="margin:0">Server Dependencies <a href="#" class="doclink" data-doc="08-settings.md#dependencies">Guide</a></h2><button class="act sec" id="depRecheck" type="button" style="margin-left:auto">Re-check</button></div>
         <p class="dim hs-sub">Software that must be installed on this server for some workflow tools. Kookaburrow only checks; it does not install anything.</p>
         <div id="depList"></div>
       </div>
     </section>
     <section class="page" id="settings/binaries">
       <div class="card">
-        <div style="display:flex; align-items:center; gap:10px"><h2 style="margin:0">Binaries</h2><button class="act sec" id="binFromServer" type="button" style="margin-left:auto" data-perm="collections.manage" data-perm-what="upload binaries">Upload from server</button></div>
+        <div style="display:flex; align-items:center; gap:10px"><h2 style="margin:0">Binaries <a href="#" class="doclink" data-doc="08-settings.md#binaries">Guide</a></h2><button class="act sec" id="binFromServer" type="button" style="margin-left:auto" data-perm="collections.manage" data-perm-what="upload binaries">Upload from server</button></div>
         <p class="dim hs-sub">Tools that hunts, actions and workflows depend on. Upload each one here.</p>
         <div class="bin-bar">
           <div class="toggle" id="binKind"><button type="button" data-k="all" class="on">All <span class="bn"></span></button><button type="button" data-k="hunt" title="Used by collections: staged on the target for a hunt">Hunts <span class="bn"></span></button><button type="button" data-k="action" title="Used by actions, such as the deploy installers: staged on the target for a response">Actions <span class="bn"></span></button><button type="button" data-k="processing" title="Used by workflow processors: unpacked and run on the server">Processing <span class="bn"></span></button></div>
@@ -349,7 +397,7 @@
     </section>
     <section class="page" id="hosts/discover">
       <div class="card auto">
-        <h2>Subnet scan</h2>
+        <h2>Subnet scan <a href="#" class="doclink" data-doc="03-hosts.md#discover-scanning-a-network">Guide</a></h2>
         <div class="row">
           <input id="cidr" placeholder="192.168.50.0/24, 10.0.0.5-20, 172.16.1.7,8,9" size="46" title="Subnets (192.168.50.0/24), ranges (192.168.50.10-20), lists (192.168.50.5,6,7) or single addresses. Chain several with commas." spellcheck="false" autocomplete="off">
           <button class="act" id="scanBtn" data-perm="hosts.manage" data-perm-what="run discovery scans">Scan</button>
@@ -461,7 +509,7 @@
               <div class="home-tag">Threat hunting for Windows and Linux hosts</div>
               <div class="home-btns">
                 <a class="act" href="#hosts/discover">Get started</a>
-                <a class="act sec" href="https://github.com/flynnmackie/kookaburrow#readme" target="_blank" rel="noopener noreferrer">Documentation</a>
+                <a class="act sec" id="homeDocs" href="https://github.com/flynnmackie/kookaburrow#readme" target="_blank" rel="noopener noreferrer">Documentation</a>
               </div>
               <div class="home-stats" id="homeStats"></div>
             </div>
@@ -695,6 +743,31 @@
     <div class="dlg-foot"><button class="act" id="wfSave" type="button">Create</button><button class="act sec" id="wfCancel" type="button">Cancel</button></div>
   </div>
 </div>
+<div class="modal" id="kbModal" hidden role="dialog" aria-modal="true" aria-labelledby="kbTitle">
+  <div class="dlg kbdlg">
+    <div class="dlg-head"><h2 id="kbTitle">Import dashboards into Kibana</h2><button class="dlg-x" id="kbX" aria-label="Close">×</button></div>
+    <div class="dlg-body kb-body">
+      <p class="dim" style="margin:0 0 8px;font-size:12.5px">Imports the Kookaburrow dashboards, visualizations, saved searches and data view. Importing again replaces them. The sign-in below is used once and not saved.</p>
+      <span class="fl">Kibana address</span><input id="kbUrl" type="text" spellcheck="false" placeholder="http://kibana.lab.local:5601" autocomplete="off">
+      <span class="fl">Sign-in</span><select id="kbAuth"><option value="basic">User name and password</option><option value="apikey">API key</option><option value="none">None (security off)</option></select>
+      <div id="kbBasic"><span class="fl">User name</span><input id="kbUser" type="text" autocomplete="off" value="elastic"><span class="fl">Password</span><input id="kbPass" type="password" autocomplete="new-password"></div>
+      <div id="kbKeyRow" hidden><span class="fl">API key</span><input id="kbKey" type="password" autocomplete="off" placeholder="The encoded value of a key that may use Kibana"></div>
+      <span class="fl">Space <span class="dim">(optional; blank is the default space)</span></span><input id="kbSpace" type="text" spellcheck="false" autocomplete="off">
+      <label class="dim" style="display:block;margin:8px 0 2px"><input type="checkbox" id="kbInsecure"> Skip certificate check (https with a self-signed certificate; not recommended)</label>
+      <div id="kbResult" style="margin-top:8px"></div>
+    </div>
+    <div class="dlg-foot"><button class="act" id="kbGo" type="button">Import</button><button class="act sec" id="kbCancel" type="button">Close</button></div>
+  </div>
+</div>
+<div class="modal" id="docModal" hidden role="dialog" aria-modal="true" aria-labelledby="docTitle">
+  <div class="dlg docdlg">
+    <div class="dlg-head"><h2 id="docTitle">Documentation</h2><span class="doc-tools"><button class="act sec" id="docBack" type="button" disabled>Back</button><a class="dim" href="https://github.com/flynnmackie/kookaburrow#readme" target="_blank" rel="noopener noreferrer">View on GitHub</a></span><button class="dlg-x" id="docX" aria-label="Close">×</button></div>
+    <div class="doc-layout">
+      <div class="doc-side"><input id="docSearch" type="search" placeholder="Search the documentation" autocomplete="off" spellcheck="false"><nav id="docNav"></nav><div id="docResults" hidden></div></div>
+      <article class="md doc-body" id="docBody"><p class="dim">Loading…</p></article>
+    </div>
+  </div>
+</div>
 <div class="modal" id="pwModal" hidden role="dialog" aria-modal="true" aria-labelledby="pwTitle">
   <div class="dlg pwdlg">
     <div class="dlg-head"><h2 id="pwTitle">Change password</h2><button class="dlg-x" id="pwX" aria-label="Close">×</button></div>
@@ -829,6 +902,10 @@
 <script src="respond.js"></script>
 <script src="recurring.js"></script>
 <script src="workflow.js"></script>
+<script src="sso.js"></script>
+<script src="vendor/marked.min.js"></script>
+<script src="docs.js"></script>
+<script src="kibana.js"></script>
 <script src="report.js"></script>
 <script src="browse.js"></script>
 <script src="analysis.js"></script>

@@ -22,13 +22,13 @@ If the server uses HTTPS (see [Certificate](08-settings.md#certificate)) your br
 
 ## The interface
 
-Click the logo for **Home**: the server's name, listening address, version, WinRM engine, uptime and disk use, the library counts, and what your account is allowed to do.
+Click the logo for **Home**: the server's name, listening address, version, WinRM engine, uptime and disk use, the library counts, and what your account is allowed to do. **Documentation** opens these guides inside Kookaburrow with search, so they work offline (**View on GitHub** in the viewer opens the online copy).
 
 The top bar holds the main areas. Anything your role cannot use is greyed out.
 
 | Tab | What it is for |
 |---|---|
-| **Settings** | System settings (users, shell, health, run, server, certificate, Elastic), the collection and action libraries, and External (Binaries and Dependencies) |
+| **Settings** | System settings (users, shell, health, run, server, certificate), the collection and action libraries, and External (Binaries, Dependencies, Elastic and Single Sign-On) |
 | **Host Management** | View Hosts, Profiles, Groups, Discover (scan), Manually Add |
 | **Burrow!** | Hunt, Respond, Workflow, Recurring |
 | **Results** | Activity log, JSON, and Analysis: Report, Diff, Cross-host comparison, IOC, Baseline |

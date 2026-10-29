@@ -44,7 +44,7 @@ Find the symptom, check the cause, apply the fix.
 
 | Symptom | Cause and fix |
 |---|---|
-| Another PC says *can't reach this page* | Check in order: (1) the server listens on a network address, not `127.0.0.1` (Server Settings, Home shows it); (2) the other PC's address is in the **allowed list**; (3) Windows Firewall has an inbound rule for the port; (4) the PC really has a route to the server (VPNs and default routes can send the traffic elsewhere); (5) you browse to an address or name the server accepts |
+| Another PC says *can't reach this page* | Check in order: (1) the server listens on a network address, not `127.0.0.1` (Server Settings, Home shows it); (2) the other PC's address is in the **allowed list**; (3) Windows Firewall has the inbound rule *Kookaburrow web interface* for the port (Server Settings shows its state; the server creates it itself when computers are allowed, and says why if it cannot); (4) the PC really has a route to the server (VPNs and default routes can send the traffic elsewhere); (5) you browse to an address or name the server accepts |
 | `403 Forbidden` | Your address is not in the allowed list |
 | `Bad Host header` or `Bad Origin` | You are browsing by a name or address that is not one of the server's own. Use an address Server Settings lists, or add the name to the [certificate](08-settings.md#certificate) and browse by it |
 | The browser shows a certificate warning | HTTPS is on and the CA is not trusted on this machine. Import the CA, see [Certificate](08-settings.md#certificate). Or browse from the server PC, where plain HTTP always works |
@@ -122,6 +122,20 @@ ode.exe scriptsinstall-setup.js --host=x127.0.0.1x --port=x46200x --allow=xx --u
 | The account cannot write to `kookaburrow-*` | The API key or role lacks `create_index`, `index` or `auto_configure` on `<prefix>-*` |
 | Rows show as failed | The status line shows the first reason Elasticsearch gave (a mapping or index setting problem, for example) |
 | Nothing arrives | Check the switch is **On**, run *Test connection*, then use *Send a past hunt* to confirm the path |
+
+## Single sign-on
+
+| Symptom | Cause and fix |
+|---|---|
+| "The provider signed the ID token with the client secret (HS256)" | Choose a **Signing Key** on the provider so it signs with RS256 |
+| "the provider's certificate is not trusted" | The provider uses an internal or self-signed certificate. Paste its CA into **CA certificate** |
+| The provider rejects the redirect address | Register exactly the address shown on the page, including the port. It is built from **This server's address**, which must match how you browse to Kookaburrow |
+| "The provider's issuer ... does not match" | The issuer address must be exactly what the provider reports (authentik: its trailing slash) |
+| "This sign-in attempt is not valid or has expired" | The browser did not send back the sign-in cookie, the attempt was older than 10 minutes, or it was used twice. Start again from the sign-in page; check the address in the browser matches **This server's address** |
+| "The provider did not send ..." | The user name claim is not in the token. Check the scopes and the claim name |
+| "already linked to a different single sign-on identity" | That Kookaburrow user belongs to another provider account. Sign in with the right provider account, or delete the Kookaburrow user in User Management (a new one is made at the next sign-in) |
+| Signed in, but everything is locked | A new user has the **No Access** role. An administrator gives a role in Settings > System > User Management |
+| "ID token ... issued in the future" or "expired" straight away | The clock on this server or the provider is wrong |
 
 ## Collecting information for a bug report
 

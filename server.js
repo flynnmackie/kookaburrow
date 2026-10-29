@@ -20,6 +20,9 @@ const shell = require('./src/shell');
 const monitor = require('./src/monitor');
 const quarantine = require('./src/quarantine');
 const auth = require('./src/auth');
+const sso = require('./src/sso');
+const firewall = require('./src/firewall');
+const kibana = require('./src/kibana');
 const serverSettings = require('./src/server-settings');
 const tls = require('./src/tls');
 const permissions = require('./src/permissions');
@@ -54,7 +57,7 @@ const access = (u) => {
 // API calls and other files answer 401, which the app turns into a redirect to the sign-in page.
 const PUBLIC_FILES = new Set(['/login.html', '/fonts.css', '/tokens.css', '/favicon.ico', '/logo.png', '/logo-sm.png']);
 app.use((req, res, next) => {
-  if (PUBLIC_FILES.has(req.path) || req.path.startsWith('/fonts/') || req.path === '/api/auth/login') return next();
+  if (PUBLIC_FILES.has(req.path) || req.path.startsWith('/fonts/') || req.path === '/api/auth/login' || req.path.startsWith('/api/auth/sso/')) return next();
   const s = auth.sessionFrom(req);
   if (s) { req.user = s.user; return next(); }
   if (req.method === 'GET' && (req.path === '/' || req.path === '/index.html')) return res.redirect('/login.html');
@@ -66,6 +69,10 @@ app.post('/api/auth/login', async (req, res) => {
     res.set('Set-Cookie', r.cookie + (req.socket.encrypted ? '; Secure' : '')).json({ ok: true, username: r.user });
   } catch (e) { res.status(e.status || 400).json({ error: e.message }); }
 });
+// Single sign-on (src/sso.js): the status is public so the sign-in page can show its button; the other two are the browser's way there and back.
+app.get('/api/auth/sso/status', (req, res) => res.json(sso.status()));
+app.get('/api/auth/sso/login', (req, res) => { sso.begin(req, res); });
+app.get('/api/auth/sso/callback', (req, res) => { sso.callback(req, res); });
 app.post('/api/auth/logout', (req, res) => { res.set('Set-Cookie', auth.logout(req) + (req.socket.encrypted ? '; Secure' : '')).json({ ok: true }); });
 // Who is signed in, with their roles and what those roles allow (the Home page shows this).
 app.get('/api/auth/me', (req, res) => {
@@ -502,7 +509,7 @@ const roleView = (r) => ({
   id: r.id, name: r.name, description: r.description, builtin: !!r.builtin, all: r.permissions.includes('*'),
   permissions: permissions.expand(r), members: db.users.filter((u) => u.roles.includes(r.id)).map((u) => u.username),
 });
-const userView = (u) => ({ id: u.id, username: u.username, createdAt: u.createdAt, ...access(u) });
+const userView = (u) => ({ id: u.id, username: u.username, createdAt: u.createdAt, sso: !!u.sso, ...access(u) });
 app.get('/api/roles', (req, res) => res.json(db.roles.map(roleView)));
 app.get('/api/users', (req, res) => res.json(db.users.map(userView)));
 
@@ -668,7 +675,7 @@ app.post('/api/hunts', wrap((req, res) => {
   if (b.quick && (b.schedule || (b.listIds || []).length || hosts.length !== 1)) throw new Error('A quick hunt runs once, on exactly one host');
   const elasticMod = require('./src/elastic');
   const sendElastic = typeof b.sendElastic === 'boolean' ? b.sendElastic : elasticMod.defaultOn();
-  if (sendElastic && !elasticMod.configured()) throw new Error('Elastic is not set up (Settings > System > Elastic)');
+  if (sendElastic && !elasticMod.configured()) throw new Error('Elastic is not set up (Settings > External > Elastic)');
   const workflowId = b.workflowId ? String(b.workflowId) : null;
   if (workflowId) {
     const wfDef = require('./src/workflows').find(workflowId);
@@ -936,23 +943,68 @@ app.post('/api/workflows', wrap((req, res) => res.status(201).json(workflows.cre
 app.put('/api/workflows/:id', wrap((req, res) => res.json(workflows.update(req.params.id, req.body || {}))));
 app.delete('/api/workflows/:id', wrap((req, res) => { workflows.remove(req.params.id); res.json({ ok: true }); }));
 
-// ---- Elastic: forward hunt rows to Elasticsearch (Settings > System > Elastic) ----
+// ---- Offline documentation: the markdown in docs/ and README.md, read by the viewer on the Home page (public/docs.js) ----
+const fs = require('fs'), path = require('path');
+const DOC_DIR = path.join(__dirname, 'docs');
+const docPath = (name) => (name === 'README.md' ? path.join(__dirname, 'README.md') : /^\d\d-[a-z0-9-]+\.md$/.test(name) ? path.join(DOC_DIR, name) : null);
+const docNames = () => ['README.md', ...(fs.existsSync(DOC_DIR) ? fs.readdirSync(DOC_DIR).filter((n) => docPath(n)).sort() : [])].filter((n) => fs.existsSync(docPath(n)));
+const docTitle = (name) => { const m = /^#\s+(.+)$/m.exec(fs.readFileSync(docPath(name), 'utf8')); return m ? m[1].replace(/[*_`]/g, '').trim() : name; };
+const docSlug = (t) => String(t).trim().toLowerCase().replace(/[^\p{L}\p{N}\s_-]/gu, '').replace(/\s/g, '-');
+app.get('/api/docs', (req, res) => res.json(docNames().map((file) => ({ file, title: file === 'README.md' ? 'Overview' : docTitle(file) }))));
+// words in any order, all must be on one line; up to 6 lines per guide and 60 in all, each with the heading it sits under
+app.get('/api/docs/search', (req, res) => {
+  const words = String(req.query.q || '').toLowerCase().split(/\s+/).filter((w) => w.length >= 2).slice(0, 6);
+  if (!words.length) return res.json([]);
+  const hits = [];
+  for (const file of docNames()) {
+    let heading = '', fence = false, n = 0;
+    const title = file === 'README.md' ? 'Overview' : docTitle(file);
+    for (const line of fs.readFileSync(docPath(file), 'utf8').split(/\r?\n/)) {
+      if (/^\s*```/.test(line)) fence = !fence;
+      const h = !fence && /^#{1,6}\s+(.+)$/.exec(line);
+      if (h) heading = h[1].replace(/[*_`]/g, '').trim();
+      const low = line.toLowerCase();
+      if (words.every((w) => low.includes(w)) && line.trim()) {
+        hits.push({ file, title, heading, anchor: docSlug(heading), text: line.replace(/[#*`|]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160) });
+        if (++n >= 6) break;
+      }
+    }
+    if (hits.length >= 60) break;
+  }
+  res.json(hits.slice(0, 60));
+});
+app.get('/api/docs/file/:name', (req, res) => {
+  const p = docPath(req.params.name);
+  if (!p || !fs.existsSync(p)) return res.status(404).json({ error: 'No such guide' });
+  res.type('text/markdown; charset=utf-8').send(fs.readFileSync(p, 'utf8'));
+});
+
+// ---- Elastic: forward hunt rows to Elasticsearch (Settings > External > Elastic) ----
 const elastic = require('./src/elastic');
 app.get('/api/dependencies', wrap(async (req, res) => res.json(await Promise.all(dependencies.CATALOG.map((d) => dependencies.status(d.id))))));
 app.post('/api/dependencies/recheck', wrap(async (req, res) => res.json(await dependencies.checkAll())));
+app.get('/api/settings/sso', (req, res) => res.json({ settings: sso.settings() }));
+app.put('/api/settings/sso', wrap((req, res) => { sso.setSettings(req.body || {}); res.json({ settings: sso.settings() }); }));
+app.post('/api/settings/sso/test', wrap(async (req, res) => res.json(await sso.test(req.body || {}))));
 app.get('/api/settings/elastic', (req, res) => res.json({ settings: elastic.settings(), status: elastic.status() }));
 app.put('/api/settings/elastic', wrap((req, res) => { elastic.setSettings(req.body || {}); res.json({ settings: elastic.settings(), status: elastic.status() }); }));
 app.post('/api/settings/elastic/test', wrap(async (req, res) => res.json(await elastic.test(req.body || {}))));
+// the index template and the Kibana dashboards (src/elastic.js, src/kibana.js); the Kibana sign-in is typed in the import dialog and not saved
+app.get('/api/settings/elastic/template', wrap(async (req, res) => res.json({ status: await elastic.templateStatus(), request: elastic.templateRequest(), name: elastic.TEMPLATE_NAME })));
+app.post('/api/settings/elastic/template', wrap(async (req, res) => res.json(await elastic.installTemplate(req.body || {}))));
+app.get('/api/settings/elastic/dashboards', wrap((req, res) => res.json(kibana.contents())));
+app.post('/api/settings/elastic/dashboards/import', wrap(async (req, res) => res.json(await kibana.importDashboards(req.body || {}))));
 app.post('/api/settings/elastic/forward', wrap((req, res) => res.json(elastic.forwardRun(String((req.body || {}).runId || '')))));
 
 // ---- Server Settings: the address and port the server listens on and who may connect (Settings > System > Server Settings) ----
 // Saving restarts the server. This PC (localhost) is always allowed and always listened on.
 const reqCtx = (req) => ({ clientAddr: req.socket.remoteAddress, hostHeader: req.headers.host });
-app.get('/api/settings/server', (req, res) => res.json({
+app.get('/api/settings/server', wrap(async (req, res) => res.json({
+  firewall: await firewall.status(running),
   settings: serverSettings.settings(), running, defaults: serverSettings.DEFAULTS, saved: serverSettings.hasSaved(),
   addresses: serverSettings.localAddresses().map((a) => ({ name: a.name, address: a.address })),
   fallback: serverSettings.fallback(), you: { address: serverSettings.clean(req.socket.remoteAddress), host: req.headers.host },
-}));
+})));
 app.post('/api/settings/server/check', wrap(async (req, res) => res.json(await serverSettings.check(req.body || {}, reqCtx(req)))));
 app.put('/api/settings/server', wrap(async (req, res) => {
   const c = await serverSettings.setSettings(req.body || {}, reqCtx(req));
@@ -1079,6 +1131,7 @@ async function startListening() {
   monitor.start();
   quarantine.start();
   scheduler.start();
+  firewall.apply(running).catch(() => {}); // Windows Firewall follows the listening address, port and allowed computers
 }
 // Saving Server Settings restarts the server: stop listening, start a fresh copy of this process (detached) and exit.
 serverSettings.onRestart(() => setTimeout(() => {

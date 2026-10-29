@@ -7,7 +7,7 @@ const { db, save } = require('./store');
 const { encrypt, decrypt } = require('./crypto');
 const { parseCsv, runDir } = require('./output');
 
-// Forwarding hunt results to Elasticsearch (Settings > System > Elastic, kept in db.settings.elastic). Each hunt decides for itself whether
+// Forwarding hunt results to Elasticsearch (Settings > External > Elastic, kept in db.settings.elastic). Each hunt decides for itself whether
 // it sends (run.sendElastic, set in the New Hunt dialog); the settings page holds the connection and whether new hunts send by default.
 // Every row of every collection's CSV becomes one document, sent with the _bulk API as results arrive:
 //   index       <prefix>-<collection>      one index per collection (so columns of different collections never share a mapping)
@@ -17,7 +17,7 @@ const { parseCsv, runDir } = require('./output');
 //   kookaburrow.{run_id, hunt, run_by, scheduled, collection, collection_id}   run_by is the user who started the hunt (a schedule's creator)
 //   kookaburrow.data.<column>              the CSV columns, as text
 // Works with plain Elasticsearch 7/8 and with SOF-ELK (point it at the Elasticsearch port, 9200).
-const DEFAULTS = { enabled: false, url: '', auth: 'none', username: '', index: 'kookaburrow', insecure: false, ca: '' };
+const DEFAULTS = { enabled: false, url: '', auth: 'none', username: '', index: 'kookaburrow', insecure: false, ca: '', kibanaUrl: '' };
 const err = (m) => Object.assign(new Error(m), { status: 400 });
 
 function raw() { return { ...DEFAULTS, ...((db.settings && db.settings.elastic) || {}) }; }
@@ -26,9 +26,20 @@ const hasSecret = (s) => !!(s.apiKeyEnc || s.passwordEnc);
 // What the page sees: never the secret itself.
 function settings() {
   const s = raw();
-  return { enabled: !!s.enabled, url: s.url, auth: s.auth, username: s.username, index: s.index, insecure: !!s.insecure, ca: s.ca, hasApiKey: !!s.apiKeyEnc, hasPassword: !!s.passwordEnc };
+  return { enabled: !!s.enabled, url: s.url, kibanaUrl: s.kibanaUrl || '', auth: s.auth, username: s.username, index: s.index, insecure: !!s.insecure, ca: s.ca, hasApiKey: !!s.apiKeyEnc, hasPassword: !!s.passwordEnc };
 }
 
+// Kibana's address (kept to save typing it again; never a secret): http(s)://host:port, optionally with a base path
+function cleanKibanaUrl(v) {
+  let u = String(v || '').trim().replace(/\/+$/, '');
+  if (!u) return '';
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(u) && !/^https?:\/\//i.test(u)) throw err("Kibana's address must start with http:// or https://");
+  if (!/^https?:\/\//i.test(u)) u = 'http://' + u;
+  let p;
+  try { p = new URL(u); } catch { throw err("Kibana's address is not a valid http:// or https:// URL"); }
+  if (!/^https?:$/.test(p.protocol) || p.username || p.password || p.search || p.hash) throw err("Kibana's address must look like http://host:5601 (no user name, ? or #)");
+  return p.origin + (p.pathname === '/' ? '' : p.pathname.replace(/\/+$/, ''));
+}
 const indexOk = (s) => /^[a-z0-9][a-z0-9._-]{0,80}$/.test(s);
 function normalise(b, cur) {
   const out = { ...cur };
@@ -38,6 +49,7 @@ function normalise(b, cur) {
     if (u) { try { const p = new URL(u); if (!/^https?:$/.test(p.protocol)) throw 0; u = p.origin + (p.pathname === '/' ? '' : p.pathname.replace(/\/+$/, '')); } catch { throw err('The address is not a valid http:// or https:// URL'); } }
     out.url = u;
   }
+  if (b.kibanaUrl !== undefined) out.kibanaUrl = cleanKibanaUrl(b.kibanaUrl);
   if (b.auth !== undefined) { if (!['none', 'apikey', 'basic'].includes(b.auth)) throw err('Unknown sign-in type'); out.auth = b.auth; }
   if (b.username !== undefined) out.username = String(b.username).trim();
   if (b.index !== undefined) { const i = String(b.index).trim().toLowerCase(); if (!indexOk(i)) throw err('The index name may only use lowercase letters, digits, . _ - (and must start with a letter or digit)'); out.index = i; }
@@ -70,11 +82,11 @@ function authHeader(s) {
   if (s.auth === 'basic' && s.passwordEnc) return 'Basic ' + Buffer.from(`${s.username}:${decrypt(s.passwordEnc)}`).toString('base64');
   return null;
 }
-function request(s, method, urlPath, body, contentType = 'application/json') {
+function request(s, method, urlPath, body, contentType = 'application/json', extraHeaders = {}) {
   return new Promise((resolve, reject) => {
     const u = new URL(s.url + urlPath);
     const lib = u.protocol === 'https:' ? https : http;
-    const headers = { Accept: 'application/json' };
+    const headers = { Accept: 'application/json', ...extraHeaders };
     const a = authHeader(s); if (a) headers.Authorization = a;
     if (body !== undefined) { headers['Content-Type'] = contentType; headers['Content-Length'] = Buffer.byteLength(body); }
     const opts = { method, headers, timeout: 30000 };
@@ -122,6 +134,13 @@ async function test(b = {}) {
     } else if (p.status === 401 || p.status === 403) { out.security = true; out.canWrite = null; out.note = 'Signed in, but the account cannot check its own privileges'; }
     else { out.security = false; out.canWrite = true; out.note = 'Security looks switched off on this server (no sign-in needed)'; }
   } catch (e) { out.canWrite = null; }
+  // the index template is optional: report whether this account could install it, without making that part of "ok"
+  if (out.security) {
+    try {
+      const c = await request(s, 'POST', '/_security/user/_has_privileges', JSON.stringify({ cluster: ['manage_index_templates'] }));
+      if (c.status === 200 && c.json && c.json.cluster) out.canTemplate = !!c.json.cluster.manage_index_templates;
+    } catch { /* not known */ }
+  }
   out.ok = out.canWrite !== false;
   if (out.canWrite === false) out.error = `The account cannot write to ${s.index}-*: it needs ${out.missing.length ? out.missing.join(', ') : 'create_index, index and auto_configure'} on that index pattern`;
   return out;
@@ -229,6 +248,54 @@ function forwardResult({ run, collection, host, csv }) {
   } catch (e) { stats.lastError = e.message; stats.lastErrorAt = new Date().toISOString(); }
 }
 
+// ---- the index template ----
+// Without it Elasticsearch guesses every field as text (with a .keyword copy), which cannot be charted directly. The template maps the fields every
+// document carries (the ones in the dashboards), and keeps kookaburrow.data.* as the default text with a .keyword copy (a collection's columns differ, and
+// dates and numbers in them are not detected, so a column never changes type from one hunt to the next).
+// It applies to indexes created after it is installed; existing ones keep their mapping (delete them and send the hunts again).
+const TEMPLATE_NAME = 'kookaburrow';
+function templateBody(prefix) {
+  const kw = { type: 'keyword', ignore_above: 512 };
+  return {
+    index_patterns: [`${prefix}-*`],
+    priority: 200,
+    _meta: { description: 'Created by Kookaburrow (Settings > External > Elastic). Maps the fields every Kookaburrow document has.' },
+    // date_detection off: a column whose value looks like a date in one hunt and not in another would otherwise become a date in one index and text in
+    // another (Kibana shows a type conflict), and the CSV columns are meant to stay text
+    template: { mappings: { date_detection: false, numeric_detection: false, properties: {
+      '@timestamp': { type: 'date' },
+      event: { properties: { module: kw, dataset: kw, kind: kw } },
+      host: { properties: { name: kw, ip: { type: 'ip' } } },
+      kookaburrow: { properties: { run_id: kw, hunt: kw, run_by: kw, scheduled: { type: 'boolean' }, collection: kw, collection_id: kw, workflow: kw, processor: kw } },
+    } } },
+  };
+}
+// What an administrator could paste into Kibana Dev Tools instead.
+const templateRequest = (prefix = raw().index) => `PUT _index_template/${TEMPLATE_NAME}\n${JSON.stringify(templateBody(prefix), null, 2)}`;
+async function templateStatus() {
+  const s = raw();
+  if (!s.url) return { configured: false };
+  try {
+    const r = await request(s, 'GET', `/_index_template/${TEMPLATE_NAME}`);
+    if (r.status === 200) { const t = (r.json.index_templates || [])[0]; return { configured: true, installed: true, patterns: t ? t.index_template.index_patterns : [], upToDate: !!t && JSON.stringify(t.index_template.index_patterns) === JSON.stringify([`${s.index}-*`]) }; }
+    if (r.status === 404) return { configured: true, installed: false };
+    if (r.status === 401 || r.status === 403) return { configured: true, installed: null, note: 'This API key cannot read index templates, so whether it is installed is not known.' };
+    return { configured: true, installed: null, note: `Elasticsearch answered ${r.status}` };
+  } catch (e) { return { configured: true, installed: null, note: friendly(e) }; }
+}
+// `b` can carry unsaved form values, like test().
+async function installTemplate(b = {}) {
+  const s = normalise({ ...b, enabled: false }, raw());
+  if (!s.url) throw err('Enter the Elasticsearch address first');
+  try {
+    const r = await request(s, 'PUT', `/_index_template/${TEMPLATE_NAME}`, JSON.stringify(templateBody(s.index)));
+    if (r.status === 200 && r.json && r.json.acknowledged) return { ok: true, name: TEMPLATE_NAME, patterns: [`${s.index}-*`] };
+    if (r.status === 401) throw err('Sign-in was refused: check the API key or user name and password');
+    if (r.status === 403) throw err('This account is not allowed to manage index templates. Give the API key the cluster privilege manage_index_templates (see the Elastic guide), or paste the template into Kibana Dev Tools instead.');
+    throw err(`Elasticsearch did not accept the template (HTTP ${r.status}): ${(r.json && r.json.error && (r.json.error.reason || r.json.error.type)) || r.text.slice(0, 200)}`);
+  } catch (e) { if (e.status) throw e; throw err(friendly(e)); }
+}
+
 // A processor's output (a CSV a workflow produced) as documents. The hunt decides whether it is sent (run.sendElastic). Returns { queued } or { skipped: reason }.
 const MAX_FILE = 300 * 1024 * 1024;
 // A Zeek log (tab separated, with #fields and other # header lines) as CSV text. "-" (unset) and "(empty)" become empty cells.
@@ -247,7 +314,7 @@ function zeekToCsv(text) {
 
 function forwardFile({ run, collection, host, file, relName, timeColumn, timeUtc, timeEpoch, format, workflow }) {
   const s = raw();
-  if (!s.url) return { skipped: 'Elastic is not set up (Settings > System > Elastic)' };
+  if (!s.url) return { skipped: 'Elastic is not set up (Settings > External > Elastic)' };
   const size = fs.statSync(file).size;
   if (size > MAX_FILE) return { skipped: `the output is ${(size / 1048576).toFixed(0)} MB, over the ${MAX_FILE / 1048576} MB limit for sending` };
   const text = fs.readFileSync(file, 'utf8');
@@ -279,7 +346,7 @@ function forwardRun(runId) {
   return { queued: docs };
 }
 
-// Is Elastic set up, and should a new hunt send to it unless told otherwise (Settings > System > Elastic, "send hunts by default")?
+// Is Elastic set up, and should a new hunt send to it unless told otherwise (Settings > External > Elastic, "send hunts by default")?
 const configured = () => !!raw().url;
 const defaultOn = () => !!raw().enabled && configured();
 const target = () => { try { return new URL(raw().url).host; } catch { return ''; } };
@@ -287,4 +354,5 @@ const target = () => { try { return new URL(raw().url).host; } catch { return ''
 function status() { return { ...stats, queued: queue.length, working }; }
 
 module.exports = {
+  request, friendly, TEMPLATE_NAME, templateBody, templateRequest, templateStatus, installTemplate, cleanKibanaUrl,
   zeekToCsv, settings, setSettings, test, forwardResult, forwardRun, forwardFile, status, configured, defaultOn, target, DEFAULTS, rowsToDocs };

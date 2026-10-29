@@ -23,6 +23,8 @@
   button:hover:not(:disabled) { background:var(--accent-hover); border-color:var(--accent-hover); } button:disabled { opacity:.6; cursor:default; }
   button:focus-visible { outline:2px solid var(--blue); outline-offset:2px; }
   #msg { min-height:18px; margin-top:12px; color:var(--bad); font-size:12.5px; text-align:center; }
+  .sso { display:none; margin-top:12px; } .sso a { display:block; text-align:center; text-decoration:none; background:none; color:var(--text); border:1px solid var(--line-hi); border-radius:var(--r-m); padding:9px 10px; font:500 13.5px var(--f-ui); }
+  .sso a:hover { border-color:var(--blue); } .sso .or { color:var(--faint); font-size:11.5px; text-align:center; margin-bottom:10px; }
   .foot { margin-top:16px; color:var(--faint); font-size:11.5px; }
 </style>
 </head>
@@ -38,12 +40,17 @@
       <input id="p" name="password" type="password" autocomplete="current-password">
       <button id="go" type="submit">Sign in</button>
       <div id="msg" role="alert"></div>
+      <div class="sso" id="sso"><div class="or">or</div><a id="ssoGo" href="/api/auth/sso/login">Single sign-on</a></div>
     </form>
   </div>
 <script>
   const $ = (id) => document.getElementById(id);
   // Already signed in? Go straight to the app.
   fetch('/api/auth/me').then((r) => { if (r.ok) location.replace('/#home/home'); }).catch(() => {});
+  // Single sign-on: a button when it is on, and the reason when a sign-in through it failed
+  fetch('/api/auth/sso/status').then((r) => r.json()).then((s) => { if (s.enabled) { $('ssoGo').textContent = 'Sign in with ' + s.name.replace(/^sign in with\s+/i, ''); $('sso').style.display = 'block'; } }).catch(() => {});
+  const ssoErr = new URLSearchParams(location.search).get('sso_error');
+  if (ssoErr) { $('msg').textContent = ssoErr; history.replaceState(null, '', '/login.html'); }
   $('f').onsubmit = async (e) => {
     e.preventDefault();
     if (!$('u').value.trim() || !$('p').value) { $('msg').textContent = 'Enter your username and password'; return; }

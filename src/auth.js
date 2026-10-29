@@ -17,6 +17,8 @@ function makeUser(username, password) {
   return { id: id(), username, salt: salt.toString('hex'), hash: scrypt(password, salt).toString('hex'), createdAt: new Date().toISOString() };
 }
 function checkPassword(user, password) {
+  // a user created by single sign-on has no password: the same work is done, and the answer is no
+  if (!user.hash || !user.salt) { scrypt(password, Buffer.alloc(16)); return false; }
   const want = Buffer.from(user.hash, 'hex');
   const got = scrypt(password, Buffer.from(user.salt, 'hex'));
   return want.length === got.length && crypto.timingSafeEqual(want, got);
@@ -98,12 +100,16 @@ async function login(username, password) {
     throw Object.assign(new Error('Incorrect username or password'), { status: 401 });
   }
   fails.delete(name);
+  return startSession(user.username);
+}
+// A new session for a user who has been let in (a correct password, or single sign-on). Returns { user, cookie }.
+function startSession(username) {
   const token = crypto.randomBytes(32).toString('hex');
   const now = Date.now();
   db.sessions = db.sessions.filter((s) => now - s.lastSeen <= IDLE_MS); // drop expired ones while we are here
-  db.sessions.push({ h: sha256(token), user: user.username, created: new Date().toISOString(), lastSeen: now });
+  db.sessions.push({ h: sha256(token), user: username, created: new Date().toISOString(), lastSeen: now });
   save();
-  return { user: user.username, cookie: `${COOKIE}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${IDLE_MS / 1000}` };
+  return { user: username, cookie: `${COOKIE}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${IDLE_MS / 1000}` };
 }
 
 function logout(req) {
@@ -139,4 +145,4 @@ function setPassword(user, password, { keepSession } = {}) {
 }
 const sessionHash = (req) => { const t = cookieOf(req); return /^[0-9a-f]{64}$/.test(t) ? sha256(t) : null; };
 
-module.exports = { sessionFrom, login, logout, makeUser, endSessions, confirmPassword, setPassword, sessionHash };
+module.exports = { sessionFrom, login, startSession, logout, makeUser, endSessions, confirmPassword, setPassword, sessionHash };

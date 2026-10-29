@@ -26,7 +26,7 @@ Kookaburrow holds administrator credentials for your hosts and can run code on t
 - **Password storage**: a salted scrypt hash. The password itself is never stored. Minimum length 8.
 - **Lockout**: five wrong passwords for a user name pause sign-in for that name for 30 seconds. Checking your *current* password when changing it counts towards the same limit.
 - **Sessions**: a random token is sent in an `HttpOnly`, `SameSite=Strict` cookie (also `Secure` over HTTPS). Only its SHA-256 is kept on the server, so a copy of the database cannot be used to sign in. A session ends after 8 hours without use, on sign-out, and when the password changes (your other sessions end; for someone else's password, all of theirs).
-- No multi-factor authentication or single sign-on yet.
+- **Single sign-on** through OpenID Connect is available ([Settings](08-settings.md#single-sign-on)): the code flow with PKCE, state and nonce, and the ID token's signature, issuer, audience, expiry and nonce are all checked. Multi-factor authentication is whatever the provider enforces; Kookaburrow has none of its own. A user created by single sign-on gets the **No Access** role and no password. Linking an identity to an existing user by name trusts the provider's choice of names: see the warning there.
 
 ## Authorisation
 
@@ -44,7 +44,7 @@ Kookaburrow holds administrator credentials for your hosts and can run code on t
 | localhost | Always allowed and always listened on, so settings can never lock you out from the server PC |
 | `Host` / `Origin` checks | Requests whose `Host` or `Origin` is not one of the server's own names are rejected. This blocks DNS rebinding and cross-site requests |
 | HTTPS | Optional, with a built-in CA ([Certificate](08-settings.md#certificate)). When on, plain HTTP from other machines is redirected to HTTPS. **Plain HTTP stays available from this PC itself**, by design |
-| Firewall | The MSI opens the chosen port when not localhost only. Changing the port later does not change the rule |
+| Firewall | The server keeps one Windows Firewall rule for its port, open only to the allowed computers, while it listens on the network; with no allowed computers or on localhost there is no rule |
 
 Server Settings warns when you expose the server over plain HTTP, listen on the network without an allow-list, use a very wide range, or would lock out your own browser.
 
