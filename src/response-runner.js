@@ -13,7 +13,7 @@ const cancel = require('./cancel');
 // one row per line, with a Stream column), and the response's log, All_Hosts CSV and All_Hosts JSON at the top level.
 // It is kept in db.runs with kind 'response' so Burrow > Respond lists it. Parameter VALUES are used to run the action but are
 // never stored or logged (they can be passwords); only the parameter names are recorded.
-function startResponse({ name, actionIds, hosts, params, startedBy, scheduleId, quick = false }) {
+function startResponse({ name, actionIds, hosts, params, startedBy, scheduleId, quick = false, approval = null }) {
   const chosen = actionIds.map((aid) => {
     const a = collections.resolveAction(aid);
     if (!a) throw new Error(`Unknown action: ${aid}`);
@@ -33,7 +33,7 @@ function startResponse({ name, actionIds, hosts, params, startedBy, scheduleId, 
   const hostBase = (h) => `${folder.base}_${safeName(h.address, 'host')}`;
   const outputs = new Map(); // `${actionId}|${hostId}` -> csv text
   const run = {
-    id: id(), kind: 'response', name: respName, startedBy: startedBy || null, ...(scheduleId ? { scheduleId } : {}), ...(quick ? { quick: true } : {}),
+    id: id(), kind: 'response', name: respName, startedBy: startedBy || null, ...(scheduleId ? { scheduleId } : {}), ...(quick ? { quick: true } : {}), ...(approval ? { approval: { requestedBy: approval.requestedBy, approvedBy: approval.approvedBy } } : {}),
     actionIds: chosen.map((a) => a.id), actionNames: chosen.map((a) => a.name),
     collectionIds: [], collectionName: chosen.map((a) => a.name).join(', '),
     parameterNames: Object.fromEntries(chosen.map((a) => [a.id, a.parameters.map((p) => (a.optionalParameters.includes(p) ? `${p}?` : p))])),
@@ -45,6 +45,7 @@ function startResponse({ name, actionIds, hosts, params, startedBy, scheduleId, 
   const audit = createAudit(run, path.join(folder.abs, `${folder.base}_Log.csv`));
   audit.log({ kind: 'hunt', action: quick ? 'Quick response started' : 'Response started', detail: `${respName}: ${chosen.length} action${chosen.length === 1 ? '' : 's'} (${run.collectionName}) on ${hosts.length} host${hosts.length === 1 ? '' : 's'}${startedBy ? `, started by ${startedBy}` : ''}` });
 
+  if (approval) audit.log({ kind: 'hunt', action: 'Approved', detail: `Requested by ${approval.requestedBy || 'unknown'}, approved by ${approval.approvedBy}${approval.note ? `: ${approval.note}` : ''}` });
   const signal = cancel.begin(run.id); // aborted by Cancel: stops the host being worked on and skips every action not started
   (async () => {
     let next = 0;

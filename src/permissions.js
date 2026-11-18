@@ -22,6 +22,7 @@ const GROUPS = [
     P('actions.view', 'View actions', 'See the action library.'),
     P('actions.manage', 'Manage actions', 'Create, edit and delete actions.', ['actions.view']),
     P('actions.run', 'Run actions', 'Run actions on hosts. These change the hosts they run on.', ['actions.view']),
+    P('actions.approve', 'Approve actions', 'See every pending approval and approve or reject requests to run actions, when Settings > Approvals requires it.', ['actions.view']),
   ] },
   { id: 'hunts', name: 'Hunts and results', permissions: [
     P('hunts.view', 'View hunts and results', 'See hunts, the activity log, collected data, reports and the output files.'),

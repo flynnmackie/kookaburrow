@@ -25,7 +25,7 @@ A **hunt** runs read-only **collections** against hosts and keeps what comes bac
 
 1. **Who.** Tick **Groups** and/or individual **Hosts**. A host in several chosen groups is run once.
 2. **Collections.** Choose the **PowerShell** or **Linux** list, then tick collections.
-   - Search the names and the script text, filter by tag or by type.
+   - **Search** finds collections by what you type, best match first: every word must match, a "quoted phrase" counts as one, matches in the name rank above tags, tags above the description, and the script text is only searched when nothing else matches. Short words match whole words (so *exe* finds executables, not every *Execution* collection). Common short forms work: *exe*, *dll*, *ps*, *creds*, *login*. The same search is used in View Collections, View Actions and the New Response dialog. You can also filter by tag or by type.
    - A star marks your **favourites** (kept per user) so they are easy to find.
    - A collection that needs a [binary](08-settings.md#binaries) you have not uploaded is greyed out and says what is missing.
    - PowerShell collections are for Windows hosts and Linux collections for SSH hosts. Pick collections that match the hosts you chose: a collection run on the wrong kind of host fails and is recorded as an error.
@@ -45,6 +45,7 @@ A collection lists the inputs it takes in its metadata (`$Parameters = @('LogNam
 - Values are put on the first lines of a temporary copy of the script as variables. The copy is deleted afterwards.
 - Parameter values are **not** stored with the hunt or written to logs.
 - For recurring hunts the values are needed to run unattended, so they are kept [encrypted](11-security.md#credentials) in the schedule and never shown again.
+- **YARA hunts** (*Yara - Scan Files* for Windows and Linux, *Yara - Scan Processes*) take a **YaraRule** parameter that shows a rule picker: **The enabled rule files** (the default), a **built-in** rule (list every executable, unsigned or packed programs, archives, secrets, web shells and more), a rule file you saved, or **Write my own rule**. Choosing a rule file shows its text in the box so you can see what it looks for. For your own rule the box starts with a template; it is **compiled before the hunt starts**, so a mistake is reported on the spot. The rule is used for that hunt only (it is staged on the host in place of the shared `kb-rules.yar`). When a hunt ran with a rule you wrote, its page offers **Save it on the server…** to name it and keep it under [YARA Rules](08-settings.md#yara-rules) (needs `collections.manage`).
 - Event log collections take `LastMinutes`, or `StartTime` and `EndTime` (`yyyy-MM-dd HH:mm`), and default to the last 24 hours.
 
 ## Quick hunts

@@ -4,7 +4,7 @@
 
 # 9. The library
 
-About 200 **collections** (hunts) in `collections/` and about 120 **actions** in `actions/`, in PowerShell for Windows and bash for Linux. They are re-implementations of the techniques in Velociraptor, KAPE and UAC artefacts, not copies of them.
+About 400 **collections** (hunts) in `collections/` and about 120 **actions** in `actions/`, in PowerShell for Windows and bash for Linux. They are re-implementations of the techniques in Velociraptor, KAPE and UAC artefacts, not copies of them.
 
 - [Naming](#naming)
 - [What is in the library](#what-is-in-the-library)
@@ -37,9 +37,56 @@ The areas of the collections (Linux versions are bash; the rest PowerShell):
 | Registry, Browser, USB, SRUM, Windows Timeline | Hives, keys, user activity, browser history and extensions, USB history, SRUM and timeline collection |
 | Security, Defender, Sysmon | Credential protection, network hardening, installed security products, Defender status and logs, Sysmon events |
 | Logs, Config, Users, Shell, Web, Packages, Kernel, Containers | Linux log search and collection, `/etc`, per-user dotfiles and histories, web server configuration, packages, kernel modules and eBPF, Docker and Podman |
-| Triage, Baseline, KAPE, UAC, Yara | Quick triage for Windows and Linux, the full Windows baseline, KAPE and UAC runs, YARA scans of files and processes |
+| Triage, Baseline, KAPE, UAC, Yara | Quick triage for Windows and Linux, **Triage - Linux Full** (a UAC-style live response with no tool to upload, see below), the full Windows baseline, KAPE and UAC runs, YARA scans of files and processes |
 
 Actions are listed in [Responses](05-responses.md#what-the-actions-cover). The live, searchable list is **Settings > Collections > View Collections** and **Actions > View Actions**.
+
+### The second 200
+
+The library doubled with about 100 PowerShell and 100 bash collections, written with Velociraptor's artifacts, UAC and the community hunts as the model, none of them copied. All are read-only, run with no uploaded tool, and finish in seconds (the file hunts in a minute or two). The bash ones print **tab-separated rows with a header line**, so they are columns in Diff, Cross-host comparison and Continuous like the PowerShell ones.
+
+| Area | Examples |
+|---|---|
+| System and hardware | Windows features, pending reboot, firmware and Secure Boot, uptime, time sources, page file and crash dumps, WSL and Hyper-V, Windows Update and WSUS; Linux CPU and memory, reboot history, NTP, installed kernels and boot loader, limits and core dumps, virtualisation, cloud instance, SELinux and AppArmor, mount options, memory file systems |
+| Accounts | Password and lockout policy, stale local accounts, user profiles, stored credentials, remote access groups, dangerous user rights; Linux login policy and PAM, who is logged in, last login per account, home directory permissions, group memberships, system accounts with shells, password hash algorithms |
+| Network | Routes, DNS client, port proxies, mapped drives, firewall profiles, RDP and WinRM configuration, OpenSSH on Windows, VPN connections; Linux routes, DNS, neighbours, NFS and Samba shares, wireless and bridges, proxies, DHCP leases, established connections with programs, UDP sockets, services on all interfaces, remote addresses by count, namespaces and tunnels |
+| Persistence | Winlogon, AppInit and AppCert DLLs, netsh helpers, print monitors, time providers, screensaver and boot execute, logon and GPO scripts, file association handlers, KnownDLLs; Linux at and anacron, udev rules, systemd timers and user units, desktop autostart, login scripts, ld.so.preload, network hooks, package manager hooks, Python startup hooks |
+| Execution and forensics | Run dialog history, Program Compatibility Assistant, open and save dialog history, mounted devices, known networks, error reports and crash dumps, Office recent files, cloud sync clients, per-user software, PowerShell logging configuration, outbound RDP history, PuTTY sessions |
+| Event logs | Failed logons, explicit credential use, special privileges, lockouts, NTLM validation, startup and time changes, driver installs, code integrity, WinRM, BITS, application crashes, print jobs, DNS client lookups |
+| Processes and services | Process tree, suspicious parent and child pairs, unusual locations, owners, service host groups; services in detail, unquoted paths, SYSTEM services outside system folders, security services; Linux unusual paths, listening programs, capabilities, namespaces, deleted libraries, kernel thread impostors, top resource users |
+| Files | User-area programs, scripts in odd places, new programs, hidden files, large files, password stores, known attack tool names, changed system binaries; Linux hidden files, immutable flags, new programs, unowned programs, suspicious links, core dumps, web-root archives, files in /dev, writable scheduled files, SUID outside standard folders, readable private keys |
+| Logs (Linux) | SSH logins, sudo and su failures, cron runs, package operations, kernel faults, failed services, USB devices, firewall drops, web access summary, root logins, journal health, missing or empty logs |
+| Software, cloud, security | Runtimes, admin tools, AppX, package managers, management agents; Linux Snap and Flatpak, Python and Node packages, compilers and tools, repository keys, Docker configuration and risky containers, Kubernetes, cloud credential files and agents, auditd, fail2ban, AV and integrity tools, web server, PHP and Tomcat, databases |
+| Active Directory | Domain controllers, trusts, AdminSDHolder accounts, delegation, new computers, group policy objects |
+
+### Triage - Linux Full
+
+A live-response triage in the style of UAC (Unix-like Artifacts Collector) that needs **no tool and no upload**: it is a plain bash collection. It needs root, or an account with passwordless sudo, and changes nothing on the host. Use *Triage - Linux Core* for a quick look and this one for an incident.
+
+| Parameter | Default | |
+|---|---|---|
+| `DAYS` | 14 | Days of logs, changed files and unit files to collect (1 to 365) |
+| `BODYFILE` | yes | A timeline of every file on the root file system (`find / -xdev`, mactime format). The slowest part: say `no` for a quick run |
+| `HASH` | yes | SHA-256 of every running program (even one whose file was deleted) and of the program files in the usual places and in temp folders |
+
+What comes back (one folder, pulled over SFTP like other large transfers):
+
+| Folder | Content |
+|---|---|
+| `live_response/system` | date and time zone, kernel and modules (with taint and signer), `sysctl` security settings, systemd units and timers, init scripts, SELinux/AppArmor, `LD_PRELOAD` and `ld.so.preload` |
+| `live_response/process` | `ps` forest and full list, `pstree`, `lsof` (all, network, deleted files), a CSV of every process (executable, whether the file is deleted, working directory, command line), a folder per process with `/proc` status, command line, open files, memory map, cgroup and links, hidden pids (in `/proc` but not in `ps`) |
+| `live_response/network` | sockets, listening ports with owners, unix and raw/packet sockets, interfaces, routes, ARP, firewall rules (iptables, nftables, ufw, firewalld), DNS and hosts, tunnels and VPNs, `/proc/net` |
+| `live_response/users` | accounts, password status, sudoers, logons (`who`, `last`, `lastb`, `lastlog`), SSH authorized keys, cron and at jobs |
+| `live_response/persistence` | startup files, changed systemd units, user startup files, kernel module and udev persistence, login hooks |
+| `live_response/suspicious` | SUID/SGID, world-writable files, files with no owner, capabilities, hidden files in system and web folders, executables and ELF files in temp folders, files changed in the last `DAYS` days, web shell candidates |
+| `live_response/storage`, `hardware`, `packages`, `containers` | disks and mounts; CPU and memory; installed and recently changed packages and repositories; Docker, Podman, LXC and Kubernetes |
+| `files/` | `var-log.tgz` and `journal.export.gz` (last `DAYS` days), `etc.tgz` (without `/etc/shadow` and private keys), `user-files.tgz` (shell histories, startup files, `.ssh` files), `persistence.tgz` |
+| `hashes/`, `bodyfile/` | the program hashes and the timeline (`bodyfile.txt.gz`, open in a timeline tool) |
+| top level | `collection-info.txt` (host, kernel, times, account, parameters), `collection-errors.log` (commands that ran out of time) and `file-hashes.sha256`, the SHA-256 of every file collected, for chain of custody |
+
+- Every command has a five-minute limit, so one hung tool cannot stall the run. A command that is not installed (no `docker`, no `lsof`) just leaves a file saying so.
+- The run is read-only apart from files in its own temp folder, which is deleted after the transfer. Process data is read from `/proc`, so it works without `lsof` and on minimal systems. The bodyfile needs GNU `find`; on BusyBox it falls back to `stat`.
+- **Tested** on Ubuntu 24.04 (WSL2) as root: with the defaults it took about 5 minutes on a small system; without bodyfile and hashes, about 15 seconds. Refuses to run, with a message, without root or passwordless sudo. Not tested on RHEL, Alpine or a busy production server (the bodyfile and hashes scale with the number of files).
 
 ## Metadata
 
@@ -56,7 +103,9 @@ Every collection starts with metadata variables that the platform **reads as tex
 | `$Returns` | `RETURNS` | no | `records` (rows), `files` (raw artefacts) or `both` |
 | `$Type` | `TYPE` | no | `command`, `artefact` (collects existing files) or `tool` (deploys a dependency and returns its output) |
 | `$Transfer = 'large'` | `TRANSFER='large'` | no | The script leaves files in `$OutDir` / `$OUT_DIR` for the server to pull back |
-| `$Produces = @('evtx')` | `PRODUCES=(evtx)` | no | The kind of raw files it leaves in `raw/`. A [workflow processor](07-workflows-and-recurring.md#processors) that accepts that kind can run on them. Kinds in use: `evtx` (Event Logs - Export, Triage - Windows Core, KAPE), `prefetch` (Prefetch - Collect, Triage, KAPE), `registry` (Registry - Collect Hives, Triage, KAPE), `jumplists`, `lnk`, `recyclebin` (Recycle Bin - Collect), `srum`, `timeline` (Windows Timeline - Collect), `pcap` (Network - Packet Capture, Windows and Linux), and for KAPE also `mft` |
+| `$Produces = @('evtx')` | `PRODUCES=(evtx)` | no | The kind of raw files it leaves in `raw/`. A [workflow processor](07-workflows-and-recurring.md#processors) that accepts that kind can run on them. Kinds in use: `evtx` (Event Logs - Export, Triage - Windows Core, KAPE), `prefetch` (Prefetch - Collect, Triage, KAPE), `registry` (Registry - Collect Hives, Triage, KAPE), `jumplists`, `lnk`, `recyclebin` (Recycle Bin - Collect), `srum`, `timeline` (Windows Timeline - Collect), `pcap` (Network - Packet Capture, Windows and Linux), `memory` (Memory - Full Dump, Windows with WinPmem and Linux with AVML), and for KAPE also `mft` |
+| `$DiffIgnore = @('LastRun')` | `DIFFIGNORE=(LastRun)` | no | Columns that change on every run, so they do not make a row look new in [Diff](06-results.md) or on [recurring hunts](07-workflows-and-recurring.md#what-changed-since-the-previous-run). Process IDs, uptime, free space and similar are ignored already |
+| `$DiffKey = @('Name', 'Path')` | `DIFFKEY=(Name Path)` | no | Instead of `DiffIgnore`: only these columns identify a row when two runs are compared |
 
 When left out, `Footprint`, `Returns` and `Type` are worked out: a script with dependencies is a *tool* with a *transient* footprint; one that returns only files is an *artefact* pull; an action is *persistent*. Use single quotes and write a literal apostrophe as two (`''`) in PowerShell.
 
@@ -78,7 +127,7 @@ A dependency is an external binary a script needs that is **not** part of a stan
 - A collection whose binaries are not uploaded is greyed out in the New Hunt dialog.
 - Standard cmdlets and modules do not count as dependencies.
 
-The standard dependencies: Sysinternals `sigcheck64.exe`, `handle64.exe`, `listdlls64.exe`, `accesschk64.exe`, `procdump64.exe`, `autorunsc.exe`; `winpmem.exe` (the winpmem mini x64 build renamed); `yara64.exe` with your own rules as `kb-rules.yar`; NirSoft `BrowsingHistoryView.exe`; `kape.zip` (your KAPE folder zipped) and `uac.tar.gz` (the UAC release tarball); and the deploy installers.
+The standard dependencies: `avml` (Microsoft AVML, the static Linux build, for **Memory - Full Dump** on Linux); Sysinternals `sigcheck64.exe`, `handle64.exe`, `listdlls64.exe`, `accesschk64.exe`, `procdump64.exe`, `autorunsc.exe`; `winpmem.exe` (the winpmem mini x64 build renamed); `yara64.exe`, with the rules managed on [Settings > YARA Rules](08-settings.md#yara-rules) (they become `kb-rules.yar`); NirSoft `BrowsingHistoryView.exe`; `kape.zip` (your KAPE folder zipped) and `uac.tar.gz` (the UAC release tarball); and the deploy installers.
 
 Parsing of Prefetch, Shimcache, Amcache, UserAssist, BAM, the Recycle Bin and the USN journal is done natively in PowerShell, so no tools are needed on hosts for those.
 

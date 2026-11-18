@@ -44,7 +44,7 @@ async function loadAccess() {
   } catch { /* a 401 already redirected to the sign-in page */ }
   setNavUser();
 }
-// "Logged in as: name", small and blue, after the Shell and Health buttons.
+// "Logged in as: name", small and blue, after the Shell and Monitor buttons.
 function setNavUser() { const s = $('navUser'); if (s) s.innerHTML = access.username ? `Logged in as: <b>${esc(access.username)}</b>` : ''; }
 const permLabel = (key) => access.options[key]?.label || key;
 
@@ -93,12 +93,13 @@ document.addEventListener('mousedown', (e) => { const el = lockedTarget(e); if (
 // Which permission each page needs. The top-bar tab for an area is locked when every page in it is.
 const PAGE_PERM = {
   'settings/user-management': 'users.view', 'settings/shell-settings': 'system.view', 'settings/health-settings': 'system.view', 'settings/run-settings': 'system.view', 'settings/server-settings': 'system.view', 'settings/certificate': 'system.view', 'settings/elastic': 'system.view', 'settings/dependencies': 'system.view', 'settings/sso': 'system.view',
-  'settings/view-collections': 'collections.view', 'settings/add-collections': 'collections.manage', 'settings/binaries': 'collections.manage',
+  'settings/view-collections': 'collections.view', 'settings/add-collections': 'collections.manage', 'settings/yara': 'collections.view', 'settings/binaries': 'collections.manage',
   'settings/view-actions': 'actions.view', 'settings/add-actions': 'actions.manage',
   'hosts/view-hosts': 'hosts.view', 'hosts/profiles': 'hosts.view', 'hosts/groups': 'hosts.view', 'hosts/discover': 'hosts.manage', 'hosts/manual': 'hosts.manage',
-  'burrow/hunt': 'hunts.view', 'burrow/respond': 'actions.view', 'burrow/workflow': 'workflows.view', 'burrow/recurring': 'hunts.view,actions.view',
-  'output/log': 'hunts.view', 'output/report': 'hunts.view', 'output/json': 'hunts.view', 'browse/files': 'hunts.view', 'browse/pinned': 'hunts.view', 'output/diff': 'hunts.view', 'output/compare': 'hunts.view', 'output/ioc': 'hunts.view', 'output/baseline': 'hunts.view',
+  'burrow/hunt': 'hunts.view', 'burrow/respond': 'actions.view', 'burrow/approvals': 'actions.approve,actions.run', 'settings/approvals': 'system.view', 'burrow/workflow': 'workflows.view', 'burrow/recurring': 'hunts.view,actions.view',
+  'output/log': 'hunts.view', 'output/report': 'hunts.view', 'output/json': 'hunts.view', 'browse/files': 'hunts.view', 'browse/pinned': 'hunts.view', 'output/diff': 'hunts.view', 'output/compare': 'hunts.view', 'output/ioc': 'hunts.view', 'output/yara-scan': 'hunts.view', 'output/baseline': 'hunts.view',
   'shell/shell': 'shell.open', 'health/monitor': 'system.view', 'health/monitor-log': 'system.view', 'health/quarantine-log': 'system.view',
+  'health/validate': 'hunts.view,system.view', 'health/validate-history': 'hunts.view,system.view', 'health/watches': 'hunts.view,system.view', 'health/events': 'hunts.view,system.view',
 };
 const pageAllowed = (slug) => can(PAGE_PERM[slug]);
 function refreshTopLocks() {
@@ -117,8 +118,8 @@ const NAV = [
   // A third entry puts a page under a titled dropdown in the side menu (the titles are not pages).
   // { heading: 'Name' } is a titled dropdown with no pages yet.
   { id: 'settings', label: 'Settings', pages: [
-    ['user-management', 'User Management', 'System'], ['shell-settings', 'Shell Settings', 'System'], ['health-settings', 'Health Settings', 'System'], ['run-settings', 'Run Settings', 'System'], ['server-settings', 'Server Settings', 'System'], ['certificate', 'Certificate', 'System'],
-    ['view-collections', 'View Collections', 'Collections'], ['add-collections', 'Add Collections', 'Collections'],
+    ['user-management', 'User Management', 'System'], ['shell-settings', 'Shell Settings', 'System'], ['health-settings', 'Health Settings', 'System'], ['run-settings', 'Run Settings', 'System'], ['approvals', 'Approvals', 'System'], ['server-settings', 'Server Settings', 'System'], ['certificate', 'Certificate', 'System'],
+    ['view-collections', 'View Collections', 'Collections'], ['add-collections', 'Add Collections', 'Collections'], ['yara', 'YARA Rules', 'Collections'],
     ['view-actions', 'View Actions', 'Actions'], ['add-actions', 'Add Actions', 'Actions'],
     ['binaries', 'Binaries', 'External'], ['dependencies', 'Dependencies', 'External'], ['elastic', 'Elastic', 'External'], ['sso', 'Single Sign-On', 'External'],
   ] },
@@ -126,19 +127,19 @@ const NAV = [
     ['view-hosts', 'View Hosts', 'Hosts'], ['profiles', 'Profiles', 'Hosts'], ['groups', 'Groups', 'Hosts'],
     ['discover', 'Discover', 'Add Hosts'], ['manual', 'Manually Add', 'Add Hosts'],
   ] },
-  { id: 'burrow', label: 'Burrow!', accent: true, pages: [['hunt', 'Hunt'], ['respond', 'Respond'], ['workflow', 'Workflow'], ['recurring', 'Recurring']],
+  { id: 'burrow', label: 'Burrow!', accent: true, pages: [['hunt', 'Hunt'], ['respond', 'Respond'], ['approvals', 'Approvals'], ['workflow', 'Workflow'], ['recurring', 'Recurring']],
     // Hyperlink-style shortcuts under the pages: [label, slug of the page they open]
     links: [['View Collections (Hunt)', 'settings/view-collections'], ['View Actions (Respond)', 'settings/view-actions'], ['Upload Binaries', 'settings/binaries']] },
   { id: 'output', label: 'Results', pages: [
     ['log', 'Activity', 'Logs'], ['json', 'JSON', 'Logs'],
-    ['report', 'Report', 'Analysis'], ['diff', 'Diff', 'Analysis'], ['compare', 'Cross-host comparison', 'Analysis'], ['ioc', 'IOC', 'Analysis'], ['baseline', 'Baseline', 'Analysis'],
+    ['report', 'Report', 'Analysis'], ['diff', 'Diff', 'Analysis'], ['compare', 'Cross-host comparison', 'Analysis'], ['ioc', 'IOC', 'Analysis'], ['yara-scan', 'YARA scan', 'Analysis'], ['baseline', 'Baseline', 'Analysis'],
   ] },
   { id: 'browse', label: 'Browse', pages: [['files', 'Files'], ['pinned', 'Pinned']] },
   // The logo in the header opens this landing page. It has no tab of its own and no side menu.
   { id: 'home', label: 'Home', hidden: true, pages: [['home', 'Home']] },
-  // Shell and Health are placed apart on the right of the top bar.
+  // Shell and Monitor are placed apart on the right of the top bar.
   { id: 'shell', label: 'Shell', pages: [['shell', 'Shell']], right: true, hostMenu: true }, // the side menu lists authenticated hosts
-  { id: 'health', label: 'Health', pages: [['monitor', 'Monitor'], ['monitor-log', 'Monitor log'], ['quarantine-log', 'Quarantine log']], right: true },
+  { id: 'health', label: 'Monitor', pages: [['monitor', 'Health'], ['monitor-log', 'Health log'], ['quarantine-log', 'Quarantine log'], ['validate', 'Checks', 'Validate'], ['validate-history', 'History', 'Validate'], ['watches', 'Watches', 'Continuous'], ['events', 'Events', 'Continuous']], right: true },
 ];
 const loaders = {
   'settings/view-collections': () => loadCollectionList(),
@@ -148,11 +149,19 @@ const loaders = {
   'burrow/recurring': () => window.loadRecurring?.(),
   'output/report': () => window.loadReports?.(), // report.js loads after this file
   'burrow/respond': () => window.loadRespond?.(), // respond.js loads after this file
+  'burrow/approvals': () => window.loadApprovals?.(), // approvals.js
+  'settings/approvals': () => window.loadApprovalSettings?.(),
   'browse/files': () => window.bbEnter?.(), // browse.js
   'browse/pinned': () => window.loadPins?.(),
   'output/diff': () => window.loadDiff?.(), // browse.js
   'output/compare': () => window.loadCompare?.(), // analysis.js
   'output/baseline': () => window.loadBaselines?.(),
+  'settings/yara': () => window.loadYara?.(), // yara.js
+  'health/validate': () => window.loadValidate?.(), // validate.js
+  'health/watches': () => window.loadWatches?.(), // watch.js
+  'health/events': () => window.loadEvents?.(),
+  'health/validate-history': () => window.loadValidateHistory?.(),
+  'output/yara-scan': () => window.loadYaraScan?.(), // analysis.js
   'output/ioc': () => window.loadIocs?.(), // iocs.js
   'home/home': loadHome,
   'shell/shell': loadShell,
@@ -216,6 +225,7 @@ function renderSide() {
   }
   for (const [label, slug] of tab.links || []) html += `<button class="sidelink" data-link="${esc(slug)}">${esc(label)}</button>`;
   $('sidenav').innerHTML = html;
+  window.paintApprovalBadge?.(); window.paintWatchBadge?.();
 }
 
 // A page the user may not open: say so and stay where they are (or go home if they have nowhere yet, e.g. a bookmarked link).
@@ -929,7 +939,7 @@ function makeLibrary({ id, url, noun, folder, showParams }) {
       b.textContent = (b.dataset.type === 'bash' ? 'Linux' : 'PowerShell') + (f.active() ? ` (${count(b.dataset.type)})` : '');
     });
     const dir = `${folder}/${type === 'bash' ? 'bash' : 'powershell'}`;
-    const tag = (m) => !m ? '' : [m.name && 'name', m.script && 'script'].filter(Boolean).join(' + ');
+    const tag = (m) => !m ? '' : [m.name && 'name', m.tags && 'tag', m.description && 'description', m.script && 'script'].filter(Boolean).join(' + ');
     el('List').innerHTML = all.filter((h) => h.type === type && keep(h)).map((h) => `<div class="collection-item ${h.id === open ? 'on' : ''} ${depState(h)}" data-id="${esc(h.id)}">
     ${h.verified ? VERIFIED : ''}${starHtml(h.id)}<div class="hn">${esc(h.name)} ${h.match ? `<span class="mtag">${tag(h.match)}</span>` : ''}${h.warnings.length ? `<span class="mwarn" title="${esc(h.warnings.join('; '))}">⚠</span>` : ''}</div>
     <div class="hd" title="${esc(h.description)}">${esc(h.description)}</div>
@@ -1355,7 +1365,7 @@ function bdAbout({ kind, r, schedule }) {
     const ps = (r.parameterNames || {})[cid] || [];
     return `<div class="rc-item"><b>${esc(name)}</b>${ps.length ? `<span class="dim">parameters: ${esc(ps.join(', '))}</span>` : ''}</div>`;
   }).join('') || '<span class="dim">None</span>';
-  return `<div class="bd-facts">${facts}</div>
+  return `${isHunt && window.yrSaveBanner ? yrSaveBanner(r) : ''}<div class="bd-facts">${facts}</div>
     <div class="hd-label">Recurring</div>${recurring}
     ${isHunt ? `<div class="hd-label">Workflow</div>${r.workflowName ? `<p style="margin:0">${esc(r.workflowName)}${stages.length ? `<span class="dim"> · ${stages.map(esc).join(', then ')}</span>` : ''}</p>` : '<p class="dim" style="margin:0">No workflow was attached.</p>'}` : ''}
     <div class="hd-label">${isHunt ? 'Collections' : 'Actions'} run</div><div class="rc-items">${list}</div>
@@ -1485,7 +1495,7 @@ function makeParamsPane({ root, p, st, noun, items, onRemove }) {
     const v = st.params[x.id] || {};
     el('PDetail').innerHTML = `<div class="hd-name">${esc(x.name)}</div><div class="hd-file">${esc(x.id)}</div><div class="pr-desc dim">${esc(x.description)}</div>
       <div class="pr-state" id="${p}PState"></div>
-      ${x.parameters.map((q) => `<label class="rm-prow"><span>${esc(q)} ${x.optionalParameters.includes(q) ? '<i class="dim">(optional)</i>' : '<i class="pr-req">required</i>'}</span><input type="${secret(q) ? 'password' : 'text'}" data-pi="${esc(x.id)}" data-pp="${esc(q)}" value="${esc(v[q] || '')}" autocomplete="off" spellcheck="false"></label>`).join('')}
+      ${x.parameters.map((q) => q === 'YaraRule' && window.yrPickHtml ? yrPickHtml(x, v[q] || '', paintDetail) : `<label class="rm-prow"><span>${esc(q)} ${x.optionalParameters.includes(q) ? '<i class="dim">(optional)</i>' : '<i class="pr-req">required</i>'}</span><input type="${secret(q) ? 'password' : 'text'}" data-pi="${esc(x.id)}" data-pp="${esc(q)}" value="${esc(v[q] || '')}" autocomplete="off" spellcheck="false"></label>`).join('')}
       <div class="pr-foot"><button type="button" class="act" id="${p}PSet">Set parameters</button><span class="pr-msg" id="${p}PMsg"></span></div>`;
     paintState();
   }
@@ -1505,6 +1515,10 @@ function makeParamsPane({ root, p, st, noun, items, onRemove }) {
     if (row) { st.pShown = row.dataset.pi; render(); return; }
     if (e.target.closest(`#${p}PSet`)) setParams();
   });
+  // the YaraRule parameter is a rule picker (public/yara.js): choose a rule file from the server and see it, or write your own
+  const yrTouched = (id) => { if (st.setP.delete(id)) { paintList(); paintState(); say('Changed: press Set parameters again.', ''); } };
+  $(root).addEventListener('change', (e) => { const d = e.target.dataset; if (d.yrsel !== undefined) { window.yrOnSelect(e.target, st, paintDetail); yrTouched(d.pi); } });
+  $(root).addEventListener('input', (e) => { const d = e.target.dataset; if (d.yrtext !== undefined) { window.yrOnText(e.target, st); yrTouched(d.pi); } });
   $(root).addEventListener('input', (e) => {
     const d = e.target.dataset; if (!d.pp || !d.pi) return;
     (st.params[d.pi] ||= {})[d.pp] = e.target.value;
@@ -1556,7 +1570,8 @@ async function hmQuery() {
 function hmRenderCollections() {
   const keep = (c) => (!hm.matches || hm.matches.has(c.id)) && hmF.keep(c);
   const shown = hm.collections.filter((c) => c.type === hm.type && keep(c));
-  const tag = (m) => !m ? '' : [m.name && 'name', m.script && 'script'].filter(Boolean).join(' + ');
+  if (hm.matches) shown.sort((a, b) => ((hm.matches.get(b.id) || {}).score || 0) - ((hm.matches.get(a.id) || {}).score || 0)); // best match first
+  const tag = (m) => !m ? '' : [m.name && 'name', m.tags && 'tag', m.description && 'description', m.script && 'script'].filter(Boolean).join(' + ');
   document.querySelectorAll('#hmToggle button').forEach((b) => {
     b.classList.toggle('on', b.dataset.type === hm.type);
     b.textContent = (b.dataset.type === 'bash' ? 'Linux' : 'PowerShell') + (hmF.active() ? ` (${hm.collections.filter((c) => c.type === b.dataset.type && keep(c)).length})` : '');
@@ -2809,6 +2824,7 @@ async function sendFiles(files) {
     const first = list[0].webkitRelativePath || list[0].name;
     toast(`Sent ${list.length} file${list.length === 1 ? '' : 's'} (${first.includes('/') ? first.split('/')[0] + '/' : first}) to the shell's current folder`);
   } catch (e) { toast(`Send failed: ${e.message}`, 'bad'); }
+  pmForget(sh.id); // the host's files changed (even when a send failed part way), so the kept folder listings may be out of date
   noteShell('');
 }
 function positionMenu(btn) {
@@ -2822,26 +2838,42 @@ for (const id of ['sendFiles', 'sendFolder']) {
 }
 document.addEventListener('click', (e) => { if (!e.target.closest('#sendMenu, [data-shell-act="Send file"]')) $('sendMenu').hidden = true; });
 
-const pm = { path: '', parent: null, sep: '\\', entries: [], sel: null, busy: false };
+const pm = { path: '', parent: null, sep: '\\', entries: [], sel: null, busy: false, at: 0, cached: false, seq: 0 };
 const pmJoin = (dir, name) => (dir.endsWith(pm.sep) ? dir + name : dir + pm.sep + name);
-async function pmLoad(p) {
+// Every folder listed is kept for the shell session (keyed by the shell's id, so a new shell starts empty), the way Velociraptor's
+// VFS view shows the last listing: going back, up or into a folder seen before asks the host nothing. Refresh lists it again;
+// sending files clears the session's listings, as they change the host.
+const pmCache = new Map(); // `${shellId}|${path}` -> { r, at }
+const PM_MAX = 400;
+const pmForget = (shellId) => { for (const k of [...pmCache.keys()]) if (!shellId || k.startsWith(`${shellId}|`)) pmCache.delete(k); };
+const pmAgo = (t) => { const s = Math.round((Date.now() - t) / 1000); return s < 10 ? 'just now' : s < 60 ? `${s}s ago` : s < 3600 ? `${Math.floor(s / 60)} min ago` : `${Math.floor(s / 3600)} h ago`; };
+async function pmLoad(p, refresh = false) {
   const sh = liveShell(); if (!sh) return;
+  const seq = ++pm.seq; // a slow listing that finishes after a later click is ignored
   $('pmMsg').textContent = ''; $('pmMsg').className = '';
-  $('pmList').innerHTML = '<p class="dim" style="margin:8px 0">Loading…</p>';
-  try {
-    const r = await api('POST', `/api/shell/${sh.id}/ls`, { path: p });
-    Object.assign(pm, { path: r.path, parent: r.parent, sep: r.sep, entries: r.entries, sel: null });
-    $('pmPath').value = r.path || '(drives)';
-  } catch (e) {
-    $('pmList').innerHTML = '';
-    $('pmMsg').textContent = e.message; $('pmMsg').className = 'bad';
-    return;
+  const hit = !refresh && pmCache.get(`${sh.id}|${p}`);
+  let r = hit?.r, at = hit?.at;
+  if (!hit) {
+    $('pmList').innerHTML = '<p class="dim" style="margin:8px 0">Listing on the host…</p>';
+    try { r = await api('POST', `/api/shell/${sh.id}/ls`, { path: p }); at = Date.now(); } catch (e) {
+      if (seq !== pm.seq) return;
+      $('pmList').innerHTML = '';
+      $('pmMsg').textContent = e.message; $('pmMsg').className = 'bad';
+      return;
+    }
+    // stored under what was asked for and where it really is (an SSH shell's "" is its current folder)
+    for (const k of new Set([p, r.path])) { pmCache.delete(`${sh.id}|${k}`); pmCache.set(`${sh.id}|${k}`, { r, at }); }
+    while (pmCache.size > PM_MAX) pmCache.delete(pmCache.keys().next().value);
   }
+  if (seq !== pm.seq) return;
+  Object.assign(pm, { path: r.path, parent: r.parent, sep: r.sep, entries: r.entries, sel: null, at, cached: !!hit });
+  $('pmPath').value = r.path || '(drives)';
   pmRender();
 }
 function pmRender() {
   $('pmUp').disabled = pm.parent === null;
   $('pmPull').disabled = !pm.sel;
+  $('pmAge').textContent = pm.at ? (pm.cached ? `Listed ${pmAgo(pm.at)} (kept from earlier in this session; Refresh to list it again)` : `Listed ${pmAgo(pm.at)}`) : '';
   $('pmSel').textContent = pm.sel || '';
   const rows = pm.entries.map((e) => `<tr class="bb-row ${!e.dir && e.name === pm.sel ? 'on' : ''}" data-name="${esc(e.name)}" data-dir="${e.dir ? 1 : 0}">
       <td class="bb-name">${bbIcon(e.dir)}<span>${esc(e.name)}</span></td>
@@ -2853,6 +2885,7 @@ async function openPull() {
   const h = hostOf(shellHost);
   $('pmTitle').textContent = `Pull file from ${h ? h.name || h.hostname : 'host'}`;
   $('pullModal').hidden = false;
+  for (const k of [...pmCache.keys()]) if (!k.startsWith(`${sh.id}|`)) pmCache.delete(k); // listings of shells that are gone
   let start = '';
   try { start = (await api('GET', '/api/shell')).find((o) => o.id === sh.id)?.cwd || ''; } catch { /* start at the top */ }
   pmLoad(start);
@@ -2863,6 +2896,7 @@ $('pullModal').onclick = (e) => { if (e.target.id === 'pullModal') closePull(); 
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('pullModal').hidden) closePull(); });
 $('pmUp').onclick = () => { if (pm.parent !== null) pmLoad(pm.parent); };
 $('pmGo').onclick = () => pmLoad($('pmPath').value.trim() === '(drives)' ? '' : $('pmPath').value.trim());
+$('pmRefresh').onclick = () => pmLoad(pm.path, true);
 $('pmPath').onkeydown = (e) => { if (e.key === 'Enter') $('pmGo').click(); };
 $('pmList').onclick = (e) => {
   const tr = e.target.closest('.bb-row'); if (!tr) return;
@@ -2889,10 +2923,13 @@ const fmtUptime = (sec) => {
   return d ? `${d}d ${h}h` : h ? `${h}h ${m}m` : `${m}m ${sec % 60}s`;
 };
 const fmtBytes = (n) => (n < 1073741824 ? `${(n / 1048576).toFixed(0)} MB` : n < 1099511627776 ? `${(n / 1073741824).toFixed(1)} GB` : `${(n / 1099511627776).toFixed(2)} TB`);
+let homeTimer;
 async function loadHome() {
   const rows = [], stats = [];
+  clearTimeout(homeTimer);
   try {
     const a = await api('GET', '/api/about');
+    if (a.storage && a.storage.used == null && isActive('home/home')) homeTimer = setTimeout(loadHome, 2500); // the folder size is still being measured
     const split = (c) => `${c.standard}${c.custom ? ` + ${c.custom} custom` : ''}`;
     const engine = String(a.winrm || '').replace(/^pypsrp \(bundled, (pypsrp [\d.]+).*$/, '$1 (bundled)');
     const ips = a.addresses.slice(0, 3).map(esc).join('<br>') + (a.addresses.length > 3 ? `<br><span class="dim">+${a.addresses.length - 3} more</span>` : '');
@@ -2903,7 +2940,7 @@ async function loadHome() {
       ['WinRM', esc(engine)],
       ['OS', esc(String(a.os).replace(/^Windows /, 'Win ').replace(/ \(x64\)$/, ''))],
       ['Uptime', fmtUptime(a.uptimeSec)],
-      ['Disk', a.storage ? `${fmtBytes(a.storage.used)} used <span class="dim">${fmtBytes(a.storage.free)} free</span>` : '<span class="dim">unknown</span>'],
+      ['Disk', a.storage ? `${a.storage.used == null ? '<span class="dim">measuring…</span>' : fmtBytes(a.storage.used)} used <span class="dim">${fmtBytes(a.storage.free)} free</span>` : '<span class="dim">unknown</span>'], // used: Kookaburrow's own folder; free: the drive
       { section: 'Library' },
       ['Hunts', split(a.collections)],
       ['Responses', split(a.actions)],
@@ -3356,3 +3393,5 @@ loadAccess().then(() => {
   go(startTab || 'hosts', startPage);
   pollNavStats();
 });
+
+window.loadBurrowHunts = loadBurrowHunts;

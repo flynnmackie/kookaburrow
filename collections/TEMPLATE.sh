@@ -22,6 +22,10 @@ TRANSFER='none'
 #                  artefact   collects existing files such as logs
 #                  tool       deploys a binary from DEPENDENCIES and returns its output
 #     When left out they are worked out: dependencies means tool + transient, otherwise command + none + records.
+#   * DIFFIGNORE and DIFFKEY are optional and decide what counts as a change when two runs are compared (Diff, and the
+#       "+new / -gone" on recurring hunts). Process IDs, uptime, free space and similar are ignored already.
+#       DIFFIGNORE=(LastRun)      columns that change on every run and must not make a row look new
+#       DIFFKEY=(Name Path)       or: only these columns identify a row (everything else is shown but not compared)
 #   * NAME, DESCRIPTION, DEPENDENCIES and TAGS must be the first statements in the file (after an
 #     optional shebang). Comments and blank lines may sit between them; the first other
 #     line starts the collection.

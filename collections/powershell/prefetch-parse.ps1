@@ -3,6 +3,7 @@ $Description = 'Parses Windows Prefetch files natively (no tools needed, like PE
 $Dependencies = @()
 $Parameters = @('ExeContains?', 'IncludeFiles?')
 $Tags = @('execution', 'forensics', 'prefetch')
+$DiffKey = @('Executable', 'PrefetchHash')
 
 $ErrorActionPreference = 'SilentlyContinue'
 Add-Type -TypeDefinition @'

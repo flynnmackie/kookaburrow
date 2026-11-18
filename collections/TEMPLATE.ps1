@@ -27,6 +27,10 @@ $Transfer = 'none'
 #       hunt's raw folder (over SMB for Windows hosts, which is switched on for this hunt only and closed again; over SFTP for Linux),
 #       checks each file's SHA-256 against the host's, then removes the folder. The hunter is warned before the hunt runs.
 #       See event-logs-export.ps1 for a working example. Leave it out or use 'none' for normal collections.
+#   * $DiffIgnore and $DiffKey are optional and decide what counts as a change when two runs are compared (Diff, and the
+#       "+new / -gone" on recurring hunts). Process IDs, uptime, free space and similar are ignored already.
+#       $DiffIgnore = @('LastRun')          columns that change on every run and must not make a row look new
+#       $DiffKey    = @('Name', 'Path')     or: only these columns identify a row (everything else is shown but not compared)
 #   * $Name, $Description, $Dependencies and $Tags must be the first statements in the file.
 #     Comments and blank lines may sit between them; the first other line starts the collection.
 #   * Each value must be a plain literal. The platform reads them as text and never runs

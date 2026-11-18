@@ -46,7 +46,8 @@ Browser ──HTTP(S)──▶ Express server (Node.js)
 | `data/secret.key` | The AES-256-GCM key for stored secrets |
 | `data/tls/` | The CA and server certificate and keys |
 | `data/monitor-log.jsonl` (+ `.1`) | Health checks, trimmed at 20 MB |
-| `data/baselines/` | Uploaded baseline files |
+| `data/baselines/` | Baselines: one folder per baseline, laid out like a run's output folder (copied from a run, or an unpacked upload) |
+| `data/yara/` | YARA rule files (Settings > YARA Rules); the enabled ones are joined into `binaries/kb-rules.yar` |
 | `data/server.log`, `server.err` | Server output (under the service, `server.log`) |
 | `data/tools/` | Processor tool archives unpacked on the server, one folder per version |
 | `output/` | Hunt and response results, reports, pulled files, see [output layout](04-hunts.md#output-layout) |
@@ -138,6 +139,15 @@ Generated from `src/route-perms.js`, in the order the rules are evaluated.
 | any | `/api/(pins\|diff\|compare)(/\|$)` | `hunts.view` |
 | GET | `/api/baselines` | `hunts.view` |
 | any | `/api/baselines(/\|$)` | `hunts.run` |
+| GET | `/api/expected` | `hunts.view` |
+| any | `/api/expected(/\|$)` | `hunts.run` |
+| GET | `/api/validate(/\|$)` | `hunts.view` or `system.view` |
+| any | `/api/validate(/\|$)` | `hunts.run` (a check with a command condition also needs `actions.run`) |
+| GET | `/api/yara-scans/:id/csv` | `hunts.export` |
+| GET | `/api/yara-scans` | `hunts.view` |
+| any | `/api/yara-scans(/\|$)` | `hunts.run` |
+| GET | `/api/yara` | `collections.view` |
+| any | `/api/yara(/\|$)` | `collections.manage` |
 | GET | `/api/iocs(/\|$)` | `hunts.view` |
 | any | `/api/iocs(/\|$)` | `hunts.run` |
 | GET | `/api/browse(/\|$)` | `hunts.view` |
@@ -168,11 +178,14 @@ Generated from `src/route-perms.js`, in the order the rules are evaluated.
 | `src/hunt-runner.js`, `response-runner.js`, `scheduler.js`, `cancel.js`, `run-settings.js` | Running, scheduling, cancelling and concurrency |
 | `src/large-transfer.js`, `remote/*` | Remote execution and file pulls |
 | `src/output.js`, `audit.js`, `zip.js`, `migrate-output.js` | Output folders, the activity log, zip download |
-| `src/report.js`, `diff.js`, `compare.js`, `iocs.js`, `browse.js` | Analysis |
+| `src/report.js`, `diff.js`, `diff-keys.js`, `compare.js`, `baselines.js`, `iocs.js`, `browse.js` | Analysis. `diff-keys.js` works out from the data which columns are volatile, which are times and which identify an item; `diff.js` uses it for new / gone / changed, `compare.js` for drift between hosts, `baselines.js` for operating system, standard, export and summaries. The UI for all three is `public/changes.js` (the shared change report) with `browse.js` and `analysis.js` |
 | `src/scanner.js`, `monitor.js`, `quarantine.js`, `shell.js` | Discovery, health, containment, shells |
 | `src/server-settings.js`, `tls.js`, `tls_gen.py` | Listening, allow-list, HTTPS |
 | `src/elastic.js` | Elastic forwarding (rows, and processor output files); the index template |
 | `src/kibana.js`, `elastic/kibana/` | Importing the shipped Kibana dashboards (saved objects NDJSON, written by `elastic/kibana/build.js`) with Kibana's saved objects API |
+| `src/watch.js` | Continuous: scheduled light collections per host, compared with the last snapshot (`data/watch/`) using the Diff engine; events in `db.watchEvents` |
+| `src/yara-rule.js`, `yara.js`, `yara-scan.js`, `yara-rules/` | YARA: rule files (the built-in ones ship in `yara-rules/`), the per-hunt rule choice (the `YaraRule` parameter, staged in place of `kb-rules.yar`), server-side scans |
+| `src/approvals.js`, `response-launch.js` | Approvals: requests to run actions that wait for a second person; the shared "check and start a response" used by Respond and by an approval |
 | `src/workflows.js`, `processors.js`, `workflow-runner.js` | Workflow definitions and the shipped default, processor manifests and running tools, post-processing of a hunt |
 | `processors/*.json` | Processor manifests (shipped: Hayabusa) |
 | `public/` | The interface: `index.html`, `app.js` and per-area scripts, `tokens.css`, `app.css`, `polish.css` |

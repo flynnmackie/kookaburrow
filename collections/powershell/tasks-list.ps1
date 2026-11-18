@@ -3,6 +3,7 @@ $Description = 'Every scheduled task with its actions, triggers, run-as account 
 $Dependencies = @()
 $Parameters = @('ExcludeMicrosoft?')
 $Tags = @('persistence', 'scheduled-tasks', 'execution')
+$DiffIgnore = @('LastRun', 'LastResult')
 
 $ErrorActionPreference = 'SilentlyContinue'
 $tasks = Get-ScheduledTask

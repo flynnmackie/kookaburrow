@@ -3,6 +3,7 @@ $Description = 'Running processes with full command line, parent, owner, image p
 $Dependencies = @()
 $Parameters = @('ProcessName?')
 $Tags = @('processes', 'execution', 'signing')
+$DiffIgnore = @('Parent', 'Started')
 
 $ErrorActionPreference = 'SilentlyContinue'
 $procs = Get-CimInstance Win32_Process

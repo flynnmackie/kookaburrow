@@ -19,6 +19,10 @@ const RULES = [
   ['*', /^\/api\/dependencies(\/|$)/, ['system.view']],
   ['GET', /^\/api\/binaries$/, ['collections.view']],
   ['*', /^\/api\/binaries(\/|$)/, ['collections.manage']],
+  ['GET', /^\/api\/yara\/choices(\/[^/]+\/text)?$/, ['hunts.run', 'collections.view']], // the rule picker of a YARA hunt
+  ['POST', /^\/api\/runs\/[^/]+\/yara-save$/, ['collections.manage']], // saving a rule written for a hunt adds a rule file
+  ['GET', /^\/api\/yara$/, ['collections.view']],
+  ['*', /^\/api\/yara(\/|$)/, ['collections.manage']], // includes reading a rule file's text
   ['GET', /^\/api\/collections\/user$/, ['collections.manage']],
   ['GET', /^\/api\/collections(\/|$)/, ['collections.view', 'hunts.run']],
   ['*', /^\/api\/collections(\/|$)/, ['collections.manage']],
@@ -27,12 +31,17 @@ const RULES = [
   ['*', /^\/api\/actions(\/|$)/, ['actions.manage']],
 
   ['POST', /^\/api\/responses$/, ['actions.run']],
+  ['GET', /^\/api\/approvals(\/count)?$/, ['actions.approve', 'actions.run']], // approvers see every request, others only their own (checked in the handler)
+  ['GET', /^\/api\/approvals\/[^/]+$/, ['actions.approve', 'actions.run']],
+  ['POST', /^\/api\/approvals\/[^/]+\/(approve|reject)$/, ['actions.approve']],
+  ['POST', /^\/api\/approvals\/[^/]+\/cancel$/, ['actions.approve', 'actions.run']],
   ['POST', /^\/api\/responses\/[^/]+\/cancel$/, ['actions.run']],
   ['POST', /^\/api\/runs\/[^/]+\/cancel$/, ['hunts.run']],
   ['DELETE', /^\/api\/responses\/[^/]+$/, ['actions.run']],
   ['GET', /^\/api\/workflows$/, ['workflows.view']],
   ['*', /^\/api\/workflows(\/|$)/, ['workflows.manage']],
   ['GET', /^\/api\/schedules$/, ['hunts.view', 'actions.view']],
+  ['POST', /^\/api\/schedules\/[^/]+\/seen$/, ['hunts.view', 'actions.view']], // the kind of schedule is checked in the handler
   ['DELETE', /^\/api\/schedules\/[^/]+$/, ['hunts.run', 'actions.run']],
   ['PUT', /^\/api\/schedules\/[^/]+$/, ['hunts.run', 'actions.run']], // pause / resume; the kind of schedule is checked in the handler // the kind of schedule is checked in the handler
   ['GET', /^\/api\/responses(\/|$)/, ['actions.view']],
@@ -47,8 +56,19 @@ const RULES = [
   ['GET', /^\/api\/browse\/download$/, ['hunts.export']],
   ['DELETE', /^\/api\/browse$/, ['hunts.run', 'actions.run']], // output, reports and pulled files only; the server refuses anything else
   ['*', /^\/api\/(pins|diff|compare)(\/|$)/, ['hunts.view']],
-  ['GET', /^\/api\/baselines$/, ['hunts.view']],
+  ['GET', /^\/api\/baselines(\/changes)?$/, ['hunts.view']],
+  ['GET', /^\/api\/baselines\/[^/]+\/download$/, ['hunts.export']],
   ['*', /^\/api\/baselines(\/|$)/, ['hunts.run']],
+  ['GET', /^\/api\/watch(\/|$)/, ['hunts.view', 'system.view']],
+  ['POST', /^\/api\/watch\/events\/seen$/, ['hunts.view', 'system.view']], // marking what you have read
+  ['*', /^\/api\/watch(\/|$)/, ['hunts.run']], // a watch runs collections on hosts
+  ['GET', /^\/api\/validate(\/|$)/, ['hunts.view', 'system.view']],
+  ['*', /^\/api\/validate(\/|$)/, ['hunts.run']], // the command condition also needs actions.run, checked in src/validate.js
+  ['GET', /^\/api\/yara-scans\/[^/]+\/csv$/, ['hunts.export']],
+  ['GET', /^\/api\/yara-scans$/, ['hunts.view']],
+  ['*', /^\/api\/yara-scans(\/|$)/, ['hunts.run']],
+  ['GET', /^\/api\/expected$/, ['hunts.view']],
+  ['*', /^\/api\/expected(\/|$)/, ['hunts.run']],
   ['GET', /^\/api\/iocs(\/|$)/, ['hunts.view']],
   ['*', /^\/api\/iocs(\/|$)/, ['hunts.run']],
   ['GET', /^\/api\/browse(\/|$)/, ['hunts.view']],
@@ -59,7 +79,7 @@ const RULES = [
   ['GET', /^\/api\/quarantine(\/log)?$/, ['system.view']],
   ['*', /^\/api\/quarantine\/[^/]+$/, ['actions.run']], // isolating a host runs the Host - Isolate action
   ['*', /^\/api\/monitor(\/|$)/, ['system.view']],
-  ['GET', /^\/api\/settings\/(health|shell|runs|server|elastic|sso|certificate(\/ca\.pem)?)$/, ['system.view']],
+  ['GET', /^\/api\/settings\/(health|shell|runs|approvals|server|elastic|sso|certificate(\/ca\.pem)?)$/, ['system.view']],
   ['*', /^\/api\/settings(\/|$)/, ['system.manage']],
 
   ['GET', /^\/api\/(users|roles)$/, ['users.view']],

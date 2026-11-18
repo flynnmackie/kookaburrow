@@ -10,9 +10,11 @@
 - [Shell Settings](#shell-settings)
 - [Health Settings](#health-settings)
 - [Run Settings](#run-settings)
+- [Approvals](#approvals)
 - [Server Settings](#server-settings)
 - [Certificate](#certificate)
 - [Collections and Actions](#collections-and-actions)
+- [YARA Rules](#yara-rules)
 - [External: Binaries](#binaries)
 - [External: Dependencies](#dependencies)
 - [External: Elastic](#elastic)
@@ -63,6 +65,19 @@ Controls the [health monitor](03-hosts.md#health-monitor). Changes apply immedia
 | Ping interval | 60 seconds | 5 to 3600 |
 | Remote port interval | 300 seconds | 10 to 86400 |
 | Hosts checked | all | per host, ping and remote port separately. A host that is not checked shows *not monitored*. A host added later is checked both ways until you change it |
+
+## Approvals
+
+**Settings > System > Approvals** makes running actions wait for a second person. How it works for the people involved is in [Responses > Approvals](05-responses.md#approvals).
+
+| Setting | Default | |
+|---|---|---|
+| Approvals (switch) | off | When on, *Run* on New Response sends a request to **Burrow! > Approvals** |
+| Which actions need approval | All actions | Or *Only the actions ticked below*: the list shows every action with its platform and footprint (what it leaves on the host) |
+| The person who asked may also approve their own request | off | Leave it off for a real second pair of eyes. Turn it on when you are the only admin |
+| Expire after | 72 hours | 0 to 2160. 0 means a request waits until someone decides |
+
+Seeing the page needs *View system*; changing it needs *Manage system*. Turning approvals off does not delete requests that are waiting: they can still be approved, rejected or withdrawn, and they expire as set.
 
 ## Run Settings
 
@@ -135,6 +150,21 @@ The page warns when the certificate has expired or expires within 30 days, when 
 - **Add Collections** and **Add Actions** create custom ones: choose PowerShell or Linux, a file name, a name, description, tags, the footprint, what it returns, its type and dependencies, and paste or **upload** the script. Needs `collections.manage` or `actions.manage`.
 - Custom ones show as *custom* (not verified). Writing them is covered in [The library](09-library.md#writing-your-own).
 
+## YARA Rules
+
+**Settings > Collections > YARA Rules** holds the rule files for the **Yara - Scan Files** and **Yara - Scan Processes** collections. The enabled files are joined into `kb-rules.yar`, which every YARA hunt copies to the host next to `yara64.exe`, so a hunt always scans with the current set.
+
+- **Add rules**: choose one or more `.yar` files (5 MB each at most), or paste rules, with a name and an optional note. Each file is added on its own.
+- **Compiling**: with `yara64.exe` uploaded on [Binaries](#binaries) (Windows server), or `yara` on the PATH (Linux server), each file is compiled when it is added, and so is the joined `kb-rules.yar` whenever it changes. A file that does not compile is kept but not enabled, with YARA's error. Without YARA on the server nothing is compiled there, and a mistake only shows when a hunt runs.
+- **Enable or disable** a file with its switch. Two enabled files may not define the same rule name (YARA would refuse the whole set), so enabling one that clashes is refused until the other is disabled.
+- **Imports** (`import "pe"`) are moved to the top of the joined file. `include` is not supported: add each included file as its own rule file.
+- Click the rule count to see the rule names and the file. **Delete** removes a file and rebuilds `kb-rules.yar`. With nothing enabled, `kb-rules.yar` is removed, and the YARA collections show it as missing.
+- `kb-rules.yar` cannot be uploaded on the Binaries page any more. One that was uploaded there before is kept as the rule file *Imported kb-rules.yar* the first time this page opens.
+- **Built-in rules** (marked *built-in*) ship with Kookaburrow in `yara-rules/`: 12 files with 34 generic rules, checked with YARA. They start **disabled**, so every YARA hunt does not run them; choose one for a single hunt (the *YaraRule* parameter, see [Hunts](04-hunts.md#parameters)) or a single [YARA scan](06-results.md#yara-scan), or enable it to add it to `kb-rules.yar`. They cannot be deleted and are kept up to date at every start. The files: all Windows PE programs, libraries and drivers; all Linux ELF programs and modules; programs with no digital signature; packed or high-entropy programs; process injection and memory dumping APIs; suspicious PowerShell; executables hidden inside other files (including Base64 encoded ones); archives and disk images; Office macros, shortcuts and HTA files; secrets and private keys; web shells and attack tool strings; all scripts and reverse shell commands.
+- A rule saved from a hunt (a rule you wrote in the hunt dialog) is a normal rule file, disabled, named as you chose.
+- Rules are also checked here when no YARA program is uploaded, using the `yara-python` that comes with the Python bundled with Kookaburrow.
+- Viewing needs `collections.view`; adding, enabling, deleting and reading a file's text need `collections.manage`.
+
 ## Dependencies
 
 Settings > External > **Dependencies** lists software that must be **installed on the server** (not uploaded) for some [workflow tools](07-workflows-and-recurring.md#writing-a-processor). Kookaburrow only checks; installing needs administrator or root rights.
@@ -156,7 +186,7 @@ Some collections and actions need an external tool. Tools are **not shipped**: u
 - **Upload from server** imports instead of uploading from your own computer. Point the server at a folder, an SMB share, Nextcloud/WebDAV (a folder address, a WebDAV address or a public share link) or an SFTP server. It searches below that location for the wanted file names (exact name, any case; the newest copy first), and you import the ones you want, optionally checking each against an expected SHA-256. A binary already uploaded is only replaced if you tick **Overwrite**. Nothing about the location is saved, and the server will not connect to its own machine or link-local addresses. SMB from a Linux server needs `smbclient` and is untested.
 - Needs `collections.manage`.
 
-The standard set: Sysinternals `sigcheck64.exe`, `handle64.exe`, `listdlls64.exe`, `accesschk64.exe`, `procdump64.exe`, `autorunsc.exe`; `winpmem.exe`; `yara64.exe` (with your rules as `kb-rules.yar`); NirSoft `BrowsingHistoryView.exe`; `kape.zip` and `uac.tar.gz`; and the deploy installers listed in [Responses](05-responses.md#deploy-actions).
+The standard set: Sysinternals `sigcheck64.exe`, `handle64.exe`, `listdlls64.exe`, `accesschk64.exe`, `procdump64.exe`, `autorunsc.exe`; `winpmem.exe`; `yara64.exe` (the rules come from [YARA Rules](#yara-rules)); NirSoft `BrowsingHistoryView.exe`; `kape.zip` and `uac.tar.gz`; and the deploy installers listed in [Responses](05-responses.md#deploy-actions).
 
 ## Elastic
 
@@ -220,6 +250,7 @@ Generated from `src/permissions.js`.
 | Actions (Respond) | `actions.view` | See the action library. | - |
 | Actions (Respond) | `actions.manage` | Create, edit and delete actions. | `actions.view` |
 | Actions (Respond) | `actions.run` | Run actions on hosts. These change the hosts they run on. | `actions.view` |
+| Actions (Respond) | `actions.approve` | See every pending approval and approve or reject requests to run actions, when [Approvals](#approvals) is on. | `actions.view` |
 | Hunts and results | `hunts.view` | See hunts, the activity log, collected data, reports and the output files. | - |
 | Hunts and results | `hunts.run` | Create and run hunts on hosts and delete hunt records. | `hunts.view` |
 | Hunts and results | `hunts.export` | Export logs and collected data and download output files. | `hunts.view` |

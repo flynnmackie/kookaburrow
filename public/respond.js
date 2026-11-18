@@ -95,7 +95,8 @@ async function rmQuery() {
 function rmRenderActions() {
   const keep = (c) => (!rm.matches || rm.matches.has(c.id)) && rmF.keep(c);
   const shown = rm.actions.filter((c) => c.type === rm.type && keep(c));
-  const tag = (m) => !m ? '' : [m.name && 'name', m.script && 'script'].filter(Boolean).join(' + ');
+  if (rm.matches) shown.sort((a, b) => ((rm.matches.get(b.id) || {}).score || 0) - ((rm.matches.get(a.id) || {}).score || 0)); // best match first
+  const tag = (m) => !m ? '' : [m.name && 'name', m.tags && 'tag', m.description && 'description', m.script && 'script'].filter(Boolean).join(' + ');
   document.querySelectorAll('#rmToggle button').forEach((b) => {
     b.classList.toggle('on', b.dataset.type === rm.type);
     b.textContent = (b.dataset.type === 'bash' ? 'Linux' : 'PowerShell') + (rmF.active() ? ` (${rm.actions.filter((c) => c.type === b.dataset.type && keep(c)).length})` : '');
@@ -289,6 +290,7 @@ rmEl('Run').onclick = async () => {
       name: rmEl('Name').value.trim(), actionIds: [...rm.selA], hostIds: [...rm.selH], listIds: [...rm.selL], params, schedule: rec?.schedule, quick: !!rm.quick,
     });
     closeRespModal();
+    if (run.approval) { toast(`"${run.approval.name}" is waiting for approval`); rmEl('Run').disabled = false; go('burrow', 'approvals'); return; }
     toast(`Response "${run.name}" started${rec ? ` and scheduled: ${rec.text.replace(/^Runs now, then /, '')}` : `. Output goes to ${run.outputPath}`}`);
     br.sel = run.id;
     await loadRespond();

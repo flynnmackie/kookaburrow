@@ -62,6 +62,7 @@ function listBinaries() {
 function saveBinary(name, data) {
   if (!isSafeName(name)) throw new Error('Invalid binary name');
   if (!declaring().some((h) => h.dependencies.includes(name))) throw new Error(`No collection requires "${name}"`);
+  if (name === require('./yara').OUT) throw new Error('kb-rules.yar is built from Settings > Collections > YARA Rules: add your rule files there');
   if (!Buffer.isBuffer(data) || !data.length) throw new Error('No file received');
   if (data.length > MAX_BYTES) throw new Error(`File is too large (the limit is ${MAX_BYTES / 1024 / 1024} MB)`);
   if (/\.(exe|dll|sys)$/i.test(name) && data.subarray(0, 2).toString('latin1') !== 'MZ') {
@@ -80,6 +81,7 @@ function saveBinary(name, data) {
 async function importStream(name, stream, { overwrite = false, expectedSha256 = '' } = {}) {
   if (!isSafeName(name)) throw new Error('Invalid binary name');
   if (!declaring().some((h) => h.dependencies.includes(name))) throw new Error(`No collection requires "${name}"`);
+  if (name === require('./yara').OUT) throw new Error('kb-rules.yar is built from Settings > Collections > YARA Rules: add your rule files there');
   const expected = String(expectedSha256 ?? '').trim().toLowerCase();
   if (expected && !/^[0-9a-f]{64}$/.test(expected)) throw new Error('The expected SHA-256 must be 64 hex characters');
   const dest = path.join(binariesDir, name);

@@ -2,6 +2,7 @@ $Name = 'Execution - BAM'
 $Description = 'Background Activity Moderator entries: the full path of each program a user ran and the last time it ran, per user SID (Windows 10 1709 and later).'
 $Dependencies = @()
 $Tags = @('execution', 'forensics', 'registry')
+$DiffKey = @('User', 'Program')
 
 $ErrorActionPreference = 'SilentlyContinue'
 $rows = foreach ($base in 'HKLM:\SYSTEM\CurrentControlSet\Services\bam\State\UserSettings', 'HKLM:\SYSTEM\CurrentControlSet\Services\bam\UserSettings') {

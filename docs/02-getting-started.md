@@ -22,7 +22,7 @@ If the server uses HTTPS (see [Certificate](08-settings.md#certificate)) your br
 
 ## The interface
 
-Click the logo for **Home**: the server's name, listening address, version, WinRM engine, uptime and disk use, the library counts, and what your account is allowed to do. **Documentation** opens these guides inside Kookaburrow with search, so they work offline (**View on GitHub** in the viewer opens the online copy).
+Click the logo for **Home**: the server's name, listening address, version, WinRM engine, uptime and disk (the space Kookaburrow's own folder uses, hunt output included, and the free space on the drive it is on), the library counts, and what your account is allowed to do. **Documentation** opens these guides inside Kookaburrow with search, so they work offline (**View on GitHub** in the viewer opens the online copy).
 
 The top bar holds the main areas. Anything your role cannot use is greyed out.
 
@@ -30,11 +30,11 @@ The top bar holds the main areas. Anything your role cannot use is greyed out.
 |---|---|
 | **Settings** | System settings (users, shell, health, run, server, certificate), the collection and action libraries, and External (Binaries, Dependencies, Elastic and Single Sign-On) |
 | **Host Management** | View Hosts, Profiles, Groups, Discover (scan), Manually Add |
-| **Burrow!** | Hunt, Respond, Workflow, Recurring |
+| **Burrow!** | Hunt, Respond, Approvals, Workflow, Recurring |
 | **Results** | Activity log, JSON, and Analysis: Report, Diff, Cross-host comparison, IOC, Baseline |
 | **Browse** | A file browser over collections, actions, binaries, output and reports, and your Pinned items |
 | **Shell** (right) | Interactive shells on authenticated hosts |
-| **Health** (right) | Monitor, Monitor log, Quarantine log |
+| **Monitor** (right) | Health, Health log, Quarantine log, Validate (Checks, History), Continuous (Watches, Events) |
 
 Next to the Shell and Health buttons the bar shows how many hosts answer ping (*hosts*) and how many answer their remote-management port (*remote*), for example `hosts 5/6  remote 6/6`.
 

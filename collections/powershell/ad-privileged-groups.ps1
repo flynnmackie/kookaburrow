@@ -2,6 +2,7 @@ $Name = 'AD - Privileged Groups'
 $Description = 'Members of the most powerful Active Directory groups.'
 $Dependencies = @()
 $Tags = @('accounts', 'privilege-escalation', 'persistence', 'active-directory')
+$DiffIgnore = @('LastLogon')
 
 $ErrorActionPreference = 'Stop'
 try { $dn = ([ADSI]'LDAP://RootDSE').defaultNamingContext.ToString() } catch { throw 'This host is not joined to a domain, or no domain controller is reachable' }

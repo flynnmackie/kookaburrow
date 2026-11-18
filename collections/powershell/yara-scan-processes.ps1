@@ -1,7 +1,7 @@
 $Name = 'Yara - Scan Processes'
-$Description = 'Scans the memory of running processes with YARA rules and returns the processes that match and which rule matched. Needs administrator rights.'
+$Description = 'Scans the memory of running processes with YARA rules and returns the processes that match and which rule matched. Choose the rules with YaraRule (the enabled rule files by default, one rule file from the server, or your own). Needs administrator rights.'
 $Dependencies = @('yara64.exe', 'kb-rules.yar')
-$Parameters = @('ProcessName?')
+$Parameters = @('ProcessName?', 'YaraRule?')
 $Tags = @('malware', 'processes', 'forensics')
 $Footprint = 'transient'
 $Returns = 'records'

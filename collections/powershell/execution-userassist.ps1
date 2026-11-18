@@ -2,6 +2,7 @@ $Name = 'Execution - UserAssist'
 $Description = 'Programs launched from Explorer by each user, decoded from the UserAssist registry keys (ROT13 names).'
 $Dependencies = @()
 $Tags = @('execution', 'forensics', 'registry')
+$DiffKey = @('User', 'Program')
 
 $ErrorActionPreference = 'SilentlyContinue'
 function Mount-Hives([switch]$Classes) {

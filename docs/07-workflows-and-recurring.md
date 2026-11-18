@@ -7,7 +7,7 @@
 - [Workflows](#workflows)
 - [Processors](#processors)
 - [Shipped workflows](#shipped-workflows)
-- [Eric Zimmerman tools](#eric-zimmerman-tools), [Chainsaw and Zircolite](#chainsaw-and-zircolite), [Zeek](#zeek)
+- [Eric Zimmerman tools](#eric-zimmerman-tools), [Chainsaw and Zircolite](#chainsaw-and-zircolite), [Zeek](#zeek), [Volatility](#volatility)
 - [Building a workflow](#building-a-workflow)
 - [Running a workflow](#running-a-workflow)
 - [Writing a processor](#writing-a-processor)
@@ -67,6 +67,7 @@ Shipped processors:
 | **WxTCmd - Windows Timeline Parser** | `timeline` | `WxTCmd.zip` | CSVs per user (`user<n>/`), one run per ActivitiesCache.db |
 | **MFTECmd - MFT and USN Journal Parser** | `mft` | `MFTECmd.zip` | `mftecmd-<n>-<name>.csv` for each `$MFT` and `$J` found. Can be several GB |
 | **Zeek - Network Log Analysis** | `pcap` | **Installed on the server** (Linux only), not uploaded. See [Zeek](#zeek) | Zeek logs (`conn.log`, `dns.log`, `http.log`, ...) in `capture<n>/`, one folder per capture |
+| **Volatility 3 - Memory Analysis** | `memory` | `volatility3.zip`, plus optional symbol packs. See [Volatility](#volatility) | One CSV per plugin and memory image: `<image>__<plugin>.csv` |
 
 The tools marked *.zip* from Eric Zimmerman need the .NET 10 runtime on the server (see [Eric Zimmerman tools](#eric-zimmerman-tools)).
 
@@ -93,6 +94,8 @@ Kookaburrow ships these (marked *Shipped*, read-only; **Copy** one to change it)
 | **Execution - Amcache, Shimcache and ShellBags** | Registry - Collect Hives | AmcacheParser, AppCompatCacheParser, SBECmd |
 | **Filesystem - MFT and USN Journal (KAPE)** | KAPE - SANS Triage | MFTECmd |
 | **Network - Zeek on Packet Capture** | Network - Packet Capture (Windows or Linux) | Zeek |
+| **Memory - Volatility on Windows** | Memory - Full Dump (WinPmem) | Volatility |
+| **Memory - Volatility on Linux** | Memory - Full Dump (AVML) | Volatility |
 
 ### Eric Zimmerman tools
 
@@ -117,6 +120,32 @@ Kookaburrow ships these (marked *Shipped*, read-only; **Copy** one to change it)
 - Sent to Elastic, each Zeek log becomes its own index (`<prefix>-zeek-network-log-analysis-conn`, `-dns`, `-http`, ...), with `@timestamp` from Zeek's `ts` column (the packet time, not the hunt time). Zeek's default tab-separated logs are converted for you.
 - The packet captures come from **Network - Packet Capture** (Windows: `pktmon`, writing pcapng; Linux: `tcpdump`).
 - **Not tested with Zeek itself.** The pieces around it (per-file runs, per-capture folders, Zeek log counting, conversion, per-log indexes and time stamps) were tested with a stand-in program that writes Zeek-format logs.
+
+### Volatility
+
+Volatility 3 analyses a memory image. It works **offline** once three things are uploaded under **Settings > External > Binaries** (the page lists each name):
+
+| Upload as | What it is | Needed |
+|---|---|---|
+| `volatility3.zip` | The **Source code (zip)** of a Volatility 3 release from [github.com/volatilityfoundation/volatility3/releases](https://github.com/volatilityfoundation/volatility3/releases), uploaded unchanged. Tested with 2.28.2 | Always |
+| `volatility3-symbols-windows.zip` | The Foundation's [windows.zip](https://downloads.volatilityfoundation.org/volatility3/symbols/windows.zip) symbol pack, renamed | To analyse Windows images |
+| `volatility3-symbols-linux.zip` | The Foundation's [linux.zip](https://downloads.volatilityfoundation.org/volatility3/symbols/linux.zip) banner and symbol pack, renamed. A kernel it does not cover needs its own symbol file (build it with `dwarf2json` and add it to this zip) | To analyse Linux images |
+
+- **Nothing is downloaded when it runs.** Volatility is started with `--offline`, so it never looks for symbols on the internet. If a symbol file is missing the plugin fails and the message says which pack to upload.
+- **No Python to install.** It runs with the Python that Kookaburrow already carries for WinRM. The packages Volatility imports (`pefile`, `capstone`, `pycryptodome`, `yara-python`) are added to it by `npm run setup-winrm`, which needs internet only once, when Kookaburrow is built. An existing install gets them with `npm run setup-winrm -- --force`.
+- **Plugin set** (a parameter of the workflow step) chooses what runs on each image. One CSV is written per plugin:
+
+| Set | Plugins |
+|---|---|
+| Windows - triage | info, pslist, pstree, psscan, cmdline, netscan, malfind, svcscan, hivelist |
+| Windows - deep | triage plus psxview, netstat, hollowprocesses, ldrmodules, dlllist, userassist, driverscan, modules, ssdt, callbacks, envars, getsids, privileges, mutantscan, handles, filescan (slow) |
+| Linux - triage | pslist, pstree, psaux, bash, sockstat, lsmod, malfind, check_syscall, mountinfo |
+| Linux - deep | triage plus psscan, lsof, hidden_modules, check_modules, check_idt, check_creds, envars, elfs, ip.Addr, kmsg, library_list |
+
+- Images are found by extension: `.raw .mem .vmem .lime .dmp .dump .img .bin .core`. The memory collections produce them: **Memory - Full Dump** for Windows (WinPmem, `memory.raw`) and for Linux (AVML, `memory.lime`). Both need the image to fit on the host's disk, and the file is as big as the RAM, so a large transfer takes a while.
+- A plugin that fails (a symbol file is missing, or the plugin does not suit the image) does not stop the others. The failure is shown on the step with the plugin name; the plugins that worked keep their CSV. If every plugin fails the step fails.
+- The CSVs can be sent to Elastic like other processor output. They have no time column, so documents carry the time the hunt ran.
+- **What was tested:** the whole path with the real Volatility 3.28.2 source: it unpacks, runs with the bundled Python, writes one CSV per plugin, finds symbol packs, keeps its cache between runs, reports a failing plugin with the reason and removes its empty file, and stops when cancelled. A plugin that needs no symbols (`banners.Banners`) ran on a stand-in image. **Not tested** is analysis of a real Windows or Linux memory image, because none was available: check one with a lab machine and its symbol pack before relying on it.
 
 ### Archives from collections
 
@@ -195,6 +224,11 @@ Add a JSON file to `processors/` (it is read when the server starts):
 - `archive` is the file you upload under External > Binaries (it appears there automatically). It is normally a zip of the tool; `exe` is a pattern for the program inside it.
 - `requires` (optional) lists [server dependencies](08-settings.md#dependencies) that must be installed, for example `dotnet10`. While one is missing the workflow cannot run. `launcher: "dotnet"` runs the tool as `dotnet <file>` (for `.dll` tools); the tool is started with `DOTNET_ROOT` set to the runtime found and `DOTNET_ROLL_FORWARD=Major`, so a newer runtime than the tool was built for still works.
 - `each` (optional) is a list of file name patterns, for tools that read one named file (`["Amcache.hve"]`, `["$MFT", "$J"]`, `["*.pcap"]`). The command then runs once per matching file below the input folder, with `{file}` (the path), `{n}` (1, 2, ...) and `{name}` (the file name made safe) available, so the outputs of different files do not overwrite each other. If no file matches, the stage records a note and succeeds.
+- `launcher` (optional) is `dotnet` (run a .dll with the .NET runtime) or `python` (run a script with the Python that comes with Kookaburrow).
+- `runs` (optional) is `{ "param": "Plugins", "sets": { "Windows - triage": ["windows.info.Info", ...] } }`: the command runs once for every name in the set chosen by that parameter (and for every `each` file), with `{run}` replaced by the name. Every option of the parameter needs a set.
+- `stdout` (optional) names a file below `{output}` that the program's standard output is written to, for tools that print their result. It may use `{name}`, `{n}` and `{run}`; a run that fails leaves no file.
+- `assets` (optional) lists extra uploads (`[{ "archive": "name.zip" }]`) that are copied as they are, not unpacked, into the folder `{assets}`; they show on the Binaries page as optional. `{cache}` is a folder kept between runs.
+- `hints` (optional) are `{ "match", "text" }` pairs: when a failure message contains `match`, `text` is added to it so the usual cause is explained.
 - `cwd` (optional) is the folder the tool runs in (it may use `{output}` and `{n}`); the default is the folder the tool is in. Zeek writes its logs into the current folder, so it uses `{output}/capture{n}`.
 - `tool` can be `{ "system": "zeek" }` instead of `archive` and `exe`: the program installed on the server and found by [Dependencies](08-settings.md#dependencies) (the id must also be in `requires`).
 - `outputs` entries may match files in sub-folders (`capture*/*.log`) and use `"format": "zeek"` for Zeek's tab-separated logs; `"timeEpoch": true` says the time column is seconds since 1970.
@@ -222,10 +256,21 @@ A recurring run repeats a hunt or response on a timer. Create one by turning on 
 **Burrow! > Recurring** has a **Hunts / Actions / Workflows** toggle in the header. Each schedule is a collapsible row:
 
 - **Header:** name, a status badge (*Active*, *Paused* or *Finished*), how many times it ran, when it last ran, and a live countdown to the next run (or *Paused: no runs until resumed* / *No more runs*).
-- **Details** (open the row): runs every, until, planned runs, ran so far, the workflow (if any), who created it and when, the collections or actions with their parameter names, the hosts and groups, and the latest runs with their status.
+- **What changed** (in the header): **+N new / −N gone** since the previous run (see below). It is outlined until someone opens it; *N unopened* counts runs with changes nobody has looked at yet.
+- **Details** (open the row): runs every, until, planned runs, ran so far, the workflow (if any), who created it and when, the collections or actions with their parameter names, the hosts and groups, and the latest runs with their status and what changed in each.
 - **Pause** holds it: nothing runs until you **Resume**, which starts a fresh cycle (the next run is one interval from now, or it finishes if its end time has passed). The runs it already made are kept.
 - **Delete** stops it for good. The runs it already made are kept.
 
 Pausing, resuming and deleting need `hunts.run` for hunt schedules and `actions.run` for response schedules. Viewing needs `hunts.view` or `actions.view`.
+
+### What changed since the previous run
+
+When a run finishes (with its workflow, if it has one), Kookaburrow compares it with the **previous finished run of the same schedule**, using the same rules as [Diff](06-results.md#diff). Open the schedule and set **Compare each run with** to a [baseline](06-results.md#baseline) to compare every run with that known-good state instead (the column then reads *Against &lt;baseline&gt;*, and the first run is compared too). Rows marked as [expected](06-results.md#expected-changes) are not counted. The rows that are new and gone are counted across every host's collection CSVs and the workflow output; a collected file that appears or disappears counts as one.
+
+- **Click the badge** to open **Results > Diff** with the two runs already chosen and the first changed file open.
+- **No changes** means everything compared was the same. **First run** has nothing to compare with.
+- **N not compared**: a host that was collected in only one of the two runs, or a collection or workflow step that failed on a host in one of them. Those are left out instead of counting as everything gone or new; hover to see which.
+- Noisy columns are ignored (process IDs, uptime and the like). If a collection still shows changes on every run, add `$DiffIgnore` or `$DiffKey` to its header ([The library](09-library.md#metadata)).
+- Nothing is sent anywhere; there are no alerts.
 
 The **Workflows** option on the toggle is a placeholder: workflows are scheduled by attaching them to a recurring hunt, so there are no separate workflow schedules.

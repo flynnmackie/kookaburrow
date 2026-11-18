@@ -10,6 +10,7 @@ A **response** runs **actions** on hosts. Unlike collections, actions **change**
 - [What the actions cover](#what-the-actions-cover)
 - [Actions that can cut you off](#actions-that-can-cut-you-off)
 - [Deploy actions](#deploy-actions)
+- [Approvals](#approvals)
 - [Cancelling a response](#cancelling-a-response)
 - [Following a response](#following-a-response)
 - [Recurring responses](#recurring-responses)
@@ -61,7 +62,7 @@ Some actions can sever Kookaburrow's own connection to the host. They refuse to 
 | **Network - Disable Adapter** | `AdapterName` | Disabling the adapter the host is managed over ends your contact. Use Host - Isolate to keep access from your server |
 | **SSH - Disable Password Login** (Linux) | `CONFIRM` | Set `CONFIRM` to `YES` only when key login is known to work. If the account Kookaburrow uses logs in with a password, you will lose contact. Undo with SSH - Remove Overrides |
 
-The [Quarantine](03-hosts.md#quarantine) button on Health > Monitor uses Host - Isolate and works out the right allowed address for you.
+The [Quarantine](03-hosts.md#quarantine) button on Monitor > Health uses Host - Isolate and works out the right allowed address for you.
 
 ## Deploy actions
 
@@ -80,6 +81,30 @@ For rolling out monitoring agents. They share these behaviours:
 | Deploy - Elastic Agent (Linux) | `elastic-agent-linux.tar.gz` (official linux-x86_64 tarball) | `FLEET_URL`, `ENROLLMENT_TOKEN`, optional `INSECURE` |
 
 The Elastic enrolment token is used for that run only, is never stored by Kookaburrow and is hidden in the output.
+
+## Approvals
+
+An admin can require that running actions is **allowed by a second person first**. This is off by default.
+
+**Turning it on:** [Settings > System > Approvals](08-settings.md#approvals). Choose **All actions** or **Only the actions ticked** (for example just the isolation and account actions), and give a role the permission **Approve actions** under User Management.
+
+**What changes for the person running a response:** the *Run* button on **New Response** sends a request instead of starting. Nothing runs and nothing is stored on any host. The request is checked first, so a form that could not run (no host, an unknown action, a missing parameter) is refused straight away. It then waits on **Burrow! > Approvals**.
+
+**What the approver sees:** **Burrow! > Approvals** lists every request (*Waiting* or *All*). Selecting one shows who asked and when, the actions and what each does, the parameter values that were typed (a value whose name looks like a secret, such as a password, is hidden), the hosts and groups, and, for a recurring response, how often it runs. A number next to **Burrow!** and **Approvals** in the menus counts the requests waiting.
+
+- **Approve and run** starts the response exactly as asked, **as the person who asked**. The approver's name and note are written to the response's [activity log](06-results.md#activity-log) (the *Approved* line) and kept on the response.
+- **Reject** closes the request with an optional note. Nothing runs.
+- **Withdraw** lets the person who asked, or an approver, cancel a request that is still waiting.
+
+**Rules**
+
+- The person who asked **cannot approve their own request**, even an admin, unless Settings > Approvals allows it. With only one admin and nobody else holding *Approve actions*, tick that option or create a second approver.
+- A waiting request **expires** after the hours set in Settings (72 by default; 0 means never). An expired request cannot be approved: ask again.
+- Anyone who may run actions sees **their own** requests on the Approvals page. Only holders of *Approve actions* (and admins) see everyone's.
+- The values typed for parameters are kept **encrypted** while a request waits and are deleted as soon as it is decided.
+- A **recurring response** is approved once, as a whole; its later runs do not ask again. To stop it, delete it on Burrow! > Recurring.
+- If a host was deleted by the time someone approves, the approval fails with the reason and the request stays waiting.
+- Quarantine (Isolate and Release on the Monitor page) and interactive shells are not responses and are **not held** for approval. Use their own settings and permissions.
 
 ## Cancelling a response
 

@@ -98,6 +98,18 @@ const DEFAULT_WORKFLOWS = [
     steps: [{ processor: 'mftecmd', params: {} }],
   },
   {
+    id: 'volatility-windows', name: 'Memory - Volatility on Windows', builtin: true,
+    description: 'Takes a full memory image with WinPmem and runs Volatility 3 plugins on the server (processes, command lines, network connections, injected code, services). Needs winpmem.exe, volatility3.zip and a Windows symbol pack (offline). The image is as large as the RAM.',
+    collectionIds: ['powershell/winpmem-memory.ps1'],
+    steps: [{ processor: 'volatility', params: { Plugins: 'Windows - triage' } }],
+  },
+  {
+    id: 'volatility-linux', name: 'Memory - Volatility on Linux', builtin: true,
+    description: 'Takes a full memory image with AVML and runs Volatility 3 plugins on the server (processes, bash history, sockets, modules, syscall table). Needs avml, volatility3.zip and a symbol file for the host kernel (offline). The image is as large as the RAM.',
+    collectionIds: ['bash/memory-avml.sh'],
+    steps: [{ processor: 'volatility', params: { Plugins: 'Linux - triage' } }],
+  },
+  {
     id: 'zeek-pcap', name: 'Network - Zeek on Packet Capture', builtin: true,
     description: 'Captures network traffic on the host and analyses it on the server with Zeek (conn, dns, http, ssl and more). Zeek must be installed on a Linux server.',
     collectionIds: ['powershell/network-packet-capture.ps1', 'bash/network-packet-capture.sh'],

@@ -22,6 +22,8 @@ const ssh = require('./remote/ssh');
 //   $Produces = @('evtx')              PRODUCES=(evtx)          the raw artefact kinds it leaves in raw/ (feeds workflow processors, see processors/)
 //   $Transfer = 'none'                 TRANSFER="none"       none | large                   (large: the script writes files to $OutDir / $OUT_DIR, which can be GBs,
 //                                                             and they are pulled back over SMB (Windows hosts) or SFTP (Linux hosts); see src/large-transfer.js)
+//   $DiffKey = @('Name', 'Path')       DIFFKEY=(Name Path)      the columns that identify a row when two runs are compared (Diff, Recurring)
+//   $DiffIgnore = @('LastRun')         DIFFIGNORE=(LastRun)     columns that change every run and must not make a row look new (see src/diff.js)
 // The platform reads them as text and never executes the file to do so. Comments and blank
 // lines may sit between them; the first other line starts the collection itself.
 const COLLECTION_TYPES = [
@@ -97,7 +99,7 @@ const rawParams = (fields) => (Array.isArray(fields.parameters) ? fields.paramet
 function parseCollection(text, type, isAction = false) {
   const s = text.replace(/^\uFEFF/, '');
   const ps = type === 'powershell';
-  const re = ps ? /^[ \t]*\$(Name|Description|Dependencies|Tags|Parameters|Footprint|Returns|Type|Transfer|Produces)[ \t]*=[ \t]*/i : /^[ \t]*(NAME|DESCRIPTION|DEPENDENCIES|TAGS|PARAMETERS|FOOTPRINT|RETURNS|TYPE|TRANSFER|PRODUCES)=/;
+  const re = ps ? /^[ \t]*\$(Name|Description|Dependencies|Tags|Parameters|Footprint|Returns|Type|Transfer|Produces|DiffKey|DiffIgnore)[ \t]*=[ \t]*/i : /^[ \t]*(NAME|DESCRIPTION|DEPENDENCIES|TAGS|PARAMETERS|FOOTPRINT|RETURNS|TYPE|TRANSFER|PRODUCES|DIFFKEY|DIFFIGNORE)=/;
   const fields = {};
   let pos = 0, end = 0;
   while (pos < s.length) {
@@ -120,6 +122,7 @@ function parseCollection(text, type, isAction = false) {
     pos = end = e2 + 1;
   }
   const flat = (v) => (Array.isArray(v) ? v.join(', ') : String(v ?? '')).replace(/\s*\r?\n\s*/g, ' ').trim();
+  const list = (v) => [...new Set((Array.isArray(v) ? v : String(v ?? '').split(/[,;]/)).map((t) => t.trim()).filter(Boolean))];
   const deps = Array.isArray(fields.dependencies) ? fields.dependencies : String(fields.dependencies ?? '').split(/[,;]/);
   const tags = Array.isArray(fields.tags) ? fields.tags : String(fields.tags ?? '').split(/[,;]/);
   const label = (f) => (ps ? `$${f[0].toUpperCase()}${f.slice(1)}` : f.toUpperCase());
@@ -135,6 +138,8 @@ function parseCollection(text, type, isAction = false) {
     tags: [...new Set(tags.map((t) => t.trim().toLowerCase()).filter(Boolean))],
     // The kinds of raw artefact it leaves in raw/ (for example 'evtx'); workflow processors that accept one of them can run on it.
     produces: [...new Set((Array.isArray(fields.produces) ? fields.produces : String(fields.produces ?? '').split(/[,;]/)).map((t) => t.trim().toLowerCase()).filter(Boolean))],
+    diffKey: list(fields.diffkey),
+    diffIgnore: list(fields.diffignore),
     body: s.slice(end).replace(/^(?:[ \t]*\r?\n)+/, '').replace(/\s+$/, ''),
     warnings: FIELDS.filter((f) => fields[f] === undefined).map((f) => `Missing ${label(f)} variable at the top of the script`),
   };
@@ -144,9 +149,49 @@ function parseCollection(text, type, isAction = false) {
 // are returned, each tagged with where it matched. `tags` (array) keeps only collections that
 // carry every one of those tags. `requiresDeps` keeps only collections that declare at least one
 // dependency (an external binary).
-function listScripts(root, query, tags = [], requiresDeps = false) {
+// ---- Search (View Collections, View Actions, the New Hunt and New Response dialogs) ----
+// Every word typed must be found (a "quoted phrase" counts as one), and results are ranked by where it was found, best first:
+//   the name  (a whole word 120, the start of a word 100, inside a word 60; all words in the name +50; the name starts with the first word +30)
+//   the file name 50, a tag 45 (exact) / 40 (start) / 25, a dependency 30, the platform (linux, windows, powershell, bash) 15,
+//   the description (a word start 20, inside a word 10), and only when nothing else matched anything: a line of the script itself (2).
+// So "user" finds the user collections first and not every script that mentions a user somewhere in its code.
+// a short word and what it usually means
+const ALIASES = { exe: ['executable', 'executables'], exes: ['executable', 'executables'], dll: ['library', 'libraries'], ps: ['powershell'], pwsh: ['powershell'], win: ['windows'], login: ['logins', 'logon', 'logons'], logon: ['logons', 'logins'], cred: ['credential', 'credentials'], creds: ['credential', 'credentials'], pw: ['password', 'passwords'], pass: ['password', 'passwords'], cron: ['crontab'], persist: ['persistence'], lateral: ['lateral-movement'] };
+const searchTokens = (q) => { const out = []; String(q || '').toLowerCase().replace(/"([^"]+)"|(\S+)/g, (m, phrase, word) => { const w = (phrase || word).trim(); if (w && !out.includes(w)) out.push(w); return m; }); return out; };
+const wordStart = (s, w) => new RegExp('(^|[^a-z0-9])' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).test(s);
+const wholeWord = (s, w) => new RegExp('(^|[^a-z0-9])' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '($|[^a-z0-9])').test(s);
+// null when a word is not found anywhere; otherwise { score, name, tags, description, script, line }
+function scoreScript(c, toks, text, deep) {
+  const name = c.name.toLowerCase(), file = c.file.toLowerCase(), desc = (c.description || '').toLowerCase(), tags = c.tags.map((x) => x.toLowerCase()), deps = c.dependencies.map((x) => x.toLowerCase());
+  const platform = c.type === 'bash' ? ['linux', 'bash', 'ssh', 'unix'] : ['windows', 'powershell', 'winrm', 'ps1'];
+  const m = { score: 0, name: false, tags: false, description: false, script: false, line: null };
+  let inName = 0;
+  for (const w of toks) {
+    let best = 0, field = '';
+    const take = (s, f) => { if (s > best) { best = s; field = f; } };
+    for (const v of [w, ...(ALIASES[w] || [])]) {
+    const short = v.length <= 3; // exe, dns, ssh, pid: only whole words, so "exe" does not find every "execution"
+    if (wholeWord(name, v)) take(120, 'name'); else if (!short && wordStart(name, v)) take(100, 'name'); else if (!short && name.includes(v)) take(60, 'name');
+    if (!short && file.includes(v)) take(50, 'name');
+    for (const tg of tags) { if (tg === v) take(45, 'tags'); else if (!short && tg.startsWith(v)) take(40, 'tags'); else if (!short && tg.includes(v)) take(25, 'tags'); }
+    if (deps.some((d) => (short ? d.split(/[^a-z0-9]+/).includes(v) : d.includes(v)))) take(30, 'name');
+    if (platform.includes(v)) take(15, 'platform');
+    if (wholeWord(desc, v)) take(20, 'description'); else if (!short && wordStart(desc, v)) take(15, 'description'); else if (!short && desc.includes(v)) take(10, 'description');
+    }
+    if (!best && deep) { const line = text.split(/\r?\n/).find((l) => l.toLowerCase().includes(w)); if (line !== undefined) { best = 2; field = 'script'; m.line = m.line || line.trim().slice(0, 160); } }
+    if (!best) return null;
+    m.score += best; if (field === 'name' && name.includes(w)) inName++;
+    if (field === 'name') m.name = true; else if (field === 'tags') m.tags = true; else if (field === 'description') m.description = true; else if (field === 'script') m.script = true;
+  }
+  if (inName === toks.length) m.score += 50;
+  if (name.startsWith(toks[0])) m.score += 30;
+  if (toks.length > 1 && name.includes(toks.join(' '))) m.score += 60;
+  return m;
+}
+
+function listScripts(root, query, tags = [], requiresDeps = false, deep = false) {
   const isAction = root === actionsDir;
-  const q = String(query || '').trim().toLowerCase();
+  const toks = searchTokens(query), q = toks.join(' ');
   const wanted = tags.map((t) => String(t).trim().toLowerCase()).filter(Boolean);
   const out = [];
   const verified = loadVerified(root);
@@ -165,14 +210,21 @@ function listScripts(root, query, tags = [], requiresDeps = false) {
       if (!wanted.every((t) => collection.tags.includes(t))) continue;
       if (requiresDeps && !collection.dependencies.length) continue;
       collection.missingDependencies = resolveBinaries(collection).missing; // declared binaries not uploaded yet
-      if (q) {
-        const inName = [collection.name, f, collection.description, ...collection.dependencies, ...collection.tags].some((s) => s.toLowerCase().includes(q));
-        const line = text.split(/\r?\n/).find((l) => l.toLowerCase().includes(q));
-        if (!inName && line === undefined) continue;
-        collection.match = { name: inName, script: line !== undefined, line: line?.trim().slice(0, 160) ?? null };
+      if (toks.length) {
+        const m = scoreScript(collection, toks, text, deep);
+        if (!m) continue;
+        collection.match = m;
       }
       out.push(collection);
     }
+  }
+  if (toks.length) {
+    if (!out.length && !deep && q.length >= 3) return listScripts(root, query, tags, requiresDeps, true); // nothing by name, tag or description: look inside the scripts
+    // matches in the name, file name or a tag outrank everything: when there are any, results found only in a description (or a script) are left out
+    const strong = out.filter((x) => x.match.name || x.match.tags);
+    const keep = strong.length ? strong : out;
+    keep.sort((a, b) => b.match.score - a.match.score || a.name.localeCompare(b.name));
+    return keep;
   }
   return out;
 }
@@ -202,8 +254,9 @@ function resolveCollection(collectionId, root = collectionsDir) {
 function resolveBinaries(collection) {
   const found = [], missing = [];
   for (const dep of collection.dependencies) {
-    const file = path.join(binariesDir, dep);
-    const safe = dep === path.basename(dep) && !dep.startsWith('.');
+    const over = collection.binaryOverrides && collection.binaryOverrides[dep]; // a file chosen for this run in place of the one on the Binaries page (a YARA rule)
+    const file = over || path.join(binariesDir, dep);
+    const safe = over ? true : dep === path.basename(dep) && !dep.startsWith('.');
     if (safe && fs.existsSync(file) && fs.statSync(file).isFile()) found.push(file);
     else missing.push(dep);
   }
@@ -289,4 +342,26 @@ const listCollections = (...a) => listScripts(collectionsDir, ...a);
 const listActions = (...a) => listScripts(actionsDir, ...a);
 const resolveAction = (id) => resolveCollection(id, actionsDir);
 
-module.exports = { FOOTPRINTS, RETURNS, KINDS, parseCollection, loadVerified, hashText, listCollections, listActions, listTags, resolveCollection, resolveAction, startRun, executeOnHost, paramValues, withParams, collectionsDir, actionsDir };
+// What each collection says about comparing its output ($DiffKey, $DiffIgnore), for src/diff.js. Looked up by the file stem the
+// hunt runner names its CSVs after (byStem) and by the collection's name, which the All_Hosts CSV puts in its Collection column
+// (byName). Read again at most every 10 seconds.
+let rulesCache = null;
+function diffRules() {
+  if (rulesCache && Date.now() - rulesCache.at < 10000) return rulesCache;
+  const byStem = new Map(), byName = new Map();
+  for (const { type, ext } of COLLECTION_TYPES) {
+    const dir = path.join(collectionsDir, type);
+    let names = []; try { names = fs.readdirSync(dir).filter((n) => n.toLowerCase().endsWith(ext)); } catch { continue; }
+    for (const f of names) {
+      let p; try { p = parseCollection(fs.readFileSync(path.join(dir, f), 'utf8'), type); } catch { continue; }
+      if (!p.diffKey.length && !p.diffIgnore.length) continue;
+      const rule = { key: p.diffKey, ignore: p.diffIgnore };
+      const stem = f.slice(0, -ext.length).trim().replace(/[^A-Za-z0-9.-]+/g, '_').toLowerCase(); // as output.safeName does
+      if (!byStem.has(stem)) byStem.set(stem, rule);
+      byName.set((p.name || f.slice(0, -ext.length)).toLowerCase(), rule);
+    }
+  }
+  return (rulesCache = { at: Date.now(), byStem, byName });
+}
+
+module.exports = { FOOTPRINTS, RETURNS, KINDS, parseCollection, loadVerified, hashText, listCollections, listActions, listTags, resolveCollection, resolveAction, startRun, executeOnHost, paramValues, withParams, diffRules, collectionsDir, actionsDir };

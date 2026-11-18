@@ -12,7 +12,7 @@ Discover hosts, run hunts (collections) and responses (actions) over WinRM and S
 ## What it does
 
 - **Find and connect hosts.** Scan subnets, authenticate with saved credential profiles, and keep a host inventory with live health checks.
-- **Hunt.** Run about 200 read-only collections (PowerShell for Windows, bash for Linux) against one host, a group or many hosts at once. Per-host progress, cancel, and recurring schedules.
+- **Hunt.** Run about 400 read-only collections (PowerShell for Windows, bash for Linux) against one host, a group or many hosts at once. Per-host progress, cancel, and recurring schedules.
 - **Respond.** Run about 120 actions that change hosts: contain, kill, disable, deploy agents. Warnings before running, and a cancel that tells you what it may have left half done.
 - **Keep evidence.** Every step is logged with timestamps and SHA-256 hashes. Raw artefacts (event logs, hives, memory) are pulled back over SMB or SFTP and verified.
 - **Analyse.** Searchable HTML reports, run-to-run diff, cross-host comparison, IOC matching, a file browser with pins.
@@ -58,7 +58,7 @@ These guides are also built into Kookaburrow and work offline: press **Documenta
 | Default address | `http://127.0.0.1:46200` |
 | Service | `Kookaburrow` (Windows, automatic start) |
 | Data | `C:\ProgramData\Kookaburrow` (MSI install) or `data/` and `output/` (from source) |
-| Hunts | about 200 (Windows and Linux) |
+| Hunts | about 400 (Windows and Linux) |
 | Actions | about 120 (Windows and Linux) |
 
 ## Status

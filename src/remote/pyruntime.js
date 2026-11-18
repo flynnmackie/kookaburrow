@@ -21,4 +21,7 @@ function check(force = false) {
 // How to start the helper, or null when the engine is not available.
 const command = (args = []) => (check().ok ? { exe, args: ['-u', helper, ...args], env } : null);
 
-module.exports = { check, command, root };
+// The bundled Python itself ({ exe, env }), for running other tools (Volatility), or null when the engine is not installed.
+const python = () => (check().ok ? { exe, env } : null);
+
+module.exports = { check, command, python, root };

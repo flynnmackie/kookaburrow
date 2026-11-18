@@ -22,7 +22,7 @@ Find the symptom, check the cause, apply the fix.
 |---|---|
 | Server log | `C:\ProgramData\Kookaburrow\data\server.log` (MSI) or the console / `data/server.log` from source |
 | What a hunt did, step by step | **Results > Activity**, or `<name>_Log.csv` in the run folder |
-| Why a host check fails | **Health > Monitor log** |
+| Why a host check fails | **Monitor > Health log** |
 | Which engine is used, address, version | **Home** |
 | Service state | `Get-Service Kookaburrow` |
 

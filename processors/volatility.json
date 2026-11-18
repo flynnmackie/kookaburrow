@@ -1,0 +1,167 @@
+{
+  "id": "volatility",
+  "name": "Volatility 3 - Memory Analysis",
+  "description": "Runs a set of Volatility 3 plugins over each collected memory image and writes one CSV per plugin: processes, command lines, network connections, injected code, services, loaded drivers and more. Works offline: upload the Volatility 3 source zip and, for the operating system you analyse, a symbol pack (Settings > External > Binaries). Runs with the Python that comes with Kookaburrow.",
+  "homepage": "https://github.com/volatilityfoundation/volatility3",
+  "accepts": [
+    "memory"
+  ],
+  "launcher": "python",
+  "tool": {
+    "win32": {
+      "archive": "volatility3.zip",
+      "exe": "vol.py"
+    },
+    "linux": {
+      "archive": "volatility3.zip",
+      "exe": "vol.py"
+    }
+  },
+  "assets": [
+    {
+      "archive": "volatility3-symbols-windows.zip"
+    },
+    {
+      "archive": "volatility3-symbols-linux.zip"
+    }
+  ],
+  "parameters": [
+    {
+      "name": "Plugins",
+      "label": "Plugin set",
+      "default": "Windows - triage",
+      "options": [
+        "Windows - triage",
+        "Windows - deep",
+        "Linux - triage",
+        "Linux - deep"
+      ]
+    }
+  ],
+  "runs": {
+    "param": "Plugins",
+    "sets": {
+      "Windows - triage": [
+        "windows.info.Info",
+        "windows.pslist.PsList",
+        "windows.pstree.PsTree",
+        "windows.psscan.PsScan",
+        "windows.cmdline.CmdLine",
+        "windows.netscan.NetScan",
+        "windows.malfind.Malfind",
+        "windows.svcscan.SvcScan",
+        "windows.registry.hivelist.HiveList"
+      ],
+      "Windows - deep": [
+        "windows.info.Info",
+        "windows.pslist.PsList",
+        "windows.pstree.PsTree",
+        "windows.psscan.PsScan",
+        "windows.psxview.PsXView",
+        "windows.cmdline.CmdLine",
+        "windows.netscan.NetScan",
+        "windows.netstat.NetStat",
+        "windows.malfind.Malfind",
+        "windows.hollowprocesses.HollowProcesses",
+        "windows.ldrmodules.LdrModules",
+        "windows.dlllist.DllList",
+        "windows.svcscan.SvcScan",
+        "windows.registry.hivelist.HiveList",
+        "windows.registry.userassist.UserAssist",
+        "windows.driverscan.DriverScan",
+        "windows.modules.Modules",
+        "windows.ssdt.SSDT",
+        "windows.callbacks.Callbacks",
+        "windows.envars.Envars",
+        "windows.getsids.GetSIDs",
+        "windows.privileges.Privs",
+        "windows.mutantscan.MutantScan",
+        "windows.handles.Handles",
+        "windows.filescan.FileScan"
+      ],
+      "Linux - triage": [
+        "linux.pslist.PsList",
+        "linux.pstree.PsTree",
+        "linux.psaux.PsAux",
+        "linux.bash.Bash",
+        "linux.sockstat.Sockstat",
+        "linux.lsmod.Lsmod",
+        "linux.malfind.Malfind",
+        "linux.check_syscall.Check_syscall",
+        "linux.mountinfo.MountInfo"
+      ],
+      "Linux - deep": [
+        "linux.pslist.PsList",
+        "linux.pstree.PsTree",
+        "linux.psscan.PsScan",
+        "linux.psaux.PsAux",
+        "linux.bash.Bash",
+        "linux.sockstat.Sockstat",
+        "linux.lsof.Lsof",
+        "linux.lsmod.Lsmod",
+        "linux.hidden_modules.Hidden_modules",
+        "linux.malfind.Malfind",
+        "linux.check_syscall.Check_syscall",
+        "linux.check_modules.Check_modules",
+        "linux.check_idt.Check_idt",
+        "linux.check_creds.Check_creds",
+        "linux.envars.Envars",
+        "linux.elfs.Elfs",
+        "linux.mountinfo.MountInfo",
+        "linux.ip.Addr",
+        "linux.kmsg.Kmsg",
+        "linux.library_list.LibraryList"
+      ]
+    }
+  },
+  "each": [
+    "*.raw",
+    "*.mem",
+    "*.vmem",
+    "*.lime",
+    "*.dmp",
+    "*.dump",
+    "*.img",
+    "*.bin",
+    "*.core"
+  ],
+  "command": [
+    "-q",
+    "--offline",
+    "-s",
+    "{assets}",
+    "--cache-path",
+    "{cache}",
+    "-f",
+    "{file}",
+    "-r",
+    "csv",
+    "{run}"
+  ],
+  "stdout": "{output}/{name}__{run}.csv",
+  "hints": [
+    {
+      "match": "symbol_table",
+      "text": "Volatility has no symbols for this system and is offline. Upload the matching symbol pack (volatility3-symbols-windows.zip or volatility3-symbols-linux.zip, from downloads.volatilityfoundation.org/volatility3/symbols; a Linux kernel not in the pack needs its own, built with dwarf2json and zipped in with it)."
+    },
+    {
+      "match": "symbol table",
+      "text": "Volatility has no symbols for this system and is offline. Upload the matching symbol pack (volatility3-symbols-windows.zip or volatility3-symbols-linux.zip, from downloads.volatilityfoundation.org/volatility3/symbols; a Linux kernel not in the pack needs its own, built with dwarf2json and zipped in with it)."
+    },
+    {
+      "match": "No module named",
+      "text": "A Python package Volatility needs is missing from the Python that comes with Kookaburrow (run: npm run setup-winrm -- --force)."
+    },
+    {
+      "match": "layer",
+      "text": "This does not look like a memory image of the chosen operating system. Check the plugin set matches the image."
+    }
+  ],
+  "outputs": [
+    {
+      "file": "*__*.csv",
+      "format": "csv"
+    }
+  ],
+  "timeoutMinutes": 60
+}

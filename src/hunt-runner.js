@@ -7,6 +7,7 @@ const collections = require('./collections');
 const { createAudit, sha256 } = require('./audit');
 const { safeName, createRunFolder, parseCsv, combine } = require('./output');
 const { runLarge } = require('./large-transfer');
+const yaraRule = require('./yara-rule');
 const cancel = require('./cancel');
 const elastic = require('./elastic');
 const workflowRunner = require('./workflow-runner');
@@ -19,7 +20,7 @@ const workflows = require('./workflows');
 const csvCell = (v) => { const s = String(v ?? ''); return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
 
 // Linux collections print text; each line becomes a row of a one-column CSV so the output is CSV everywhere.
-const linesToCsv = (text) => ['Output', ...text.replace(/\r\n/g, '\n').replace(/\n+$/, '').split('\n')].map(csvCell).join('\r\n') + '\r\n';
+const linesToCsv = (text) => require('./output').textToCsv(text);
 // PowerShell output may carry a leading/trailing blank line from Out-String.
 const tidyCsv = (text) => text.replace(/^\s*\r?\n/, '').replace(/\s+$/, '') + '\r\n';
 
@@ -41,13 +42,21 @@ function startHunt({ name, collectionIds, hosts, params, startedBy, scheduleId, 
   // a collection that takes parameters runs from a temporary copy with the values set on its first lines (the values are never stored or logged)
   const values = new Map(); // collection id -> { parameter: value }
   for (const c of chosen) values.set(c.id, collections.paramValues(c, params && params[c.id]));
-  const tmpFiles = [];
+  const tmpFiles = [], tmpDirs = [];
+  // the YaraRule parameter of the YARA hunts chooses the rules for this hunt: they are staged in place of kb-rules.yar (src/yara-rule.js)
+  const yaraRules = new Map(); // collection id -> { mode, name, fileId?, text? (custom rules, so the hunt page can offer to save them), staged }
+  for (const c of chosen) {
+    if (!c.parameters.includes('YaraRule')) continue;
+    const r = yaraRule.resolve(values.get(c.id).YaraRule);
+    values.get(c.id).YaraRule = r ? r.label : 'all enabled rule files';
+    if (r) { const s = yaraRule.stage(r); tmpDirs.push(s.dir); yaraRules.set(c.id, { mode: r.mode, name: r.name, ...(r.fileId ? { fileId: r.fileId } : {}), ...(r.mode === 'custom' ? { text: r.text } : {}), staged: s.file }); }
+  }
   const runnable = new Map(chosen.map((c) => {
     if (!c.parameters.length) return [c.id, c];
     const full = collections.withParams(c, values.get(c.id));
     const tmp = path.join(os.tmpdir(), `kb-col-${id()}${path.extname(c.file)}`);
     fs.writeFileSync(tmp, full); tmpFiles.push(tmp);
-    return [c.id, { ...c, file: tmp, text: full }];
+    return [c.id, { ...c, file: tmp, text: full, ...(yaraRules.has(c.id) ? { binaryOverrides: { 'kb-rules.yar': yaraRules.get(c.id).staged } } : {}) }];
   }));
 
   const started = new Date();
@@ -65,6 +74,7 @@ function startHunt({ name, collectionIds, hosts, params, startedBy, scheduleId, 
       hostId: h.id, hostLabel: label(h), address: h.address, collectionId: c.id, collectionName: c.name, status: 'queued',
     }))),
   };
+  if (yaraRules.size) run.yara = Object.fromEntries([...yaraRules].map(([cid, y]) => [cid, { mode: y.mode, name: y.name, ...(y.fileId ? { fileId: y.fileId } : {}), ...(y.text ? { text: y.text, saved: false } : {}) }]));
   db.runs.unshift(run);
   save();
   const audit = createAudit(run, path.join(folder.abs, `${folder.base}_Log.csv`));
@@ -191,7 +201,7 @@ function startHunt({ name, collectionIds, hosts, params, startedBy, scheduleId, 
     audit.log({ kind: 'hunt', action: run.status === 'completed' ? 'Hunt complete' : run.status === 'cancelled' ? 'Hunt cancelled' : 'Hunt completed with errors', outcome: run.status === 'completed' ? 'ok' : run.status === 'cancelled' ? 'cancelled' : 'errors',
       detail: `${okAll} of ${run.results.length} collection runs ok; output saved to output/${folder.rel}` });
     save();
-  })().finally(() => { cancel.end(run.id); for (const f of tmpFiles) fs.promises.unlink(f).catch(() => {}); }).catch((e) => {
+  })().finally(() => { cancel.end(run.id); for (const f of tmpFiles) fs.promises.unlink(f).catch(() => {}); for (const d of tmpDirs) fs.promises.rm(d, { recursive: true, force: true }).catch(() => {}); }).catch((e) => {
     run.status = 'failed'; run.error = e.message; run.finishedAt = new Date().toISOString();
     audit.log({ kind: 'error', action: 'Hunt failed', outcome: 'error', detail: e.message });
     save();

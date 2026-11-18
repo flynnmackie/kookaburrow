@@ -3,6 +3,7 @@ $Description = 'Exports event logs as .evtx files and pulls them back to the ser
 $Dependencies = @()
 $Parameters = @('LogNames?', 'LastMinutes?', 'StartTime?', 'EndTime?')
 $Tags = @('event-logs', 'forensics')
+$DiffIgnore = @('SizeMB')
 $Footprint = 'transient'
 $Returns = 'both'
 $Type = 'artefact'

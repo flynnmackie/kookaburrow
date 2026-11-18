@@ -16,15 +16,12 @@ if (-not (Test-Path -LiteralPath $autoruns)) {
 }
 
 # -a * all categories, -c CSV, -h hashes, -s verify signatures, -nobanner, -accepteula
+# One row per autostart entry that is not signed by a verified publisher.
 $csv = & $autoruns -accepteula -nobanner -a * -c -h -s 2>$null
-$rows = $csv | ConvertFrom-Csv | Where-Object { $_.'Image Path' -or $_.'Launch String' }
-
-'== Entries per category =='
-$rows | Group-Object Category | Sort-Object Count -Descending |
-    Select-Object Count, @{ n = 'Category'; e = { $_.Name } } | Format-Table -AutoSize
-
-'== Unsigned / unverified entries =='
-$rows | Where-Object { $_.Signer -notlike '(Verified)*' } |
-    Select-Object Category, Entry, Enabled, Signer, 'Image Path', 'Launch String', 'SHA-256' |
+$csv | ConvertFrom-Csv |
+    Where-Object { ($_.'Image Path' -or $_.'Launch String') -and $_.Signer -notlike '(Verified)*' } |
     Sort-Object Category, Entry |
-    Format-List
+    ForEach-Object {
+        [pscustomobject]@{ Category = $_.Category; Entry = $_.Entry; EntryLocation = $_.'Entry Location'; Enabled = $_.Enabled; Signer = $_.Signer
+            ImagePath = $_.'Image Path'; LaunchString = $_.'Launch String'; Sha256 = $_.'SHA-256' }
+    }

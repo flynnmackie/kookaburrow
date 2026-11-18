@@ -22,9 +22,8 @@ $files = foreach ($r in $roots) {
     }
 }
 
+# capped at 200, newest first
 $files = @($files | Sort-Object LastWriteTime -Descending | Select-Object -First 200)
-"$($files.Count) file(s) (capped at 200, newest first)"
-''
 $files | ForEach-Object {
     $sig = if ($_.Extension -in '.exe', '.dll', '.scr', '.ps1') { (Get-AuthenticodeSignature -LiteralPath $_.FullName).Status } else { 'n/a' }
     [pscustomobject]@{

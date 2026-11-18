@@ -75,7 +75,7 @@ function startRun(s) {
   const hosts = hostsOf(s);
   if (!hosts.length) throw new Error('None of its hosts exist any more');
   if (s.kind === 'hunt') return huntRunner.startHunt({ name: s.name, collectionIds: s.itemIds, hosts, params: s.params ? JSON.parse(decrypt(s.params)) : {}, startedBy: s.createdBy, scheduleId: s.id, workflowId: s.workflowId || null, sendElastic: s.sendElastic });
-  return responseRunner.startResponse({ name: s.name, actionIds: s.itemIds, hosts, params: s.params ? JSON.parse(decrypt(s.params)) : {}, startedBy: s.createdBy, scheduleId: s.id });
+  return responseRunner.startResponse({ name: s.name, actionIds: s.itemIds, hosts, params: s.params ? JSON.parse(decrypt(s.params)) : {}, startedBy: s.createdBy, scheduleId: s.id, approval: s.approval || null });
 }
 
 function tick() {
@@ -94,7 +94,105 @@ function tick() {
     save();
   }
 }
-const start = () => { tick(); setInterval(tick, TICK_MS).unref?.(); };
+// What changed since the previous run (Burrow > Recurring shows it as +new / −gone, and clicking it opens Diff with the two runs).
+// Worked out once a run has finished (and its workflow with it) and kept on the run as `changes`:
+//   { against: previous run id, added, removed (rows; a raw file counts as one), files (how many differ), notCollected: ['what' on 'host'],
+//     hostsMissing: [addresses collected in only one of the two runs], at, seen }
+// The previous run is the last earlier run of the same schedule that finished; a schedule with compareTo { baselineId } is compared
+// with that baseline instead (src/baselines.js; `against` is then "baseline:<id>"). Hosts or collections that failed or were offline
+// in one of the two are listed under notCollected / hostsMissing instead of making everything look new or gone. Rows marked as
+// expected (src/expected.js) are not counted; marking one, or changing what a schedule compares with, makes the changes stale
+// (stale: true) and they are worked out again, newest run first, keeping whether they were seen.
+const DONE = new Set(['completed', 'completed_with_errors']);
+const MAX_PER_TICK = 2; // a diff reads both runs' files; a backlog (after an upgrade) is worked through a couple at a time
+const stemOf = (id) => require('./output').safeName(require('path').basename(String(id || ''), require('path').extname(String(id || ''))), 'collection').toLowerCase();
+const vpathOf = (r) => r.vpath || `/output/${r.outputPath}`;
+function changesBetween(prev, run) {
+  const diff = require('./diff'), { safeName } = require('./output');
+  const sum = diff.summarise(vpathOf(prev), vpathOf(run));
+  const notCollected = new Set();
+  let added = 0, removed = 0, modified = 0, files = 0;
+  // a file only in one run, whose collection (or workflow step) did not succeed in the other run on that host, was not collected there
+  const failedIn = (r, host, key) => {
+    const ip = host.replace(/^[_-]+/, ''), rest = key.slice(key.indexOf('/') + 1);
+    if (rest.startsWith('processed/')) {
+      const st = (r.workflow?.stages || []).find((s) => safeName(s.address, 'host') === ip && s.status !== 'ok');
+      return st ? `${st.processor} on ${st.address}` : null;
+    }
+    const low = rest.toLowerCase();
+    const res = (r.results || []).find((x) => { const st = stemOf(x.collectionId || x.actionId); return safeName(x.address, 'host') === ip && (low.startsWith(`${st}_`) || low.startsWith(`raw/${st}/`)); });
+    return res && res.status !== 'ok' ? `${res.collectionName || res.actionName || 'a collection'} on ${res.address}` : null;
+  };
+  for (const f of sum.files) {
+    if (f.kind === 'record' || f.kind === 'combined' || f.hostMissing || f.status === 'same') continue;
+    const host = f.key.includes('/') ? f.key.slice(0, f.key.indexOf('/')) : null;
+    const why = host && (f.status === 'removed' ? failedIn(run, host, f.key) : f.status === 'added' ? failedIn(prev, host, f.key) : null);
+    if (why) { notCollected.add(why); continue; }
+    files++;
+    if (f.status === 'changed') { added += f.added || 0; removed += f.removed || 0; modified += f.modified || 0; } else if (f.status === 'added') added += f.kind === 'raw' ? 1 : f.rows || 0; else removed += f.kind === 'raw' ? 1 : f.rows || 0;
+  }
+  const missing = [...sum.hosts.onlyA, ...sum.hosts.onlyB].map((h) => h.replace(/^[_-]+/, ''));
+  return { against: prev.id, added, removed, modified, files, notCollected: [...notCollected], hostsMissing: missing, at: new Date().toISOString(), seen: !added && !removed && !modified };
+}
+// The baseline a schedule compares with, as a stand-in for the previous run; null when it compares with the previous run. A baseline
+// that was uploaded is unpacked first (asynchronously), so it may not be ready on the first tick.
+const preparing = new Set();
+function baselineFor(s) {
+  const bid = s.compareTo?.baselineId; if (!bid) return null;
+  const baselines = require('./baselines'), b = baselines.find(bid);
+  if (!b) return { missing: true };
+  if (!require('fs').existsSync(baselines.folderOf(b))) {
+    if (!preparing.has(b.id)) { preparing.add(b.id); baselines.prepare(b).catch((e) => console.error(`Baseline ${b.name}:`, e.message)).finally(() => preparing.delete(b.id)); }
+    return { notReady: true };
+  }
+  return { id: `baseline:${b.id}`, vpath: `baseline:${b.id}`, name: b.name, results: [] };
+}
+function checkChanges() {
+  let done = 0;
+  for (const s of db.schedules) {
+    const runs = s.runIds.map((rid) => db.runs.find((r) => r.id === rid)).filter(Boolean);
+    const base = baselineFor(s);
+    if (base?.notReady) continue;
+    for (let i = runs.length - 1; i >= 0 && done < MAX_PER_TICK; i--) { // newest first, so the badge on the Recurring page is right soonest
+      const run = runs[i], old = run.changes;
+      if ((old && !old.stale) || !DONE.has(run.status) || !run.outputPath) continue;
+      const keepSeen = (c) => ({ ...c, seen: c.seen || !!old?.seen });
+      if (base?.missing) { run.changes = keepSeen({ error: 'The baseline it compares with was deleted', at: new Date().toISOString(), seen: true }); save(); continue; }
+      const prev = base || runs.slice(0, i).reverse().find((r) => DONE.has(r.status) && r.outputPath);
+      if (!prev) { run.changes = { first: true, at: new Date().toISOString(), seen: true }; save(); continue; }
+      done++;
+      try { run.changes = keepSeen(changesBetween(prev, run)); } catch (e) { run.changes = { against: prev.id, error: e.message, at: new Date().toISOString(), seen: true }; }
+      if (base) run.changes.againstName = base.name;
+      save();
+    }
+  }
+}
+// Marks the worked-out changes as out of date so checkChanges works them out again: all of them (an expected row was marked or
+// removed), or one schedule's when what it compares with changed (then they start unseen again).
+function staleChanges(s = null) {
+  for (const sc of s ? [s] : db.schedules) {
+    for (const rid of sc.runIds) {
+      const r = db.runs.find((x) => x.id === rid);
+      if (!r?.changes) continue;
+      if (s) delete r.changes; else r.changes.stale = true;
+    }
+  }
+  save();
+}
+function setCompareTo(s, baselineId) {
+  if (baselineId && !require('./baselines').find(baselineId)) throw new Error('Baseline not found');
+  const was = s.compareTo?.baselineId || null;
+  s.compareTo = baselineId ? { baselineId } : null;
+  if (was !== (baselineId || null)) staleChanges(s);
+  save();
+}
+function markSeen(s, runId) {
+  const run = s.runIds.includes(runId) && db.runs.find((r) => r.id === runId);
+  if (!run || !run.changes) throw new Error('Not found');
+  if (!run.changes.seen) { run.changes.seen = true; save(); }
+}
+
+const start = () => { const both = () => { tick(); try { checkChanges(); } catch (e) { console.error('Recurring changes:', e.message); } }; both(); setInterval(both, TICK_MS).unref?.(); };
 
 // What the Recurring page shows: the schedule, what it runs and on which hosts, and its latest runs. Never the parameter values.
 function view(s) {
@@ -102,12 +200,22 @@ function view(s) {
   return {
     id: s.id, kind: s.kind, name: s.name, sendElastic: typeof s.sendElastic === 'boolean' ? s.sendElastic : null, workflow: s.workflowId ? (require('./workflows').find(s.workflowId)?.name || 'a deleted workflow') : null, everyMinutes: s.everyMinutes, until: s.until, createdBy: s.createdBy, createdAt: s.createdAt,
     nextRun: s.nextRun, lastRun: s.lastRun, runCount: s.runCount, status: s.status, lastError: s.lastError,
+    compareTo: s.compareTo?.baselineId ? { baselineId: s.compareTo.baselineId, name: require('./baselines').find(s.compareTo.baselineId)?.name || 'a deleted baseline' } : null,
     totalRuns: totalRuns({ ...s }, Date.parse(s.createdAt)),
     hosts: hostsOf({ hostIds: s.hostIds, listIds: [] }).map((h) => ({ name: h.name || h.hostname || h.address, address: h.address })),
     groups: s.listIds.map((l) => db.lists.find((x) => x.id === l)).filter(Boolean).map((l) => ({ name: l.name, hosts: l.hostIds.length })),
     items: s.itemIds.map((x) => { const c = lib(x); return c ? { id: x, name: c.name, description: c.description, type: c.type, parameters: s.kind === 'response' ? c.parameters.map((p) => (c.optionalParameters.includes(p) ? `${p}?` : p)) : [] } : { id: x, name: x, description: 'No longer in the library', type: '', parameters: [] }; }),
-    runs: s.runIds.slice(-15).reverse().map((rid) => db.runs.find((r) => r.id === rid)).filter(Boolean).map((r) => ({ id: r.id, startedAt: r.startedAt, finishedAt: r.finishedAt || null, status: r.status })),
+    runs: s.runIds.slice(-15).reverse().map((rid) => db.runs.find((r) => r.id === rid)).filter(Boolean).map((r) => ({ id: r.id, startedAt: r.startedAt, finishedAt: r.finishedAt || null, status: r.status, outputPath: r.outputPath || null, ...(r.changes ? { changes: r.changes, againstPath: againstPath(r) } : {}) })),
+    // the newest run whose changes are worked out, and how many runs have changes nobody has opened yet
+    latestChanges: (() => { const r = s.runIds.map((rid) => db.runs.find((x) => x.id === rid)).filter((x) => x?.changes && !x.changes.first).pop(); return r ? { runId: r.id, outputPath: r.outputPath, againstPath: againstPath(r), startedAt: r.startedAt, ...r.changes } : null; })(),
+    unseen: s.runIds.map((rid) => db.runs.find((x) => x.id === rid)).filter((x) => x?.changes && !x.changes.seen).length,
   };
 }
+// What Diff opens as run A for a run's changes: the output path of the run it was measured against, or "baseline:<id>".
+const againstPath = (r) => {
+  const a = r?.changes?.against; if (!a) return null;
+  if (a.startsWith('baseline:')) return require('./baselines').find(a.slice(9)) ? a : null;
+  return db.runs.find((x) => x.id === a)?.outputPath || null;
+};
 
-module.exports = { parseSchedule, totalRuns, prepare, activate, pause, resume, start, tick, view };
+module.exports = { parseSchedule, totalRuns, prepare, activate, pause, resume, start, tick, view, checkChanges, changesBetween, markSeen, againstPath, staleChanges, setCompareTo };

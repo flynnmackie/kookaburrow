@@ -2,24 +2,16 @@ $Name = 'SMB - Shares and Sessions'
 $Description = 'Shows the shares this host exposes, who is connected to them right now, and the SMB connections and drive mappings this host has made outward.'
 $Dependencies = @()
 $Tags = @('lateral-movement', 'network', 'smb', 'discovery')
+$DiffIgnore = @('Detail')
 
 $ErrorActionPreference = 'SilentlyContinue'
 
-'== Shares exposed by this host =='
-Get-SmbShare | Select-Object Name, Path, Description, @{ n = 'Special'; e = { $_.Special } } | Format-Table -AutoSize
+# One row per share, inbound session, file open over SMB, outbound connection and mapped drive (Kind says which). Detail holds what
+# changes by itself (open-file counts, session age, dialect, mapping status) and is not compared. Sessions need administrator rights.
+function Row($kind, $name, $path, $user, $remote, $detail) { [pscustomobject]@{ Kind = $kind; Name = "$name"; Path = "$path"; User = "$user"; Remote = "$remote"; Detail = "$detail" } }
 
-'== Inbound SMB sessions (who is connected now) =='
-$sess = Get-SmbSession
-if ($sess) { $sess | Select-Object ClientComputerName, ClientUserName, NumOpens, SecondsExists | Format-Table -AutoSize } else { '(none, or administrator rights needed)' }
-
-'== Open files over SMB =='
-$open = Get-SmbOpenFile
-if ($open) { $open | Select-Object ClientComputerName, ClientUserName, Path | Format-Table -AutoSize } else { '(none)' }
-
-'== Outbound SMB connections from this host =='
-$conn = Get-SmbConnection
-if ($conn) { $conn | Select-Object ServerName, ShareName, UserName, Credential, Dialect | Format-Table -AutoSize } else { '(none)' }
-
-'== Mapped drives =='
-$map = Get-SmbMapping
-if ($map) { $map | Select-Object LocalPath, RemotePath, Status | Format-Table -AutoSize } else { '(none)' }
+Get-SmbShare | ForEach-Object { Row 'Share' $_.Name $_.Path '' '' "$($_.Description)$(if ($_.Special) { ' (special)' })" }
+Get-SmbSession | ForEach-Object { Row 'Inbound session' '' '' $_.ClientUserName $_.ClientComputerName "$($_.NumOpens) open, $($_.SecondsExists)s" }
+Get-SmbOpenFile | ForEach-Object { Row 'Open file' '' $_.Path $_.ClientUserName $_.ClientComputerName '' }
+Get-SmbConnection | ForEach-Object { Row 'Outbound connection' $_.ShareName '' $_.UserName $_.ServerName "$($_.Dialect) $($_.Credential)" }
+Get-SmbMapping | ForEach-Object { Row 'Mapped drive' $_.LocalPath '' '' $_.RemotePath "$($_.Status)" }

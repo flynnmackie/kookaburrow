@@ -3,6 +3,7 @@ $Description = 'A native KAPE-style quick triage with no extra tools. Needs admi
 $Dependencies = @()
 $Parameters = @('EventDays?')
 $Tags = @('forensics', 'triage', 'filesystem', 'event-logs')
+$DiffIgnore = @('Files', 'SizeMB')
 $Footprint = 'transient'
 $Returns = 'both'
 $Type = 'artefact'

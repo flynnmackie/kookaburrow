@@ -34,6 +34,7 @@ Kookaburrow holds administrator credentials for your hosts and can run code on t
 - Permissions are grouped into roles; the built-in `admin` role holds everything. A user can only grant permissions they hold themselves, cannot change the password of someone with more access, and cannot delete their own account (so an admin always remains).
 - The interface greys out what a role cannot do, but the server enforces it.
 - Use the least role: the built-in *user* role can hunt and open file shells but cannot run actions or change settings.
+- Turn on [Approvals](05-responses.md#approvals) so an action cannot change a host until a second person has approved it. The approver and the request are recorded in the response log; the person who asked cannot approve their own request unless you allow it.
 
 ## Network exposure
 

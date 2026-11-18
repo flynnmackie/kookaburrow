@@ -383,21 +383,34 @@ $('bbPinned').onclick = async (e) => {
 };
 $('bbPinFolder').onclick = async () => { await bbTogglePin(bb.path); renderBrowse(); };
 
-// ---- Diff: compare the output of two hunts or responses ----
-const df = { runs: [], res: null, show: new Set(['changed', 'added', 'removed']), allHosts: false, open: new Set(), detail: new Map() };
+// ---- Diff: compare the output of two hunts or responses (or baselines) ----
+// The report itself is public/changes.js (shared with the Baseline page). This part picks what to compare: two runs, or the latest two
+// runs of a hunt in one click, and optionally one file from each. See src/diff.js for what counts as a change.
+const df = { runs: [], rep: null, files: { A: [], B: [] }, label: {} };
+const dfWhen = (t) => new Date(t).toLocaleString([], { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
 async function loadDiff() {
   loadPins();
+  if (!df.rep) df.rep = chNew($('dfOut'));
   try { df.runs = await api('GET', '/api/diff/runs'); } catch (e) { $('dfOut').innerHTML = `<p class="bad">${esc(e.message)}</p>`; return; }
-  const opt = (r) => `<option value="${esc(r.path)}">${esc(r.name)} · ${esc(new Date(r.startedAt).toLocaleString([], { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }))}</option>`;
+  const opt = (r) => `<option value="${esc(r.path)}">${esc(r.name)} · ${esc(dfWhen(r.startedAt))}</option>`;
   const html = (kind, label) => { const l = df.runs.filter((r) => r.kind === kind); return l.length ? `<optgroup label="${label}">${l.map(opt).join('')}</optgroup>` : ''; };
-  const keepA = $('dfA').value, keepB = $('dfB').value;
-  $('dfA').innerHTML = $('dfB').innerHTML = `<option value="">Choose a run…</option>${html('hunt', 'Hunts')}${html('response', 'Responses')}`;
+  const keepA = $('dfA').value, keepB = $('dfB').value; // read after the request: openDiff may have chosen runs meanwhile
+  $('dfA').innerHTML = $('dfB').innerHTML = `<option value="">Choose a run…</option>${html('baseline', 'Baselines')}${html('hunt', 'Hunts')}${html('response', 'Responses')}`;
   if (keepA) $('dfA').value = keepA; if (keepB) $('dfB').value = keepB;
+  dfQuick();
   if (!df.runs.length) $('dfOut').innerHTML = '<p class="dim" style="margin:0">There are no hunts or responses to compare yet.</p>';
-  else if (!df.res) $('dfOut').innerHTML = '<p class="dim" style="margin:0">Choose two runs and press Compare. Files are matched by path.</p>';
+  else if (!df.rep.res) $('dfOut').innerHTML = '<p class="dim" style="margin:0">Choose two runs and press Compare, or pick one of the quick comparisons above.</p>';
 }
+// One-click comparisons: for every hunt that has run at least twice, its latest run against the one before.
+function dfQuick() {
+  const by = new Map();
+  for (const r of df.runs.filter((x) => x.kind !== 'baseline' && x.status !== 'running' && x.id)) { const k = `${r.kind}|${r.name}`; if (!by.has(k)) by.set(k, []); by.get(k).push(r); }
+  const pairs = [...by.values()].filter((l) => l.length >= 2).slice(0, 8);
+  $('dfQuick').hidden = !pairs.length;
+  $('dfQuickList').innerHTML = pairs.map(([b, a]) => `<button type="button" class="df-chip same" data-dfq="${esc(a.path)}|${esc(b.path)}" title="${esc(dfWhen(a.startedAt))} → ${esc(dfWhen(b.startedAt))}">${esc(b.name)} <span class="dim">latest vs previous</span></button>`).join('');
+}
+$('dfQuickList').onclick = (e) => { const b = e.target.closest('[data-dfq]'); if (!b) return; const [a, c] = b.dataset.dfq.split('|'); $('dfA').value = a; $('dfB').value = c; Promise.all([dfFiles('A'), dfFiles('B')]).then(dfCompare).then(() => { if (df.rep.res) chOpenAll(df.rep); }); };
 // Each side is a run and, optionally, one file of it. Both sides on a file compares just those two files; both on "Whole run" compares everything.
-df.files = { A: [], B: [] }; df.label = {};
 async function dfFiles(side, keep) {
   const run = $('df' + side).value, sel = $('dfF' + side);
   df.files[side] = [];
@@ -414,70 +427,36 @@ $('dfFA').onchange = () => { const k = $('dfFA').value; if (k && !$('dfFB').valu
 $('dfFB').onchange = () => { const k = $('dfFB').value; if (k && !$('dfFA').value && df.files.A.some((f) => f.key === k)) $('dfFA').value = k; };
 async function dfCompare() {
   const ra = $('dfA').value, rb = $('dfB').value, fa = $('dfFA').value, fb = $('dfFB').value;
-  if (!ra || !rb) { toast('Choose both runs', 'bad'); return; }
-  if (!!fa !== !!fb) { toast('Choose a file on both sides, or "Whole run" on both', 'bad'); return; }
+  if (!ra || !rb) { toast('Choose both runs', 'bad'); return null; }
+  if (!!fa !== !!fb) { toast('Choose a file on both sides, or "Whole run" on both', 'bad'); return null; }
   const a = dfSidePath('A'), b = dfSidePath('B');
-  if (a === b) { toast('Choose two different runs or files', 'bad'); return; }
-  const lab = (side) => { const r = df.runs.find((x) => x.path === $('df' + side).value); const f = df.files[side].find((x) => x.key === $('dfF' + side).value); return `${r ? r.name : ''}${f ? ' / ' + f.rel : ''}`; };
-  df.label = { [a]: lab('A'), [b]: lab('B') };
-  $('dfOut').innerHTML = '<p class="dim" style="margin:0">Comparing…</p>';
-  df.open.clear(); df.detail.clear();
-  try { df.res = await api('POST', '/api/diff', { a, b }); } catch (e) { df.res = null; $('dfOut').innerHTML = `<p class="bad">${esc(e.message)}</p>`; return; }
-  renderDiff();
-  if (fa && df.res.files.length === 1) dfToggle(df.res.files[0].key); // one file: show its rows straight away
+  if (a === b) { toast('Choose two different runs or files', 'bad'); return null; }
+  const lab = (side) => { const r = df.runs.find((x) => x.path === $('df' + side).value); const f = df.files[side].find((x) => x.key === $('dfF' + side).value); return `${r ? r.name + (r.kind === 'baseline' ? '' : ' · ' + dfWhen(r.startedAt)) : ''}${f ? ' / ' + f.rel : ''}`; };
+  return chLoad(df.rep, a, b, { [a]: lab('A'), [b]: lab('B') });
 }
-const dfName = (p) => df.label[p] || (df.runs.find((r) => r.path === p) || {}).name || p.slice(p.lastIndexOf('/') + 1);
-function renderDiff() {
-  const r = df.res; if (!r) return;
-  const files = r.files.filter((f) => df.show.has(f.status) || (f.status === 'same' && df.show.has('same'))).filter((f) => df.allHosts || !/^All[-_]Hosts/i.test(f.key));
-  const t = (s) => r.files.filter((f) => f.status === s && (df.allHosts || !/^All[-_]Hosts/i.test(f.key))).length;
-  const chip = (s, label) => `<button type="button" class="df-chip ${s} ${df.show.has(s) ? 'on' : ''}" data-dfshow="${s}">${label} <b>${t(s)}</b></button>`;
-  $('dfOut').innerHTML = `<div class="df-sum"><div><b>A</b> ${esc(dfName(r.a.path))}</div><div class="dim">compared with</div><div><b>B</b> ${esc(dfName(r.b.path))}</div></div>
-    <div class="df-chips">${chip('changed', 'Changed')}${chip('added', 'Only in B')}${chip('removed', 'Only in A')}${chip('same', 'Identical')}
-      <label class="df-all"><input type="checkbox" id="dfAll" ${df.allHosts ? 'checked' : ''}> include the combined All-Hosts files</label></div>
-    <div class="df-files">${files.map((f) => {
-      const open = df.open.has(f.key), tag = { changed: 'Changed', added: 'Only in B', removed: 'Only in A', same: 'Identical' }[f.status];
-      return `<div class="df-file ${f.status}"><div class="df-fhead" data-dfopen="${esc(f.key)}" data-st="${f.status}"><span class="df-tag ${f.status}">${tag}</span><span class="df-name">${esc(f.rel)}</span>
-        <span class="df-nums">${f.status === 'changed' && !f.binary ? `<span class="rem">−${f.removed}</span> <span class="add">+${f.added}</span> <span class="dim">${f.same} same</span>` : f.binary && f.status === 'changed' ? '<span class="dim">binary file differs</span>' : f.status === 'added' ? `<span class="dim">${bbFmt(f.sizeB)}</span>` : f.status === 'removed' ? `<span class="dim">${bbFmt(f.sizeA)}</span>` : ''}</span></div>
-        ${open ? `<div class="df-body">${dfDetailHtml(f)}</div>` : ''}</div>`;
-    }).join('') || '<p class="dim" style="margin:8px 0 0">Nothing to show with these filters.</p>'}</div>${r.truncated ? '<p class="dim">Only the first 3000 files of each run were compared.</p>' : ''}`;
-}
-function dfDetailHtml(f) {
-  const d = df.detail.get(f.key);
-  if (f.binary && f.status === 'changed') return '<p class="dim" style="margin:6px 0">A binary file; its contents are not compared line by line.</p>';
-  if (f.status === 'same') return '<p class="dim" style="margin:6px 0">The same in both runs.</p>';
-  if (!d) return '<p class="dim" style="margin:6px 0">Loading…</p>';
-  if (d.error) return `<p class="bad" style="margin:6px 0">${esc(d.error)}</p>`;
-  if (d.binary) return '<p class="dim" style="margin:6px 0">A binary file or one too large to compare.</p>';
-  const table = (rows, cls) => !rows.length ? '' : d.csv ? `<div class="bb-tablewrap"><table class="bb-tbl ${cls}"><thead><tr>${d.header.map((h) => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows.map((r) => `<tr>${d.header.map((_, i) => `<td title="${esc(r[i] ?? '')}">${esc(r[i] ?? '')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`
-    : `<pre class="code df-lines ${cls}">${rows.map((r) => esc(r)).join('\n')}</pre>`;
-  const more = (shown, total) => (total > shown ? `<p class="dim" style="margin:4px 0">Showing ${shown} of ${total}.</p>` : '');
-  return `${d.removedTotal ? `<div class="df-sec rem">Only in A (${d.removedTotal})</div>${table(d.removed, 'rem')}${more(d.removed.length, d.removedTotal)}` : ''}
-    ${d.addedTotal ? `<div class="df-sec add">Only in B (${d.addedTotal})</div>${table(d.added, 'add')}${more(d.added.length, d.addedTotal)}` : ''}
-    <p class="dim" style="margin:4px 0 2px">${d.same.toLocaleString()} ${d.csv ? 'row' : 'line'}${d.same === 1 ? '' : 's'} identical in both.</p>`;
-}
-$('dfOut').onclick = async (e) => {
-  const chip = e.target.closest('[data-dfshow]');
-  if (chip) { const s = chip.dataset.dfshow; if (df.show.has(s)) df.show.delete(s); else df.show.add(s); renderDiff(); return; }
-  const head = e.target.closest('[data-dfopen]');
-  if (head) dfToggle(head.dataset.dfopen);
+// Opens Diff on two runs and shows what changed: used by Burrow > Recurring and the Baseline page. A path is a run's output path
+// (hunts/H_name_date) or a baseline ("baseline:<id>"); with no bPath only A is chosen and B is left to pick.
+window.openDiff = async (aPath, bPath) => {
+  go('output', 'diff');
+  await loadDiff();
+  const full = (p) => (String(p).startsWith('baseline:') ? p : `/output/${p}`);
+  const a = full(aPath), b = bPath ? full(bPath) : '';
+  const has = (sel, v) => [...$(sel).options].some((o) => o.value === v);
+  if (!has('dfA', a) || (b && !has('dfB', b))) { toast('One of the two runs has no output folder any more', 'bad'); return; }
+  $('dfA').value = a; $('dfB').value = b;
+  df.rep.res = null; $('dfOut').innerHTML = '<p class="dim" style="margin:0">Choose run B and press Compare.</p>';
+  await Promise.all([dfFiles('A'), dfFiles('B')]);
+  if (!b) return;
+  df.rep.strict = false;
+  await dfCompare();
+  if (df.rep.res) chOpenAll(df.rep);
 };
-async function dfToggle(key) {
-  if (df.open.has(key)) { df.open.delete(key); renderDiff(); return; }
-  df.open.add(key); renderDiff();
-  const f = df.res.files.find((x) => x.key === key);
-  if (f && f.status !== 'same' && !df.detail.has(key) && !(f.binary && f.status === 'changed')) {
-    try { df.detail.set(key, await api('POST', '/api/diff/file', { a: df.res.a.path, b: df.res.b.path, key })); } catch (err) { df.detail.set(key, { error: err.message }); }
-    renderDiff();
-  }
-}
-$('dfOut').onchange = (e) => { if (e.target.id === 'dfAll') { df.allHosts = e.target.checked; renderDiff(); } };
 $('dfGo').onclick = dfCompare;
 $('dfSwap').onclick = async () => {
   const [a, b, fa, fb] = [$('dfA').value, $('dfB').value, $('dfFA').value, $('dfFB').value];
   $('dfA').value = b; $('dfB').value = a;
   await Promise.all([dfFiles('A', fb), dfFiles('B', fa)]);
-  if (df.res) dfCompare();
+  if (df.rep.res) dfCompare();
 };
 $('dfPinA').onclick = () => { if ($('dfA').value) bbTogglePin(dfSidePath('A')); else toast('Choose run A first', 'bad'); };
 $('dfPinB').onclick = () => { if ($('dfB').value) bbTogglePin(dfSidePath('B')); else toast('Choose run B first', 'bad'); };

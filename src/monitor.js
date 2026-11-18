@@ -59,7 +59,7 @@ const SAFE_ADDR = /^[A-Za-z0-9.:_-]+$/; // an address becomes a ping argument, s
 const portsFor = (h) => (h.protocol === 'ssh' ? [h.port || 22] : h.port ? [h.port] : [5985, 5986]);
 const remoteLabel = (h) => (h.protocol === 'ssh' ? 'SSH' : 'WinRM');
 
-// Every check is also written to a log file, data/monitor-log.jsonl (one JSON object per line), for Health > Monitor log: when it ran,
+// Every check is also written to a log file, data/monitor-log.jsonl (one JSON object per line), for Monitor > Health log: when it ran,
 // which host, the command, and whether it worked or why not. Nothing is kept in memory but the few lines waiting to be written; the page
 // reads the end of the file. At 20 MB the file is renamed to monitor-log.1.jsonl (replacing the older one), so the log never grows
 // beyond about 40 MB and the latest checks always survive a restart.

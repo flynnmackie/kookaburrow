@@ -14,7 +14,7 @@ const wfParamText = (s) => Object.entries(s.params || {}).map(([k, v]) => `${esc
 function renderProcessors() {
   $('wfProcs').innerHTML = wf.processors.length ? `<table class="bh"><thead><tr><th>Processor</th><th>Reads</th><th>Tool</th></tr></thead><tbody>${wf.processors.map((p) => `<tr>
       <td><b>${esc(p.name)}</b><div class="dim">${esc(p.description)}</div></td><td class="dim">${esc(p.accepts.join(', '))}</td>
-      <td>${!p.supported ? '<span class="st-warn">Not available on this server</span>' : p.missing.length ? `<span class="st-warn">Needs ${p.missing.map(esc).join(', ')}</span> <a href="#settings/binaries">Upload</a>` : '<span class="ok">Ready</span>'}</td></tr>`).join('')}</tbody></table>`
+      <td>${!p.supported ? '<span class="st-warn">Not available on this server</span>' : p.missing.length ? `<span class="st-warn">Needs ${p.missing.map(esc).join(', ')}</span> <a href="#settings/binaries">Upload</a>` : '<span class="ok">Ready</span>'}${p.supported && p.optional.length ? `<div class="dim" style="margin-top:3px">Optional: ${p.optional.map((o) => `${esc(o)} ${p.optionalHave.includes(o) ? '(uploaded)' : '(not uploaded)'}`).join(', ')}</div>` : ''}</td></tr>`).join('')}</tbody></table>`
     : '<p class="dim" style="margin:0">No processors installed.</p>';
 }
 function wfItem(w) {

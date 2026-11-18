@@ -3,6 +3,7 @@ $Description = 'Full read-only baseline of a Windows host using only built-in to
 $Dependencies = @()
 $Parameters = @('EventDays?', 'SkipFileFacts?', 'OnlyCategories?')
 $Tags = @('baseline', 'triage', 'system', 'accounts', 'network', 'persistence', 'event-logs', 'registry')
+$DiffIgnore = @('Records', 'Seconds', 'Files')
 $Footprint = 'transient'
 $Returns = 'both'
 $Type = 'command'

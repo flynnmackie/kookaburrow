@@ -174,7 +174,7 @@ npm start            # http://127.0.0.1:46200
 ```
 
 - The first run creates the account `admin` / `admin`. Change that password straight away (Settings > System > User Management, select your user, Change my password).
-- `npm run setup-winrm` rebuilds the WinRM engine. On Windows it downloads a private embeddable Python and `pypsrp` (nothing is installed system-wide). On Linux or macOS it creates a virtual environment from the Python 3 already installed (`python3-venv` on Debian/Ubuntu).
+- `npm run setup-winrm` rebuilds the WinRM engine. On Windows it downloads a private embeddable Python, `pypsrp` and the packages Volatility 3 needs (nothing is installed system-wide, and the internet is only needed for this step). On Linux or macOS it creates a virtual environment from the Python 3 already installed (`python3-venv` on Debian/Ubuntu).
 - Data is kept in `data/`, results in `output/` and tools in `binaries/` inside the folder.
 
 | Environment variable | Default | Meaning |

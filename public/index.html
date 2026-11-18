@@ -87,6 +87,14 @@
       </div>
       <div class="card bh-detail" id="brDetail"><p class="dim" style="margin:0">Click a response above to see what it ran, its output files, any errors, and to download the results.</p></div>
     </section>
+    <section class="page" id="burrow/approvals">
+      <div class="card bh-top">
+        <div class="bh-bar"><h2>Approvals <a href="#" class="doclink" data-doc="05-responses.md#approvals">Guide</a></h2><div class="toggle rc-kind" id="apFilter"><button type="button" data-f="pending" class="on">Waiting</button><button type="button" data-f="all">All</button></div></div>
+        <p class="dim hs-sub" id="apNote"></p>
+        <div id="apList"></div>
+      </div>
+      <div class="card bh-detail" id="apDetail"><p class="dim" style="margin:0">Click a request above to see what it will run, on which hosts, and to approve or reject it.</p></div>
+    </section>
     <section class="page" id="burrow/workflow">
       <div class="card">
         <div class="bh-bar"><h2>Workflows <a href="#" class="doclink" data-doc="07-workflows-and-recurring.md#workflows">Guide</a></h2><button class="act" id="wfNew" data-perm="workflows.manage" data-perm-what="create workflows">New Workflow</button></div>
@@ -103,6 +111,23 @@
       <div class="card">
         <div class="bh-bar"><h2>Recurring <a href="#" class="doclink" data-doc="07-workflows-and-recurring.md#recurring-runs">Guide</a></h2><div class="toggle rc-kind" id="rcKind"><button type="button" data-kind="hunt" class="on">Hunts</button><button type="button" data-kind="response">Actions</button><button type="button" data-kind="workflow">Workflows</button></div></div>
         <div id="rcList"></div>
+      </div>
+    </section>
+    <section class="page" id="settings/yara">
+      <div class="card">
+        <div class="ioc-top"><h2>YARA Rules</h2><button type="button" class="act" id="yrAdd" data-perm="collections.manage" data-perm-what="add YARA rules">Add rules</button></div>
+        <p class="dim hs-sub">Rule files for the <b>Yara - Scan Files</b> and <b>Yara - Scan Processes</b> collections. The enabled files are joined into <code>kb-rules.yar</code>, which every YARA hunt copies to the host with <code>yara64.exe</code>.</p>
+        <div class="yr-status" id="yrStatus"></div>
+        <div class="yr-add" id="yrForm" hidden>
+          <div class="yr-grid">
+            <div><span class="fl">Name</span><input id="yrName" type="text" maxlength="80" placeholder="e.g. Cobalt Strike, Florian Roth webshells" autocomplete="off" spellcheck="false"></div>
+            <div><span class="fl">Note (optional)</span><input id="yrNote" type="text" maxlength="300" placeholder="Where the rules came from" autocomplete="off"></div>
+          </div>
+          <div class="ioc-file"><label class="act sec" for="yrFile">Choose .yar files…</label><input type="file" id="yrFile" accept=".yar,.yara,.txt,.rule,.rules" multiple hidden><span class="dim" id="yrFileName">One or more rule files (5 MB each at most), or paste rules below</span></div>
+          <textarea id="yrText" rows="8" spellcheck="false" placeholder="rule Example { strings: $a = &quot;evil&quot; condition: $a }"></textarea>
+          <div class="um-actions"><button class="act" type="button" id="yrSave">Add</button><button class="act sec" type="button" id="yrCancel">Cancel</button><span class="um-msg" id="yrMsg"></span></div>
+        </div>
+        <div id="yrList"></div>
       </div>
     </section>
     <section class="page" id="settings/view-actions">
@@ -193,6 +218,28 @@
           <div class="rs-adv" id="rsLargeAdvice" hidden></div>
         </div>
         <div class="hs-actions"><button class="act" id="rsSave" type="button" data-perm="system.manage" data-perm-what="change run settings">Save</button><button class="act sec" id="rsDefaults" type="button" data-perm="system.manage" data-perm-what="change run settings">Reset to defaults</button><span class="um-msg" id="rsMsg"></span></div>
+      </div>
+    </section>
+    <section class="page" id="settings/approvals">
+      <div class="card">
+        <h2>Approvals <a href="#" class="doclink" data-doc="05-responses.md#approvals">Guide</a></h2>
+        <p class="dim hs-sub">Hold actions until a second person approves them. When on, <b>Run</b> on Respond sends a request to <a href="#burrow/approvals">Burrow! &gt; Approvals</a> instead of starting. Give a role <b>Approve actions</b> in User Management to let its users decide. Quarantine and shells are not held.</p>
+        <div class="sw-row" data-perm="system.manage" data-perm-what="turn approvals on or off"><button class="switch" id="asEnabled" type="button" role="switch" aria-checked="false" aria-label="Approvals"></button><b id="asEnabledLabel">Approvals: Off</b><span class="dim" id="asEnabledNote"></span></div>
+        <div id="asBody">
+          <div class="hs-block">
+            <span class="fl">Which actions need approval</span>
+            <div class="ss-modes"><label><input type="radio" name="asScope" value="all"> All actions</label><label><input type="radio" name="asScope" value="selected"> Only the actions ticked below</label></div>
+          </div>
+          <div class="hs-hosts-head" style="margin-top:6px"><span class="dim" id="asCount"></span><span class="hs-links"><a id="asAll">All</a><a id="asNone">None</a></span></div>
+          <div class="hs-hosts" id="asActions"></div>
+          <div class="hs-block">
+            <span class="fl">Who can approve</span>
+            <label class="ss-modes" style="gap:6px"><input type="checkbox" id="asSelf" style="width:auto;margin:0"> The person who asked may also approve their own request</label>
+            <span class="fl">Expire after</span>
+            <div class="hs-row"><input id="asExpire" type="number" min="0" max="2160" step="1"><span class="dim" id="asExpireHint"></span></div>
+          </div>
+        </div>
+        <div class="hs-actions"><button class="act" id="asSave" type="button" data-perm="system.manage" data-perm-what="change approval settings">Save</button><span class="um-msg" id="asMsg"></span></div>
       </div>
     </section>
     <section class="page" id="settings/server-settings">
@@ -464,17 +511,17 @@
     <!-- Collection: nothing yet -->
 
     <!-- Output -->
-    <!-- Health -->
+    <!-- Monitor (the Health tab id): Health, Health log, Quarantine log, Validate, Continuous -->
     <section class="page" id="health/monitor">
       <div class="card">
-        <div class="mon-top"><h2>Monitor</h2><span class="mon-sum" id="monSum"></span><button class="act sec" id="monCheck" type="button" title="Run every check now instead of waiting for the schedule">Check now</button></div>
+        <div class="mon-top"><h2>Health</h2><span class="mon-sum" id="monSum"></span><button class="act sec" id="monCheck" type="button" title="Run every check now instead of waiting for the schedule">Check now</button></div>
         <p class="dim lg-sub" id="monSub">Every monitored host is pinged and has its WinRM or SSH port checked. Green is up, red is not responding.</p>
         <div class="mon-grid" id="monGrid"></div>
       </div>
     </section>
     <section class="page" id="health/monitor-log">
       <div class="card">
-        <div class="mon-top"><h2>Monitor log</h2><span class="dim" id="mlCount"></span></div>
+        <div class="mon-top"><h2>Health log</h2><span class="dim" id="mlCount"></span></div>
         <p class="dim lg-sub">Every ping and port check, newest first (latest 1000). Kept in data/monitor-log.jsonl.</p>
         <div class="row" style="margin-bottom:8px"><input id="mlSearch" type="search" placeholder="Search host, address, command or message" autocomplete="off" style="flex:1; max-width:460px"><div class="toggle" id="mlFilter" style="margin:0"><button type="button" data-f="all" class="on">All</button><button type="button" data-f="ok">Success</button><button type="button" data-f="fail">Failed</button></div></div>
         <div id="mlBox"></div>
@@ -486,6 +533,41 @@
         <p class="dim lg-sub">Quarantine and release events, newest first: who, when and the result.</p>
         <div class="row" style="margin-bottom:8px"><input id="qlSearch" type="search" placeholder="Search host, address, event, user or detail" autocomplete="off" style="flex:1; max-width:460px"></div>
         <div id="qlBox"></div>
+      </div>
+    </section>
+    <section class="page" id="health/watches">
+      <div class="card bh-top">
+        <div class="bh-bar"><h2>Watches <a href="#" class="doclink" data-doc="03-hosts.md#continuous">Guide</a></h2><span class="mon-sum" id="wcSum"></span><button class="act" id="wcNew" type="button" data-perm="hunts.run" data-perm-what="create watches">New Watch</button></div>
+        <p class="dim hs-sub">Light, repeated collections with no agent. A watch collects a few cheap things every few minutes (processes, network, persistence, accounts) and records only what <b>changed</b>. It is a snapshot taken often, not a live stream: something that starts and stops between two runs is missed.</p>
+        <div id="wcList"></div>
+      </div>
+      <div class="card bh-detail" id="wcDetail"><p class="dim" style="margin:0">Select a watch to see its hosts, what it collects and what it has found.</p></div>
+    </section>
+    <section class="page" id="health/events">
+      <div class="card">
+        <div class="mon-top"><h2>Continuous events <a href="#" class="doclink" data-doc="03-hosts.md#continuous">Guide</a></h2><span class="dim" id="weCount"></span></div>
+        <p class="dim lg-sub">What the watches found, newest first. Select a row for the values; reading a row marks it as seen.</p>
+        <div class="we-bar"><input id="weSearch" type="search" placeholder="Search host, what, collection or values" autocomplete="off"><select id="weWatch"></select>
+          <select id="weSince"><option value="3600">Last hour</option><option value="86400" selected>Last 24 hours</option><option value="604800">Last 7 days</option><option value="">All</option></select>
+          <label class="df-all"><input type="checkbox" id="weUnseen"> not seen yet</label>
+          <div class="toggle" id="weKind" style="margin:0"><button type="button" data-k="" class="on">All</button><button type="button" data-k="new">New</button><button type="button" data-k="gone">Gone</button><button type="button" data-k="changed">Changed</button><button type="button" data-k="unreachable">Unreachable</button></div>
+          <span class="ch-spacer"></span><a id="weSeen" style="cursor:pointer">Mark all as seen</a> <a id="weExport" style="cursor:pointer">Export CSV</a></div>
+        <div id="weList"></div>
+      </div>
+    </section>
+    <section class="page" id="health/validate">
+      <div class="card bh-top">
+        <div class="bh-bar"><h2>Checks <a href="#" class="doclink" data-doc="03-hosts.md#validate">Guide</a></h2><span class="mon-sum" id="vdSum"></span><button class="act" id="vdNew" type="button" data-perm="hunts.run" data-perm-what="create checks">New Check</button></div>
+        <div id="vdList"></div>
+      </div>
+      <div class="card bh-detail" id="vdDetail"><p class="dim" style="margin:0">Select a check to see which hosts pass, what it checks and how it has run.</p></div>
+    </section>
+    <section class="page" id="health/validate-history">
+      <div class="card">
+        <div class="mon-top"><h2>Validate history</h2><span class="dim" id="vhCount"></span></div>
+        <p class="dim lg-sub">Every run of every check, newest first (the latest 30 of each check are kept). Select one to open it on the Checks page.</p>
+        <div class="row" style="margin-bottom:8px"><input id="vhSearch" type="search" placeholder="Search check or user" autocomplete="off" style="flex:1; max-width:460px"><div class="toggle" id="vhFilter" style="margin:0"><button type="button" data-f="all" class="on">All</button><button type="button" data-f="issues">Issues</button><button type="button" data-f="pass">All pass</button></div></div>
+        <div id="vhList"></div>
       </div>
     </section>
     <!-- Shell -->
@@ -535,14 +617,17 @@
     </section>
     <section class="page" id="output/diff">
       <div class="card auto">
-        <h2>Diff</h2>
-        <p class="dim hs-sub">Compare two runs, or one file from each. Files are matched by path (dates in names ignored) and compared row by row.</p>
+        <h2>Diff <a href="#" class="doclink" data-doc="06-results.md#diff">Guide</a></h2>
+        <p class="dim hs-sub">What is new, gone and changed between two runs or baselines. Times, process IDs and counters that differ on every run are not counted as changes.</p>
+        <div class="df-quick" id="dfQuick" hidden><span class="fl">Quick compare</span><div class="df-chips" id="dfQuickList"></div></div>
         <div class="df-pick">
-          <div><span class="fl">Run A (usually the older)</span><div class="df-sel"><select id="dfA"></select><button type="button" class="act sec" id="dfPinA" title="Pin run A">☆</button></div><select id="dfFA" class="df-file-sel"></select></div>
-          <button type="button" class="act sec" id="dfSwap" title="Swap A and B">⇄</button>
-          <div><span class="fl">Run B (usually the newer)</span><div class="df-sel"><select id="dfB"></select><button type="button" class="act sec" id="dfPinB" title="Pin run B">☆</button></div><select id="dfFB" class="df-file-sel"></select></div>
+          <div><span class="fl">Before (usually the older)</span><div class="df-sel"><select id="dfA"></select><button type="button" class="act sec" id="dfPinA" title="Pin run A">☆</button></div></div>
+          <button type="button" class="act sec" id="dfSwap" title="Swap the two sides">⇄</button>
+          <div><span class="fl">After (usually the newer)</span><div class="df-sel"><select id="dfB"></select><button type="button" class="act sec" id="dfPinB" title="Pin run B">☆</button></div></div>
           <button type="button" class="act" id="dfGo">Compare</button>
         </div>
+        <details class="df-adv"><summary>Compare one file from each side</summary>
+          <div class="df-pick"><div><select id="dfFA" class="df-file-sel"></select></div><div><select id="dfFB" class="df-file-sel"></select></div></div></details>
       </div>
       <div class="card" id="dfOut"></div>
     </section>
@@ -555,22 +640,49 @@
     </section>
     <section class="page" id="output/compare">
       <div class="card auto">
-        <h2>Cross-host comparison</h2>
-        <p class="dim hs-sub">One hunt CSV across all its hosts, with the number of hosts that have each row.</p>
-        <div class="cp-pick">
-          <div><span class="fl">Hunt or response</span><select id="cpRun"></select></div>
-          <div><span class="fl">CSV</span><select id="cpFile"></select></div>
-          <button type="button" class="act" id="cpGo">Compare</button>
-        </div>
+        <h2>Cross-host comparison <a href="#" class="doclink" data-doc="06-results.md#cross-host-comparison">Guide</a></h2>
+        <p class="dim hs-sub">Find the host that is not like the others. Choose a hunt that ran on several hosts: each collection is listed with how much it differs between them.</p>
+        <div class="cp-pick"><div><span class="fl">Hunt or response</span><select id="cpRun"></select></div></div>
       </div>
       <div class="card" id="cpOut"></div>
     </section>
+    <section class="page" id="output/yara-scan">
+      <div class="card" style="flex:none">
+        <div class="ioc-top"><h2>YARA scan</h2></div>
+        <p class="dim hs-sub">Scan the output of one or more runs with YARA rules, here on the server: every CSV, every workflow output and every collected file (event logs, hives, memory images, captures). Nothing runs on the hosts.</p>
+        <div class="yr-status" id="ysSetup"></div>
+        <div class="ys-pick">
+          <div><span class="fl">Runs <span class="dim" id="ysRunCount"></span></span><input id="ysRunQ" type="search" placeholder="Filter runs by name" autocomplete="off"><div class="ys-box" id="ysRuns"></div></div>
+          <div><span class="fl">Rule files <span class="dim">(Settings &gt; YARA Rules)</span></span><div class="ys-box" id="ysRules"></div></div>
+        </div>
+        <div class="um-actions"><button class="act" type="button" id="ysGo" data-perm="hunts.run" data-perm-what="run YARA scans">Scan</button><span class="um-msg" id="ysMsg"></span></div>
+      </div>
+      <div class="card"><div class="ioc-top"><h2>Scans</h2><span class="dim">The latest 20 are kept</span></div><div id="ysList"></div></div>
+    </section>
     <section class="page" id="output/baseline">
-      <div class="card" id="blCard">
-        <div class="ioc-top"><h2>Baseline</h2><button type="button" class="act" id="blAdd" data-perm="hunts.run" data-perm-what="upload baselines">Upload baseline</button></div>
-        <p class="dim hs-sub">Known-good baseline scans to compare later hunts against.</p>
-        <div class="bl-note">Comparing hunts against a baseline is not available yet. For now baselines are only uploaded and stored.</div>
+      <div class="card" id="blCard" style="flex:none">
+        <div class="ioc-top"><h2>Baseline <a href="#" class="doclink" data-doc="06-results.md#baseline">Guide</a></h2><button type="button" class="act" id="blAdd" data-perm="hunts.run" data-perm-what="add baselines">Add baseline</button></div>
+        <p class="dim hs-sub">Known-good states. Mark one baseline per system as the <b>standard</b>, then add newer baselines (or upload them) and see at a glance what changed: against the standard, and against the one before. Click a baseline, or a change count, for the details below.</p>
+        <div class="toggle bl-os" id="blOs"><button type="button" data-os="all" class="on">All<span class="dim"></span></button><button type="button" data-os="windows">Windows<span class="dim"></span></button><button type="button" data-os="linux">Linux<span class="dim"></span></button><button type="button" data-os="other">Other<span class="dim"></span></button></div>
         <div id="blList"></div>
+      </div>
+      <div class="card" id="blCmpCard" style="flex:none">
+        <h2>Compare</h2>
+        <p class="dim hs-sub">Pick a reference and something newer: another baseline, or a run. Hosts do not need to match: when the two share no host, each collection is compared across all the hosts of each side.</p>
+        <div class="df-quick" id="blQuickWrap" hidden><span class="fl">Quick compare</span><div class="df-chips" id="blQuick"></div></div>
+        <div class="df-pick">
+          <div><span class="fl">Reference (the standard or an older baseline)</span><select id="blCmpA"></select></div>
+          <button type="button" class="act sec" id="blCmpSwap" title="Swap the two sides">⇄</button>
+          <div><span class="fl">Compared with (newer baseline or run)</span><select id="blCmpB"></select></div>
+          <button type="button" class="act" id="blCmpGo">Compare</button>
+        </div>
+        <div class="df-pick" id="blRunCheck" hidden style="margin-top:10px"><div><span class="fl">Or check a run against the standard</span><select id="blCheckRun"></select></div><button type="button" class="act sec" id="blCheckGo">Check</button></div>
+      </div>
+      <div class="card" id="blReportWrap" hidden style="flex:none"><div id="blReport"></div></div>
+      <div class="card" id="exCard">
+        <div class="ioc-top"><h2>Expected changes</h2><span class="dim" id="exCount"></span></div>
+        <p class="dim hs-sub">Rows marked in a change report as known to come and go. They are not reported as new, gone or changed by Diff, baselines or recurring hunts, on any host. Mark one with <b>Expected</b> in a report.</p>
+        <div id="exList"></div>
       </div>
     </section>
     <section class="page" id="output/log">
@@ -721,7 +833,8 @@
 <div class="modal" id="pullModal" hidden role="dialog" aria-modal="true" aria-labelledby="pmTitle">
   <div class="dlg pm">
     <div class="dlg-head"><h2 id="pmTitle">Pull file</h2><button class="dlg-x" id="pmClose" aria-label="Close">×</button></div>
-    <div class="pm-bar"><button class="act sec" id="pmUp" type="button" title="Up one folder">↑ Up</button><input id="pmPath" type="text" spellcheck="false" autocomplete="off"><button class="act sec" id="pmGo" type="button">Go</button></div>
+    <div class="pm-bar"><button class="act sec" id="pmUp" type="button" title="Up one folder">↑ Up</button><input id="pmPath" type="text" spellcheck="false" autocomplete="off"><button class="act sec" id="pmGo" type="button">Go</button><button class="act sec" id="pmRefresh" type="button" title="List this folder again on the host">↻ Refresh</button></div>
+    <div class="pm-age dim" id="pmAge"></div>
     <div class="dlg-body pm-body" id="pmList"></div>
     <div class="dlg-foot"><button class="act" id="pmPull" type="button" disabled>Pull</button><button class="act sec" id="pmCancel" type="button">Cancel</button><span id="pmMsg"></span><span class="sum" id="pmSel"></span></div>
   </div>
@@ -801,14 +914,79 @@
     </div>
   </div>
 </div>
+<div class="modal" id="vdModal" hidden role="dialog" aria-modal="true" aria-labelledby="vdTitle">
+  <div class="dlg hunt">
+    <div class="dlg-head"><div class="hm-title"><h2 id="vdTitle">New check</h2></div><button class="dlg-x" id="vdX" type="button" aria-label="Close">×</button></div>
+    <div class="dlg-tabs" id="vdTabs"><button type="button" class="on" data-pane="who" id="vdTabWho"><span class="hnum">1</span>Who</button><button type="button" data-pane="cond" id="vdTabCond"><span class="hnum">2</span>Conditions</button><button type="button" data-pane="opts" id="vdTabOpts"><span class="hnum">3</span>Schedule</button><button type="button" data-pane="name" id="vdTabName"><span class="hnum">4</span>Overview</button></div>
+    <div class="dlg-body hunt-body">
+      <section class="hsec" data-pane="who">
+        <h3>Who to check</h3>
+        <div class="tcols">
+          <div><span class="fl">Groups</span><div class="pickbox" id="vdGroups"></div></div>
+          <div><span class="fl">Hosts</span><div class="pickbox" id="vdHosts"></div></div>
+        </div>
+      </section>
+      <section class="hsec" data-pane="cond" hidden>
+        <h3>Conditions</h3>
+        <p class="dim pr-help">A host passes when the whole expression is true. A condition that does not apply to a host's OS, or that could not be checked, counts as false. <b class="pr-k red">Red</b> is not filled in yet, <b class="pr-k green">green</b> is complete.</p>
+        <div class="hcoll vc">
+          <div class="coll-list">
+            <div class="pickbox" id="vdTree"></div>
+            <div class="vc-add"><button type="button" class="act sec" id="vdAddCond">+ Condition</button><button type="button" class="act sec" id="vdAddGroup">+ Group</button><span class="dim" id="vdAddNote"></span></div>
+          </div>
+          <div class="coll-detail" id="vdCond"></div>
+        </div>
+      </section>
+      <section class="hsec" data-pane="opts" hidden>
+        <h3>Schedule</h3>
+        <p class="dim" style="margin:0 0 8px">Whether the check repeats. Either way it runs once as soon as you save it.</p>
+        <div class="sw-row"><button class="switch" id="vdRecurring" type="button" role="switch" aria-checked="false" aria-label="Recurring check"></button><b id="vdRecurringLabel">Recurring check: Off</b></div>
+        <div class="rec-box" id="vdRecBox" hidden></div>
+      </section>
+      <section class="hsec" data-pane="name" hidden>
+        <h3>Overview</h3>
+        <span class="fl">Check name</span>
+        <input id="vdName" type="text" maxlength="80" placeholder="e.g. Logging baseline, WinRM reachable" autocomplete="off">
+        <span class="fl">Description <span class="dim">(optional)</span></span>
+        <input id="vdDesc" type="text" maxlength="300" placeholder="Why this matters" autocomplete="off">
+        <div class="ov-cols"><div><span class="fl" id="vdTargetsHead">Will check</span><div class="pickbox hm-tlist" id="vdTargets"></div></div>
+          <div><span class="fl" id="vdItemsHead">Passes when</span><div class="pickbox hm-tlist" id="vdItems"></div></div></div>
+        <div id="vdOvOpts" class="ov-opts"></div>
+        <div class="vd-try"><span class="fl">Try it first <span class="dim">(runs the conditions on one host now, without saving)</span></span>
+          <div class="hs-row"><select id="vdTryHost"></select><button type="button" class="act sec" id="vdTry">Try on host</button></div>
+          <div class="vd-tryout" id="vdTryOut" hidden></div></div>
+      </section>
+    </div>
+    <div class="dlg-foot"><button class="act" id="vdNext" type="button">Next</button><button class="act" id="vdSave" type="button" hidden data-perm="hunts.run" data-perm-what="save checks">Save check</button><button class="act sec" id="vdCancel" type="button">Cancel</button><span id="vdMsg"></span><span class="sum" id="vdSummary"></span></div>
+  </div>
+</div><div class="modal" id="wcModal" hidden role="dialog" aria-modal="true" aria-labelledby="wcTitle">
+  <div class="dlg wcdlg">
+    <div class="dlg-head"><h2 id="wcTitle">New watch</h2><button class="dlg-x" id="wcX" type="button" aria-label="Close">×</button></div>
+    <div class="dlg-body um-detail">
+      <div class="wc-grid">
+        <div><span class="fl">Name</span><input id="wcName" type="text" maxlength="80" placeholder="e.g. Servers - new listeners and persistence" autocomplete="off"><span class="fl">Description (optional)</span><input id="wcDesc" type="text" maxlength="300" autocomplete="off">
+          <span class="fl">Collect every</span><select id="wcEvery"></select>
+          <span class="fl">Hosts and groups</span><div class="hs-hosts wc-box" id="wcHosts"></div></div>
+        <div><span class="fl">What to watch <span class="dim" id="wcCount"></span></span><div class="df-chips" id="wcPresets" style="margin:0 0 6px"></div>
+          <input id="wcQ" type="search" placeholder="Search the collections" autocomplete="off"><div class="hs-hosts wc-box" id="wcColls" style="margin-top:6px"></div>
+          <p class="dim" style="font-size:11.5px;margin:6px 0 0">Only collections that change nothing on the host, need no uploaded tool and return no files are offered. The first run takes a baseline; changes are reported from the second.</p></div>
+      </div>
+      <div class="um-actions"><button class="act" type="button" id="wcSave">Save</button><button class="act sec" type="button" id="wcCancel">Cancel</button><span class="um-msg" id="wcMsg"></span></div>
+    </div>
+  </div>
+</div>
 <div class="modal" id="blModal" hidden role="dialog" aria-modal="true" aria-labelledby="blTitle">
   <div class="dlg iocdlg">
-    <div class="dlg-head"><h2 id="blTitle">Upload baseline</h2><button class="dlg-x" id="blX" type="button" aria-label="Close">×</button></div>
+    <div class="dlg-head"><h2 id="blTitle">Add baseline</h2><button class="dlg-x" id="blX" type="button" aria-label="Close">×</button></div>
     <div class="dlg-body um-detail">
+      <div class="toggle" id="blMode" style="margin:0 0 4px"><button type="button" data-mode="run" class="on">From a run</button><button type="button" data-mode="file">Upload a baseline</button></div>
       <span class="fl">Baseline name</span><input id="blName" type="text" maxlength="80" placeholder="e.g. Domain controllers, golden image" autocomplete="off" spellcheck="false">
-      <span class="fl">Scan file</span>
-      <div class="ioc-file"><label class="act sec" for="blFile">Choose a file…</label><input type="file" id="blFile" hidden><span class="dim" id="blFileName">A CSV, JSON or zip of the baseline scan (up to 200 MB)</span></div>
+      <div id="blFromRun"><span class="fl">Run</span><select id="blRun"></select><div class="dim" style="font-size:11.5px;margin-top:3px">Its CSVs and workflow output are copied. Collected files (event logs, hives) are not.</div></div>
+      <div id="blFromFile" hidden><span class="fl">Scan file</span>
+      <div class="ioc-file"><label class="act sec" for="blFile">Choose a file…</label><input type="file" id="blFile" hidden><span class="dim" id="blFileName">A zip of a run folder, or one CSV or JSON (up to 200 MB)</span></div></div>
       <span class="fl">Note (optional)</span><input id="blNote" type="text" maxlength="500" placeholder="Which hosts, when it was taken" autocomplete="off">
+      <span class="fl">Operating system</span><select id="blOsSel"><option value="">Detect from the data</option><option value="windows">Windows</option><option value="linux">Linux</option><option value="other">Other</option></select>
+      <label class="bl-stdl"><input type="checkbox" id="blStd"> Use as the standard for its operating system (newer baselines and runs are compared with it)</label>
       <div class="um-actions"><button class="act" type="button" id="blSave">Upload</button><button class="act sec" type="button" id="blCancel">Cancel</button><span class="um-msg" id="blMsg"></span></div>
     </div>
   </div>
@@ -900,14 +1078,19 @@
 <script src="vendor/addon-fit.js"></script>
 <script src="app.js"></script>
 <script src="respond.js"></script>
+<script src="approvals.js"></script>
 <script src="recurring.js"></script>
 <script src="workflow.js"></script>
 <script src="sso.js"></script>
 <script src="vendor/marked.min.js"></script>
 <script src="docs.js"></script>
 <script src="kibana.js"></script>
+<script src="yara.js"></script>
+<script src="validate.js"></script>
+<script src="watch.js"></script>
 <script src="report.js"></script>
 <script src="browse.js"></script>
+<script src="changes.js"></script>
 <script src="analysis.js"></script>
 <script src="iocs.js"></script>
 <script src="hostdetail.js"></script>

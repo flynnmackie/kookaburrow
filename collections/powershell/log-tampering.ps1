@@ -5,16 +5,12 @@ $Tags = @('defense-evasion', 'event-logs', 'persistence')
 
 $ErrorActionPreference = 'SilentlyContinue'
 
+# One row per event, Kind saying which check found it.
 function Show-Events($title, $filter, $max) {
-    "== $title =="
-    $e = Get-WinEvent -FilterHashtable $filter -MaxEvents $max
-    if ($e) {
-        $e | ForEach-Object {
-            $m = ($_.Message -replace '\s+', ' ')
-            [pscustomobject]@{ Time = $_.TimeCreated; Id = $_.Id; Message = $m.Substring(0, [Math]::Min(220, $m.Length)) }
-        } | Format-Table -AutoSize -Wrap
-    } else { '(none, or log not readable)' }
-    ''
+    Get-WinEvent -FilterHashtable $filter -MaxEvents $max | ForEach-Object {
+        $m = ($_.Message -replace '\s+', ' ')
+        [pscustomobject]@{ Kind = $title; Time = $_.TimeCreated; Id = $_.Id; Message = $m.Substring(0, [Math]::Min(220, $m.Length)) }
+    }
 }
 
 Show-Events 'Security log cleared (1102)' @{ LogName = 'Security'; Id = 1102 } 50

@@ -6,10 +6,10 @@ const { db, save, id } = require('./store');
 const collections = require('./collections');
 const responseRunner = require('./response-runner');
 
-// Quarantine (Health > Monitor): network-isolates a host with the Host - Isolate action and lifts it with Host - Release, so the
+// Quarantine (Monitor > Health): network-isolates a host with the Host - Isolate action and lifts it with Host - Release, so the
 // containment is exactly what those actions do (firewall rules on Windows, iptables on Linux). It runs as an ordinary response, so
 // each step also appears under Burrow > Respond. What is quarantined, since when, until when and by whom is kept in db.quarantine
-// (host id -> record); every step is written to db.quarantineLog for Health > Quarantine log.
+// (host id -> record); every step is written to db.quarantineLog for Monitor > Quarantine log.
 // The host must keep talking to this server, so the address the host sees this server on is worked out first and allowed through.
 const POLL_MS = 500, MAX_WAIT_MS = 30 * 60 * 1000;
 

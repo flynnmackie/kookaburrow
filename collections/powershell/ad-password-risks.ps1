@@ -2,6 +2,7 @@ $Name = 'AD - Account Weaknesses'
 $Description = 'Enabled accounts with risky settings.'
 $Dependencies = @()
 $Tags = @('accounts', 'privilege-escalation', 'persistence', 'active-directory')
+$DiffIgnore = @('LastLogon')
 
 $ErrorActionPreference = 'Stop'
 try { $dn = ([ADSI]'LDAP://RootDSE').defaultNamingContext.ToString() } catch { throw 'This host is not joined to a domain, or no domain controller is reachable' }

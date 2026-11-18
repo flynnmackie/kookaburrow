@@ -6,6 +6,7 @@ $Footprint = 'transient'
 $Returns = 'both'
 $Type = 'tool'
 $Transfer = 'large'
+$Produces = @('memory')
 
 $ErrorActionPreference = 'Stop'
 $exe = Join-Path $BinDir 'winpmem.exe'

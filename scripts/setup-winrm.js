@@ -12,7 +12,8 @@ const { execFileSync } = require('child_process');
 
 const root = path.join(__dirname, '..', 'vendor', 'winrm-runtime');
 const PY_VERSION = '3.12.8';
-const PACKAGES = ['pypsrp==0.9.1'];
+// pypsrp is the WinRM client. The rest are what Volatility 3 (the memory analysis processor) imports; they are installed here, while there is internet, so it runs offline later.
+const PACKAGES = ['pypsrp==0.9.1', 'pefile==2024.8.26', 'capstone==5.0.9', 'pycryptodome==4.3.0', 'yara-python==4.5.4'];
 const quiet = process.argv.includes('--quiet'), force = process.argv.includes('--force');
 const log = (m) => { if (!quiet) console.log(`[setup-winrm] ${m}`); };
 

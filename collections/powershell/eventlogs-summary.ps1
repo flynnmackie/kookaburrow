@@ -3,6 +3,7 @@ $Description = 'Every event log with its record count, size, oldest and newest e
 $Dependencies = @()
 $Parameters = @('OnlyWithEvents?')
 $Tags = @('event-logs', 'inventory', 'defense-evasion')
+$DiffIgnore = @('Records', 'SizeMB', 'LastWrite')
 
 $ErrorActionPreference = 'SilentlyContinue'
 $logs = Get-WinEvent -ListLog *

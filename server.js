@@ -31,6 +31,7 @@ const routePerms = require('./src/route-perms');
 const app = express();
 let running = serverSettings.settings(); // what the server is listening on now (set at start-up; see the end of this file)
 app.use('/api/iocs', express.json({ limit: '6mb' })); // an IOC list can be thousands of lines
+app.use('/api/yara', express.json({ limit: '7mb' })); // a YARA rule file (5 MB at most) sent as text
 app.use(express.json({ limit: '400kb' }));
 
 // The app holds credentials and runs code on remote hosts, so only this PC and the addresses listed in Server Settings may connect, and
@@ -379,6 +380,8 @@ app.post('/api/runs', wrap((req, res) => {
 // Listing omits per-host output; fetch a run for the full results.
 app.get('/api/runs', (req, res) => res.json(db.runs.map(({ events, ...r }) => ({
   ...r, eventCount: audit.eventsFor({ events, ...r }).length, results: r.results.map(({ stdout, stderr, ...meta }) => meta),
+  // the text of a rule written for a hunt stays on the server (it can be 200 KB); the page only needs to know it can be saved
+  ...(r.yara ? { yara: Object.fromEntries(Object.entries(r.yara).map(([k, y]) => [k, { mode: y.mode, name: y.name, fileId: y.fileId || null, saved: y.saved || false, canSave: !!y.text }])) } : {}),
 }))));
 // The data a hunt collected, as JSON: the hunt's own <name>_All_Hosts.json (so what is shown here is what is in its output folder).
 // Older runs keep the layout they were made with (All-Hosts/hunt.json); a run with no file falls back to the stored run.
@@ -653,8 +656,8 @@ app.get('/api/about', (req, res) => {
     users: db.users.length, roles: db.roles.length,
     hosts: db.hosts.length, profiles: db.profiles.length,
     huntsRan: db.runs.filter((r) => r.kind !== 'response').length, responsesRan: db.runs.filter((r) => r.kind === 'response').length,
-    storage: (() => { // the drive that holds the output folder
-      try { const st = require('fs').statfsSync(config.outputDir); const total = st.blocks * st.bsize, free = st.bavail * st.bsize; return { total, free, used: total - free }; } catch { return null; }
+    storage: (() => { // used: what Kookaburrow's own folder takes (null while it is first measured); free and total: the drive that holds the output folder
+      try { const st = require('fs').statfsSync(config.outputDir); return { total: st.blocks * st.bsize, free: st.bavail * st.bsize, used: require('./src/disk-usage').bytes() }; } catch { return null; }
     })(),
     timezone: (() => { const o = -new Date().getTimezoneOffset(), a = Math.abs(o); return { name: Intl.DateTimeFormat().resolvedOptions().timeZone, offset: `UTC${o < 0 ? '-' : '+'}${String(Math.floor(a / 60)).padStart(2, '0')}:${String(a % 60).padStart(2, '0')}` }; })(),
   });
@@ -662,8 +665,10 @@ app.get('/api/about', (req, res) => {
 
 // ---- Hunts: run collections on hosts/groups and collect the data as CSV under output/hunts/ ----------
 // body: { name, collectionIds: [], hostIds?: [], listIds?: [] }
-app.post('/api/hunts', wrap((req, res) => {
+app.post('/api/hunts', wrap(async (req, res) => {
   const b = req.body;
+  // YARA hunts: rules written for this hunt are compiled now, so a typing mistake is reported here and not as a failure on every host
+  for (const cid of Array.isArray(b.collectionIds) ? b.collectionIds : []) { const c = collections.resolveCollection(cid); if (c && c.parameters.includes('YaraRule')) await require('./src/yara-rule').validate(b.params && b.params[cid] && b.params[cid].YaraRule); }
   let hostIds = Array.isArray(b.hostIds) ? [...b.hostIds] : [];
   for (const lid of Array.isArray(b.listIds) ? b.listIds : []) {
     const list = db.lists.find((l) => l.id === lid);
@@ -693,24 +698,30 @@ app.post('/api/hunts', wrap((req, res) => {
 
 // ---- Responses: run actions (scripts that change a host) on hosts/groups; output is kept under output/responses/ ----
 // body: { name, actionIds: [], hostIds?: [], listIds?: [], params?: { [actionId]: { [parameter]: value } } }
-const responseRunner = require('./src/response-runner');
 const scheduler = require('./src/scheduler');
+const responseLauncher = require('./src/response-launch');
+const approvals = require('./src/approvals');
 app.post('/api/responses', wrap((req, res) => {
   const b = req.body;
-  let hostIds = Array.isArray(b.hostIds) ? [...b.hostIds] : [];
-  for (const lid of Array.isArray(b.listIds) ? b.listIds : []) {
-    const list = db.lists.find((l) => l.id === lid);
-    if (!list) throw new Error('Unknown group');
-    hostIds.push(...list.hostIds);
-  }
-  const hosts = [...new Set(hostIds)].map((hid) => db.hosts.find((h) => h.id === hid)).filter(Boolean);
-  const actionIds = Array.isArray(b.actionIds) ? b.actionIds : [];
-  if (b.quick && (b.schedule || (b.listIds || []).length || hosts.length !== 1)) throw new Error('A quick response runs once, on exactly one host');
-  const sched = b.schedule ? scheduler.prepare({ kind: 'response', name: b.name, hostIds: Array.isArray(b.hostIds) ? b.hostIds : [], listIds: Array.isArray(b.listIds) ? b.listIds : [], itemIds: actionIds, params: b.params, schedule: b.schedule, createdBy: req.user }) : null;
-  const run = responseRunner.startResponse({ name: b.name, actionIds, hosts, params: b.params, startedBy: req.user, scheduleId: sched?.id, quick: !!b.quick });
-  if (sched) scheduler.activate(sched, run);
-  res.json(run);
+  // With approvals on, the request is saved and waits for someone with "Approve actions"; 202 tells the page it has not started.
+  if (approvals.required(Array.isArray(b.actionIds) ? b.actionIds : [])) return res.status(202).json({ approval: approvals.view(approvals.request(b, req.user)) });
+  res.json(responseLauncher.launch(b, req.user));
 }));
+// ---- Approvals: requests to run actions that wait for a second person (src/approvals.js) ----
+const mayApprove = (req) => { const u = caller(req); if (!u) return false; const a = access(u); return a.all || a.permissions.includes('actions.approve'); };
+app.get('/api/approvals/count', (req, res) => { const all = mayApprove(req); res.json({ pending: approvals.list({ mayApprove: all, user: req.user }).filter((a) => a.status === 'pending').length, canApprove: all }); });
+app.get('/api/approvals', (req, res) => { const all = mayApprove(req); res.json({ canApprove: all, settings: approvals.settings(), items: approvals.list({ mayApprove: all, user: req.user }) }); });
+app.get('/api/approvals/:id', wrap((req, res) => {
+  const a = approvals.find(req.params.id), all = mayApprove(req);
+  if (!a || (!all && a.requestedBy !== req.user)) throw new Error('Not found');
+  res.json(approvals.view(a, { values: all || a.requestedBy === req.user }));
+}));
+const approvalDecision = (fn) => async (req, res) => { try { res.json(fn(req)); } catch (e) { res.status(e.status || 400).json({ error: firstLine(e.message) }); } };
+app.post('/api/approvals/:id/approve', approvalDecision((req) => approvals.approve(req.params.id, req.user, req.body?.note)));
+app.post('/api/approvals/:id/reject', approvalDecision((req) => approvals.reject(req.params.id, req.user, req.body?.note)));
+app.post('/api/approvals/:id/cancel', approvalDecision((req) => approvals.cancel(req.params.id, req.user, mayApprove(req))));
+app.get('/api/settings/approvals', (req, res) => res.json({ settings: approvals.settings(), defaults: approvals.DEFAULTS }));
+app.put('/api/settings/approvals', wrap((req, res) => res.json({ settings: approvals.setSettings(req.body || {}) })));
 app.delete('/api/responses/:id', wrap((req, res) => {
   const r = db.runs.find((x) => x.id === req.params.id && x.kind === 'response');
   if (!r) throw new Error('Not found');
@@ -728,8 +739,17 @@ app.put('/api/schedules/:id', wrap((req, res) => {
   const s = db.schedules.find((x) => x.id === req.params.id);
   if (!s) throw new Error('Not found');
   if (!mayFor(req, s.kind, 'run')) return res.status(403).json({ error: 'Permission denied', needed: [s.kind === 'hunt' ? 'Run hunts' : 'Run actions'] });
-  if (req.body?.paused) scheduler.pause(s); else scheduler.resume(s);
+  // { compareTo: { baselineId } | null } sets what each run is compared with (a baseline, or the previous run); otherwise { paused }
+  if (req.body && 'compareTo' in req.body) scheduler.setCompareTo(s, req.body.compareTo?.baselineId ? String(req.body.compareTo.baselineId) : null);
+  else if (req.body?.paused) scheduler.pause(s); else scheduler.resume(s);
   res.json(scheduler.view(s));
+}));
+// Marks a run's changes (the +new / −gone badge on Recurring) as looked at: body { runId }. Anyone who may see the schedule.
+app.post('/api/schedules/:id/seen', wrap((req, res) => {
+  const s = db.schedules.find((x) => x.id === req.params.id);
+  if (!s || !mayFor(req, s.kind, 'view')) throw new Error('Not found');
+  scheduler.markSeen(s, String(req.body?.runId || ''));
+  res.json({ ok: true });
 }));
 app.delete('/api/schedules/:id', wrap((req, res) => {
   const s = db.schedules.find((x) => x.id === req.params.id);
@@ -844,35 +864,91 @@ const runFolders = () => {
       let st; try { st = require('fs').statSync(require('path').join(dir, n)); } catch { continue; }
       if (!st.isDirectory()) continue;
       const rec = db.runs.find((r) => r.outputPath === `${group}/${n}`);
-      out.push({ kind, folder: n, path: `/output/${group}/${n}`, name: rec?.name || rec?.collectionName || n, startedAt: rec?.startedAt || st.mtime.toISOString() });
+      const protos = rec ? new Set((rec.results || []).map((x) => (db.hosts.find((h) => h.id === x.hostId) || {}).protocol).filter(Boolean)) : new Set(), os = protos.size === 1 ? (protos.has('ssh') ? 'linux' : 'windows') : null;
+      out.push({ kind, id: rec?.id || null, status: rec?.status || null, os, folder: n, path: `/output/${group}/${n}`, name: rec?.name || rec?.collectionName || n, startedAt: rec?.startedAt || st.mtime.toISOString() });
     }
   }
   return out.sort((a, b) => String(b.startedAt).localeCompare(String(a.startedAt)));
 };
-app.get('/api/diff/runs', wrap((req, res) => res.json(runFolders())));
+// Baselines are offered as well (kind 'baseline', path "baseline:<id>"), to compare a run against.
+app.get('/api/diff/runs', wrap((req, res) => res.json([...runFolders(), ...baselineList().map((b) => ({ kind: 'baseline', folder: b.filename, path: `baseline:${b.id}`, name: b.name, startedAt: b.at }))])));
 const diffWrap = (fn) => (req, res) => { try { res.json(fn(req.body || {})); } catch (e) { res.status(e.status || 400).json({ error: firstLine(e.message) }); } };
-app.post('/api/diff/files', diffWrap((b) => require('./src/diff').list(String(b.path || ''))));
-app.post('/api/diff', diffWrap((b) => require('./src/diff').summarise(String(b.a || ''), String(b.b || ''))));
-app.post('/api/diff/file', diffWrap((b) => require('./src/diff').detail(String(b.a || ''), String(b.b || ''), b.key)));
+// An upload made before baselines could be compared is unpacked the first time Diff opens it.
+const readyBaselines = (fn) => async (req, res, next) => {
+  try { for (const p of [req.body?.a, req.body?.b, req.body?.path, req.query?.a, req.query?.b]) { const m = /^baseline:([0-9a-f]+)/.exec(String(p || '')); const b = m && baselines.find(m[1]); if (b) await baselines.prepare(b); } } catch (e) { return res.status(e.status || 400).json({ error: firstLine(e.message) }); }
+  fn(req, res, next);
+};
+app.post('/api/diff/files', readyBaselines(diffWrap((b) => require('./src/diff').list(String(b.path || '')))));
+// pool: true | false | 'auto' (pool the hosts of each side when they share none); noise: also list the items that differ only in a time
+const poolOf = (b) => (b.pool === true || b.pool === false ? b.pool : 'auto');
+app.post('/api/diff', readyBaselines(diffWrap((b) => require('./src/diff').summarise(String(b.a || ''), String(b.b || ''), { strict: b.strict === true, pool: poolOf(b), nameOf: hostNameAt }))));
+app.post('/api/diff/file', readyBaselines(diffWrap((b) => require('./src/diff').detail(String(b.a || ''), String(b.b || ''), b.key, { strict: b.strict === true, pool: poolOf(b), noise: b.noise === true, nameOf: hostNameAt }))));
 
 // Cross-host comparison (Results > Analysis): list the CSVs of a run, then compare one across its hosts.
 const compareMod = require('./src/compare');
 const hostNameAt = (folder) => { const h = db.hosts.find((x) => x.address === folder); return h ? (h.name || h.hostname || folder) : folder; };
 // only the runs that have at least one CSV from two or more hosts
 app.get('/api/compare/runs', wrap((req, res) => res.json(runFolders().filter((r) => { try { return compareMod.list(r.path).files.length > 0; } catch { return false; } }))));
-app.post('/api/compare/files', diffWrap((b) => compareMod.list(String(b.path || ''))));
-app.post('/api/compare', diffWrap((b) => compareMod.compare(String(b.path || ''), String(b.key || ''), b.columns, hostNameAt)));
+// The CSV keys of a run labelled with what produced them: the collection or action (from the run's record), or the workflow step.
+// a CSV with no run record (or none that matches) is named from the collection library: tasks-list.csv is "Tasks - List"
+const libraryLabel = (key) => { if (key.includes('/')) return null; const i = require('./src/diff').collectionInfo(key.replace(/\.csv$/i, '').toLowerCase()); return i.label; };
+const compareLabels = (vpath) => {
+  const named = compareLabelsFromRun(vpath);
+  return (key) => named(key) || libraryLabel(key);
+};
+const compareLabelsFromRun = (vpath) => {
+  const rec = db.runs.find((r) => `/output/${r.outputPath}` === vpath);
+  if (!rec) return () => null;
+  const { safeName } = require('./src/output');
+  const stem = (id) => safeName(require('path').basename(String(id || ''), require('path').extname(String(id || ''))), 'collection').toLowerCase();
+  return (key) => {
+    const m = /^processed\/([^/]+)\/(.+)$/.exec(key);
+    if (m) { const st = (rec.workflow?.stages || []).find((s) => s.processorId === m[1]); return `${st ? st.processor : m[1]} (workflow): ${m[2]}`; }
+    const r = (rec.results || []).find((x) => `${stem(x.collectionId || x.actionId)}.csv` === key.toLowerCase());
+    return r ? r.collectionName || r.actionName : null;
+  };
+};
+app.post('/api/compare/files', diffWrap((b) => compareMod.list(String(b.path || ''), compareLabels(String(b.path || '')))));
+// How much each CSV of a run differs between its hosts, most interesting first.
+app.post('/api/compare/overview', diffWrap((b) => compareMod.overview(String(b.path || ''), compareLabels(String(b.path || '')), hostNameAt)));
+// body: { path, key, columns?: [match columns], keyColumns?: [item key] }
+app.post('/api/compare', diffWrap((b) => compareMod.compare(String(b.path || ''), String(b.key || ''), { columns: b.columns, keyColumns: b.keyColumns }, hostNameAt)));
 
-// Baselines (Results > Analysis > Baseline): an initial scan kept for later. For now they are only stored (data/baselines/); nothing compares against them yet.
+// Baselines (Results > Analysis > Baseline): a known-good state to compare runs with, in Diff and by recurring hunts (src/baselines.js).
+// Made from a finished run, or uploaded (a zip of a run folder, or one CSV/JSON); uploads are kept as <id>.dat and unpacked into a folder.
 const BASELINE_MAX = 200 * 1024 * 1024;
-const baselineDir = require('path').join(config.dataDir, 'baselines');
-const baselineList = () => (db.baselines ||= []);
-app.get('/api/baselines', wrap((req, res) => res.json(baselineList())));
+const baselines = require('./src/baselines');
+const baselineDir = baselines.ROOT;
+const baselineList = () => baselines.list();
+const baselineView = (b) => { baselines.ensure(b); return b; };
+app.get('/api/baselines', wrap((req, res) => res.json(baselineList().map(baselineView))));
+// What changed between two baselines, or a baseline and a run: a short summary per collection (the Baseline page lists these under each baseline).
+app.get('/api/baselines/changes', readyBaselines((req, res) => { try { res.json(baselines.changes(String(req.query.a || ''), String(req.query.b || ''))); } catch (e) { res.status(e.status || 400).json({ error: firstLine(e.message) }); } }));
+app.get('/api/baselines/:id/download', wrap(async (req, res) => {
+  const b = baselines.find(req.params.id); if (!b) throw new Error('Baseline not found');
+  await baselines.prepare(b);
+  const z = baselines.exportZip(b);
+  res.set({ 'Content-Type': 'application/zip', 'Content-Disposition': `attachment; filename="baseline_${z.name}.zip"` }).send(z.buffer);
+}));
+// body: any of { name, note, os: 'windows' | 'linux' | 'other', standard: true | false }
+app.put('/api/baselines/:id', wrap((req, res) => {
+  const b = baselines.find(req.params.id); if (!b) throw new Error('Baseline not found');
+  res.json(baselineView(baselines.update(b, req.body || {})));
+}));
+app.post('/api/baselines/from-run', wrap((req, res) => {
+  const run = db.runs.find((r) => r.id === String(req.body?.runId || ''));
+  if (!run) throw new Error('Run not found');
+  if (run.status === 'running') throw new Error('That run has not finished yet');
+  const b = baselines.fromRun(run, { name: req.body?.name, note: req.body?.note, by: req.user });
+  const set = {};
+  if (baselines.OSES.includes(req.body?.os)) set.os = req.body.os;
+  if (req.body?.standard === true) set.standard = true;
+  res.json(Object.keys(set).length ? baselines.update(b, set) : b);
+}));
 app.post('/api/baselines', (req, res) => {
   const fsx = require('fs'), name = String(req.query.name || '').trim(), note = String(req.query.note || '').slice(0, 500);
   const filename = require('path').basename(String(req.query.filename || 'baseline')).replace(/[\u0000-\u001f]/g, '').slice(0, 120) || 'baseline';
-  if (!name || name.length > 80) return res.status(400).json({ error: 'Give the baseline a name (80 characters at most)' });
-  if (baselineList().some((b) => b.name.toLowerCase() === name.toLowerCase())) return res.status(400).json({ error: 'A baseline with that name already exists' });
+  try { baselines.checkName(name); } catch (e) { return res.status(400).json({ error: e.message }); }
   fsx.mkdirSync(baselineDir, { recursive: true });
   const bid = id(), dest = require('path').join(baselineDir, `${bid}.dat`), out = fsx.createWriteStream(dest), hash = require('crypto').createHash('sha256');
   let size = 0, failed = false;
@@ -883,16 +959,105 @@ app.post('/api/baselines', (req, res) => {
   out.on('finish', () => {
     if (failed) return;
     if (!size) return fail(400, 'The file is empty');
-    const rec = { id: bid, name, note, filename, size, sha256: hash.digest('hex'), uploadedBy: req.user, at: new Date().toISOString() };
-    baselineList().push(rec); save(); res.json(rec);
+    const rec = { id: bid, name, note, source: 'upload', filename, size, sha256: hash.digest('hex'), uploadedBy: req.user, at: new Date().toISOString() };
+    baselineList().push(rec); save();
+    // unpacked now so it can be compared straight away; a file that cannot be read is removed again
+    baselines.prepare(rec).then(() => { const set = {}; if (baselines.OSES.includes(req.query.os)) set.os = req.query.os; if (req.query.standard === '1') set.standard = true; res.json(Object.keys(set).length ? baselines.update(rec, set) : rec); }).catch((e) => { baselines.remove(rec); res.status(400).json({ error: e.message }); });
   });
   req.pipe(out);
 });
 app.delete('/api/baselines/:id', wrap((req, res) => {
-  const b = baselineList().find((x) => x.id === req.params.id); if (!b) throw new Error('Baseline not found');
-  require('fs').rmSync(require('path').join(baselineDir, `${b.id}.dat`), { force: true });
-  db.baselines = baselineList().filter((x) => x.id !== b.id); save(); res.json({ ok: true });
+  const b = baselines.find(req.params.id); if (!b) throw new Error('Baseline not found');
+  baselines.remove(b); res.json({ ok: true });
 }));
+
+// Continuous (Monitor > Continuous, src/watch.js): light, repeated collections that report only what changed.
+const watch = require('./src/watch');
+const watchWrap = (fn) => async (req, res) => { try { res.json(await fn(req)); } catch (e) { res.status(e.status || 400).json({ error: firstLine(e.message) }); } };
+const watchOf = (req) => { const w = watch.find(req.params.id); if (!w) throw Object.assign(new Error('Watch not found'), { status: 404 }); return w; };
+app.get('/api/watch', watchWrap(() => ({ watches: watch.list(), presets: watch.presets(), collections: watch.eligible(), every: watch.EVERY, maxCollections: watch.MAX_COLLECTIONS, unseen: watch.unseen() })));
+app.get('/api/watch/count', (req, res) => res.json({ unseen: watch.unseen() }));
+app.get('/api/watch/events', watchWrap((req) => watch.listEvents({ watch: req.query.watch, host: req.query.host, kind: req.query.kind, q: req.query.q, since: req.query.since, unseenOnly: req.query.unseen === '1', limit: req.query.limit })));
+app.post('/api/watch/events/seen', watchWrap((req) => ({ marked: watch.markSeen({ ids: Array.isArray(req.body?.ids) ? req.body.ids.map(String) : null, all: req.body?.all === true, watch: req.body?.watch ? String(req.body.watch) : null }) })));
+app.post('/api/watch', watchWrap((req) => { const w = watch.create(req.body || {}, req.user); watch.run(w).catch(() => {}); return watch.view(w); }));
+app.put('/api/watch/:id', watchWrap((req) => { const w = watch.update(watchOf(req), req.body || {}); if (w.enabled && !w.running && req.body && Object.keys(req.body).length > 1) watch.run(w).catch(() => {}); return watch.view(w); }));
+app.post('/api/watch/:id/run', watchWrap(async (req) => { const w = watchOf(req); if (w.running) throw new Error('It is already running'); watch.run(w).catch(() => {}); return watch.view(w); }));
+app.delete('/api/watch/:id', watchWrap((req) => { watch.remove(watchOf(req)); return { ok: true }; }));
+
+// YARA rules (Settings > Collections > YARA Rules, src/yara.js): rule files joined into binaries/kb-rules.yar for the YARA collections.
+const yara = require('./src/yara');
+const yaraWrap = (fn) => async (req, res) => { try { res.json(await fn(req)); } catch (e) { res.status(e.status || 400).json({ error: firstLine(e.message) }); } };
+const yaraFile = (req) => { const r = yara.find(req.params.id); if (!r) throw Object.assign(new Error('Rule file not found'), { status: 404 }); return r; };
+// The rule files a YARA hunt can choose from (and their text, for the box on the Parameters tab). Needs only the right to run hunts.
+app.get('/api/yara/choices', yaraWrap(() => ({ files: require('./src/yara-rule').choices() })));
+app.get('/api/yara/choices/:id/text', yaraWrap((req) => ({ text: yara.text(yaraFile(req)) })));
+// Saves the custom rule a hunt ran with as a rule file on the server (disabled: it is chosen by name, not run by every hunt).
+app.post('/api/runs/:id/yara-save', yaraWrap(async (req) => {
+  const r = db.runs.find((x) => x.id === req.params.id && x.kind === 'hunt');
+  const y = r && r.yara && r.yara[String(req.body?.collectionId || '')];
+  if (!y || y.mode !== 'custom' || !y.text) throw new Error('That hunt did not run with a rule written for it');
+  if (y.saved) throw new Error(`Already saved as "${y.saved.name}"`);
+  const file = await yara.add({ name: req.body?.name, filename: `${String(req.body?.name || 'rule').replace(/[^A-Za-z0-9._ -]+/g, '_').slice(0, 60)}.yar`, text: y.text, note: String(req.body?.note || `Saved from the hunt ${r.name}`).slice(0, 300), by: req.user });
+  if (file.enabled) await yara.setEnabled(file, false);
+  y.saved = { id: file.id, name: file.name }; save();
+  return { ok: true, file: { id: file.id, name: file.name }, compiled: file.check?.ok ?? null };
+}));
+app.get('/api/yara', yaraWrap((req) => yara.view(req.user)));
+app.get('/api/yara/:id/text', yaraWrap((req) => ({ text: yara.text(yaraFile(req)) })));
+app.post('/api/yara', yaraWrap((req) => yara.add({ name: req.body?.name, filename: req.body?.filename, text: req.body?.text, note: req.body?.note, by: req.user })));
+app.put('/api/yara/:id', yaraWrap(async (req) => { await yara.setEnabled(yaraFile(req), !!req.body?.enabled); return { ok: true }; }));
+app.delete('/api/yara/:id', yaraWrap(async (req) => { await yara.remove(yaraFile(req)); return { ok: true }; }));
+
+// YARA scans of hunt output on this server (Results > Analysis > YARA scan, src/yara-scan.js).
+const yaraScan = require('./src/yara-scan');
+app.get('/api/yara-scans', wrap((req, res) => res.json({ scans: yaraScan.list(), compiler: yara.compiler()?.how || null, ruleFiles: yara.list().map((r) => ({ id: r.id, name: r.name, enabled: r.enabled, rules: r.rules.length, ok: r.check?.ok ?? null })) })));
+app.post('/api/yara-scans', wrap((req, res) => res.json(yaraScan.start({ paths: req.body?.paths, ruleFileIds: req.body?.ruleFileIds, by: req.user }))));
+app.post('/api/yara-scans/:id/cancel', wrap((req, res) => { yaraScan.cancel(req.params.id); res.json({ ok: true }); }));
+app.delete('/api/yara-scans/:id', wrap((req, res) => { yaraScan.remove(req.params.id); res.json({ ok: true }); }));
+app.get('/api/yara-scans/:id/csv', wrap((req, res) => { const t = yaraScan.csv(req.params.id); res.setHeader('Content-Type', 'text/csv; charset=utf-8'); res.setHeader('Content-Disposition', `attachment; filename="yara-scan-${req.params.id}.csv"`); res.send(t); }));
+
+// Validate (Monitor > Validate, src/validate.js): checks that hosts are in the state they should be, by hand or on a schedule.
+const validate = require('./src/validate');
+const mayDo = (req) => (perm) => { const a = access(caller(req)); return a.all || a.permissions.includes(perm); };
+const vCheck = (req) => { const c = validate.find(req.params.id); if (!c) throw new Error('Check not found'); return c; };
+app.get('/api/validate', wrap((req, res) => res.json({ presets: validate.catalog(), checks: validate.checks().map(validate.view) })));
+app.get('/api/validate/runs/:rid', wrap((req, res) => { const r = validate.getRun(req.params.rid); if (!r) throw new Error('Run not found'); res.json(r); }));
+// A new check runs once straight away, like a new hunt; so does one whose conditions or hosts were changed (its old results no longer fit).
+const vSig = (c) => JSON.stringify([c.tree, c.hostIds, c.listIds]);
+const vRunNow = (c, by) => { try { if (!c.running) validate.run(c, by); } catch { /* it shows as not run yet, and Run now tries again with the reason */ } };
+app.post('/api/validate', wrap((req, res) => {
+  const c = validate.save(req.body || {}, { by: req.user, may: mayDo(req) });
+  vRunNow(c, req.user);
+  res.json(validate.view(c));
+}));
+app.put('/api/validate/:id', wrap((req, res) => {
+  const c = vCheck(req);
+  if (req.body && Object.keys(req.body).length === 1 && 'enabled' in req.body) validate.setEnabled(c, req.body.enabled);
+  else { const before = vSig(c); validate.save(req.body || {}, { by: req.user, may: mayDo(req), existing: c }); if (vSig(c) !== before) vRunNow(c, req.user); }
+  res.json(validate.view(c));
+}));
+app.delete('/api/validate/:id', wrap((req, res) => { validate.remove(vCheck(req)); res.json({ ok: true }); }));
+app.post('/api/validate/:id/run', wrap((req, res) => { const c = vCheck(req); validate.run(c, req.user); res.json(validate.view(c)); }));
+// a check made of preset conditions only, tried on one host without saving it: what the editor's "Try on a host" shows
+app.post('/api/validate/try', wrap(async (req, res) => {
+  const b = req.body || {}, host = db.hosts.find((h) => h.id === String(b.hostId || ''));
+  if (!host) throw new Error('Choose a host');
+  const c = validate.save({ ...b, name: b.name || 'Try', hostIds: [host.id], listIds: [], schedule: null, everyMinutes: 0 }, { by: req.user, may: mayDo(req), existing: { id: 'try', hostIds: [], listIds: [] } });
+  const r = await validate.run(c, req.user);
+  validate.remove(c);
+  res.json({ run: r, expression: validate.describe(c.tree), conditions: validate.conditions(c.tree) });
+}));
+
+// Expected changes (src/expected.js): rows marked in Diff as known to come and go, so they are not reported as new or gone.
+const expected = require('./src/expected');
+app.get('/api/expected', wrap((req, res) => res.json(expected.list())));
+app.post('/api/expected', wrap((req, res) => {
+  const b = req.body || {};
+  const e = expected.add({ scope: b.scope, key: b.key, header: b.header, row: b.row, note: b.note, by: req.user });
+  scheduler.staleChanges(); // recurring hunts' counts are worked out again without it
+  res.json(e);
+}));
+app.delete('/api/expected/:id', wrap((req, res) => { expected.remove(req.params.id); scheduler.staleChanges(); res.json({ ok: true }); }));
 
 // IOC lists (Results > Analysis > IOC) and the hunts whose output contains them.
 const iocs = require('./src/iocs');
@@ -1131,6 +1296,9 @@ async function startListening() {
   monitor.start();
   quarantine.start();
   scheduler.start();
+  validate.start();
+  watch.start();
+  yara.installBuiltins().catch((e) => console.error('Built-in YARA rules: ' + e.message));
   firewall.apply(running).catch(() => {}); // Windows Firewall follows the listening address, port and allowed computers
 }
 // Saving Server Settings restarts the server: stop listening, start a fresh copy of this process (detached) and exit.

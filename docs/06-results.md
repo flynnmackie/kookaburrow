@@ -12,6 +12,7 @@ Everything a hunt or response produces is kept as ordinary files plus a record i
 - [Diff](#diff)
 - [Cross-host comparison](#cross-host-comparison)
 - [IOC lists](#ioc-lists)
+- [YARA scan](#yara-scan)
 - [Baseline](#baseline)
 - [Browse](#browse)
 - [Pinned](#pinned)
@@ -53,23 +54,46 @@ Reports are saved in `output/reports/` as `<H|R>_<name>_<date>_Report.html`, lis
 
 ## Diff
 
-**Results > Diff** compares the output of two runs, or one file from each.
+**Results > Diff** shows what is **new, gone and changed** between two runs (or baselines). It is built so that an unchanged host compared with itself shows nothing.
 
-- Pick run **A** and run **B** (typically the same hunt on two dates), or choose a single file in each.
-- Files are paired by their **path inside the run**; the date stamps in names are ignored, so one hunt's files line up with the next run of the same hunt.
-- Content is compared **by line**, or **by row for CSV**, ignoring order.
-- You see what is only in **A** (gone) and what is only in **B** (new), and how many are in both. Select a changed file to see the rows behind it.
-- A run can be pinned from here.
+**Choosing what to compare.** *Quick compare* offers the latest run of each hunt against the one before, in one click. Otherwise pick **Before** and **After** (typically the same hunt on two dates, or a [baseline](#baseline)) and press **Compare**. *Compare one file from each side* is for a single CSV. The tiles show how many rows are **new**, **gone** and **changed**, and how many hosts each side had.
+
+**Reading the result.**
+
+- The list is grouped **by collection** (switch to **by host**). Collections that matter most come first: persistence, accounts, command and control, malware, privilege escalation, then execution and lateral movement. Each shows its name from the library and a tag.
+- Open a file to see its rows. **Changed** is one item whose fields differ: only the fields that changed are shown, old value struck through, then the new one (*State: Running → Stopped*). **New** and **Gone** are rows on one side only.
+- **Search** filters collections, hosts and the rows you have opened; **Open all changes** opens every changed collection so the search covers them; **Export CSV** writes every change (collection, host, new/gone/changed, item, field, before, after) to one file. **wrap long values** keeps long commands readable.
+- **Expected** on a row (needs `hunts.run`) marks it as known to come and go: it is not reported again, on any host (see [Expected changes](#expected-changes)). A changed item is accepted by marking its new state.
+
+**What does not count as a change** (what is compared, so that running an unchanged hunt again shows no changes):
+
+- **Run records** (the log and the run summary) differ on every run and are not compared. The combined `_All_Hosts.csv` repeats every host's rows and never counts.
+- **Collected files** (under `raw/`, such as event logs and hives) count only when one appears or disappears; their bytes change on every collection.
+- **Times and counters.** A column of dates and times (created, modified, last run, a time stamp; found by its name *and* by what is in it), and the volatile columns (process IDs, CPU and memory counters, uptime, free space, durations, a collection's own `$DiffIgnore`), are **not** what makes an item new or changed. The same service with a new *last started* is the same service. Such items are counted as **noise**, hidden, and listed if you tick *list them*. Where the time **is** what tells rows apart (an event log, a timeline) it is kept: a new event is new.
+- **Items are found by a key**: the collection's `$DiffKey`, or else the smallest set of columns that tells the rows apart (a service's *Name*, a process's *Name* and *Path*), worked out from the data, so it also works for collections you write. Same key and different other columns is **changed**; a key on one side only is **new** or **gone**. A collection's `$DiffKey` on its own decides what a row is, as before. Items with the same key and a different command line are told apart only when nothing tidier separates them.
+- Values that hold the run's folder name, and the ephemeral port of a connection, are normalised.
+- **A host collected in only one of the two runs** (offline, or added later) is named in a note and its files are not compared.
+- **every column** switches all of this off, counts duplicate rows and compares the bytes of collected files.
+
+**Hosts.** Hosts are matched **by name**. When the two sides have **no host in common** (a golden-image baseline against a fleet, two baselines of different machines) the hosts are **pooled** automatically: each collection is compared across all the hosts of each side, and every row lists the hosts that have it. The *Hosts* option can force either way. A recurring hunt's badge shows `+new −gone ~changed`.
 
 ## Cross-host comparison
 
-**Results > Cross-host comparison** puts one hunt's CSV from **every host** side by side so rare things stand out.
+**Results > Cross-host comparison** finds the host that is not like the others. Choose a hunt or response that ran on two or more hosts.
 
-1. Choose a hunt or response. Only runs with results from two or more hosts are listed.
-2. Choose a CSV, listed with how many of the run's hosts returned it.
-3. Press **Compare**.
+**Overview.** Every collection that came back from two or more hosts is listed with how much it differs: *Differ* (items that are different on different hosts), *Missing on some* (items some hosts do not have), *On one host* (rows only one host has) and the *odd one out*. The most interesting come first. Click one to open it. Times and counters that differ between hosts for no reason are left out of the matching, the same way as in [Diff](#diff).
 
-Each row of the CSV is counted by how many hosts have it. Rows are ordered from the **fewest hosts to the most**, so a service, port or autorun found on one host out of forty comes first. You can choose which columns identify a row (default all columns).
+**Three views of a collection.**
+
+| View | What it shows |
+|---|---|
+| **Differences** | Drift, by item. Items are found by a key (the collection's `$DiffKey`, or the smallest set of columns that tells rows apart) and grouped by what else is true of them: *Spooler: Running on 4 hosts, Stopped on WIN-WS01 and WIN-WS02*. An item some hosts lack is *Missing on some hosts*, with the hosts that lack it. Items identical everywhere are not listed |
+| **Hosts** | Every host ranked by distance from the rest: rows no other host has, items it holds in a state few others do, and common items it lacks. Click a host to see only its differences |
+| **Rows** | Every distinct row and how many hosts have it, fewest first, with filters (one host only, rare, every host) |
+
+- **Columns** (under the tabs) shows which columns identify an item and which make two rows the same. Greyed ones were left out (volatile or times); press one to put it back, then **Apply**.
+- Filter by text or by host, click a host name anywhere to filter by it, and **Export CSV** writes the current view.
+- Workflow output (a Hayabusa timeline per host) is listed alongside the collections.
 
 ## IOC lists
 
@@ -80,9 +104,40 @@ Each row of the CSV is counted by how many hosts have it. Rows are ordered from 
 - The combined `All_Hosts` files and the log are left out so each hit is listed once. Results update when a run's files change.
 - A hunt can be pinned from here. Needs `hunts.run` to add or delete lists.
 
+## YARA scan
+
+**Results > YARA scan** scans the output of one or more runs with YARA rules, **on the server**: every CSV, every workflow output and every collected file (event logs, hives, memory images, captures). Nothing runs on the hosts, so a run collected last week can be checked against rules written today.
+
+The rule files include the **built-in rules** (marked *built-in*): generic rules such as every Windows or Linux executable, unsigned or packed programs, archives, secrets and web shells. Tick one to scan with it alone; they are disabled for hunts by default.
+
+1. Tick the runs (filter by name) and the rule files to use. The files enabled on [Settings > YARA Rules](08-settings.md#yara-rules) are ticked to start with; disabled ones can be used here too. A file that does not compile cannot be chosen, nor two files that define the same rule name.
+2. Press **Scan**. One scan runs at a time; the runs are scanned one after another and the list updates as it goes. **Cancel** stops it.
+3. Open a scan to see each run's count, and every match with its rule, run, host (the host folder the file is in) and file. Filter by rule with the chips; **Browse** opens the file's folder. **CSV** exports every match (needs `hunts.export`).
+
+It needs YARA on the server: `yara64.exe` uploaded on [Binaries](08-settings.md#binaries) (Windows server) or `yara` installed (Linux). Files YARA cannot open are counted and skipped. The latest 20 scans are kept, with up to 5,000 matches each. Viewing needs `hunts.view`; scanning, cancelling and deleting need `hunts.run`.
+
 ## Baseline
 
-**Results > Baseline > Upload baseline** stores a known-good scan (for example the output of the *Baseline - Windows Full* collection) under a name, with its SHA-256. Baselines are **stored only**: comparing later hunts against them is not available yet. Use [Diff](#diff) between two runs of the baseline collection in the meantime.
+A baseline is a known-good state that later runs, and newer baselines, are compared with. Each has an **operating system** (Windows, Linux or other), and **one baseline per system can be the standard**: the reference for that system.
+
+**Adding one** (**Add baseline**):
+
+- **From a run**: a finished hunt or response is copied (its CSVs and workflow output; collected files such as event logs are left out, and are then left out of comparisons with it too).
+- **Upload a baseline**: a zip made by **Download** on another Kookaburrow (so a standard baseline can be built once and shared), a zip of a run folder, or a single CSV, up to 200 MB. The operating system, hosts and collections are recognised from the content, or you can say which system it is.
+- Tick **Use as the standard** to make it the reference for its system. **Edit** changes the name, note, system and standard later; **Download** exports it as a zip.
+
+**Seeing what changed.** The table lists each baseline with its system, hosts, collections and rows, and two columns that fill in by themselves: **Changed since the standard** and **Changed since the one before** (the previous baseline of the same system, by date), each as `+new −gone ~changed` and how many collections. *No changes* means identical; times and counters do not count. Click a figure, or the baseline itself, and the **change report** opens below with exactly what is new, gone and changed in each collection, in the same form as [Diff](#diff): persistence and accounts first, fields that changed shown old → new, searchable and exportable.
+
+- **Compare** under the table picks any reference and any newer baseline or run. **Quick compare** offers *newest vs standard* and *newest vs previous* for each system. **Check a run against the standard** compares a run with the standard of its system.
+- Baselines of different machines are compared **pooled** (each collection across all the hosts of each side); baselines of the same hosts are compared host by host. The report says which.
+- A recurring hunt can compare **every run** with a baseline instead of with the run before: **Burrow! > Recurring**, open the schedule, **Compare each run with**. Deleting a baseline removes its files, and recurring hunts that used it go back to the previous run.
+- **Tested** with a six-host fleet audited twice and a golden-image host: changes, hidden noise, pooled comparison, the exported zip re-uploaded as an identical baseline. Not tested with very large baselines (the summary for each pair is computed once and kept until the server restarts).
+
+### Expected changes
+
+Some rows come and go on their own, such as an updater's scheduled task. In a Diff result, press **Expected** on a new or gone row (needs `hunts.run`) and add an optional note. From then on that row is not reported as new or gone, by Diff or by recurring hunts, on **any host** and in every run of that collection. It is matched on the compared columns only, so a new PID does not bring it back. Recurring hunts' counts are worked out again straight away.
+
+The rows are listed under **Expected changes** on the Baseline page, with who marked them; **Remove** reports the row again. Diff shows how many expected rows it left out of each file, and **compare every column** shows them all.
 
 ## Browse
 
@@ -114,4 +169,4 @@ It never leaves those folders and does not follow symlinks.
 |---|---|
 | View hunts, logs, results, reports, Browse, pins, Diff, Cross-host comparison, the Baseline and IOC lists | `hunts.view` |
 | Generate or download a report, download output, folders and the activity log CSV | `hunts.export` |
-| Delete a report or a run, delete files in Browse, add or delete IOC lists and baselines | `hunts.run` (deleting in Browse also accepts `actions.run`) |
+| Delete a report or a run, delete files in Browse, add or delete IOC lists and baselines, mark or remove expected changes | `hunts.run` (deleting in Browse also accepts `actions.run`) |

@@ -89,4 +89,21 @@ function combine(parts, { itemLabel = 'Collection', withItem = false } = {}) {
   return { csv: out.map(csvRow).join('\r\n') + '\r\n', columns: header, rows, records };
 }
 
-module.exports = { GROUPS, stamp, safeName, createRunFolder, runDir, csvRow, parseCsv, streamsToCsv, combine };
+// What a Linux (bash) collection printed, as CSV. A collection that prints tab-separated rows with a header line (every line with the same
+// number of tabs) gets a column per field, so it can be diffed, compared across hosts and watched like a PowerShell one. Free text becomes
+// a one-column CSV, one row per line.
+function textToCsv(text) {
+  const lines = String(text ?? '').replace(/\r\n/g, '\n').replace(/\n+$/, '').split('\n');
+  const rows = lines.filter((l) => l !== '');
+  if (rows.length && rows[0].includes('\t')) {
+    const n = rows[0].split('\t').length;
+    // a table when nearly every line has the header's number of fields; a stray tab inside a value (a line copied from a config file) is
+    // folded into the last field and a short line is padded, so one odd line does not turn the whole output into text
+    if (rows.filter((l) => l.split('\t').length === n).length >= Math.max(1, Math.ceil(rows.length * 0.8))) {
+      return rows.map((l) => { const f = l.split('\t'); if (f.length > n) f.splice(n - 1, f.length - n + 1, f.slice(n - 1).join(' ')); while (f.length < n) f.push(''); return csvRow(f); }).join('\r\n') + '\r\n';
+    }
+  }
+  return ['Output', ...lines].map((l) => csvRow([l])).join('\r\n') + '\r\n';
+}
+
+module.exports = { GROUPS, stamp, safeName, createRunFolder, runDir, csvRow, parseCsv, streamsToCsv, combine, textToCsv };

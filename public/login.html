@@ -10,6 +10,7 @@
 <style>
   * { box-sizing:border-box; }
   html, body { height:100%; }
+  html { caret-color:transparent; } input, textarea, select { caret-color:auto; } /* no blinking cursor on plain text (browser caret browsing); fields keep theirs */
   body { margin:0; background:var(--bg); color:var(--text); font:13px/1.45 var(--f-ui); display:flex; align-items:center; justify-content:center; -webkit-font-smoothing:antialiased; }
   .box { width:min(360px, calc(100vw - 32px)); text-align:center; }
   .box img { width:128px; height:auto; display:block; margin:0 auto 14px; }
