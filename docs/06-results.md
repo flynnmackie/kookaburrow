@@ -65,6 +65,13 @@ Reports are saved in `output/reports/` as `<H|R>_<name>_<date>_Report.html`, lis
 - **Search** filters collections, hosts and the rows you have opened; **Open all changes** opens every changed collection so the search covers them; **Export CSV** writes every change (collection, host, new/gone/changed, item, field, before, after) to one file. **wrap long values** keeps long commands readable.
 - **Expected** on a row (needs `hunts.run`) marks it as known to come and go: it is not reported again, on any host (see [Expected changes](#expected-changes)). A changed item is accepted by marking its new state.
 
+**The reports.** When two runs are compared, Diff makes the [report](#report) of each (if missing or older than the run) and shows one line, and nothing else, with three links: **Before**, **After** and **Drift report**. A baseline has no report of its own, so its link is greyed out. The **drift report** is one page listing every change worst first, colour coded red, amber and green, with the host, the item, the details and *why* it was rated that way. Needs `hunts.export`.
+
+- **Red (dangerous)**: the change looks like an attack or a weakened protection: encoded, hidden or download-and-run PowerShell, a program that runs from a temp, download, AppData or ProgramData folder, a new member of an administrator group, a well-known attack tool, a reverse shell, antivirus exclusions, an `ld.so.preload`, `authorized_keys` or AppInit hook, root access or weak SSH settings, or a port attack tools favour.
+- **Amber (look at)**: a new or changed item in a collection about persistence, accounts, command and control, execution, lateral movement or the network.
+- **Green (low risk)**: something that went away, or a change in an inventory collection.
+- The rating is a guide to where to look first, not a verdict: every red item still needs a person to decide. The patterns are in `src/drift.js`. Items marked [expected](#expected-changes) and time-only differences are not rated.
+
 **What does not count as a change** (what is compared, so that running an unchanged hunt again shows no changes):
 
 - **Run records** (the log and the run summary) differ on every run and are not compared. The combined `_All_Hosts.csv` repeats every host's rows and never counts.

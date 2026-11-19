@@ -10,7 +10,7 @@ const chNum = (n) => Number(n || 0).toLocaleString();
 
 // el: the element the report is drawn in. opts: { onChange() } called after a row is marked expected (so the page can refresh its own summary).
 function chNew(el, opts = {}) {
-  const r = { el, opts, res: null, detail: new Map(), open: new Set(), gopen: new Map(), show: new Set(['changed', 'added', 'removed']), q: '', group: 'collection', strict: false, pool: 'auto', timeOnly: false, wrap: false, labels: {}, a: '', b: '', loading: false };
+  const r = { el, opts, res: null, detail: new Map(), open: new Set(), gopen: new Map(), show: new Set(['changed', 'added', 'removed']), q: '', group: 'collection', strict: false, pool: 'auto', timeOnly: false, wrap: false, labels: {}, a: '', b: '', loading: false, links: null };
   el.onclick = (e) => chClick(r, e);
   el.onchange = (e) => chChange(r, e);
   el.oninput = (e) => { if (e.target.dataset.chq !== undefined) { r.q = e.target.value; r.focus = true; chRender(r); } };
@@ -26,12 +26,29 @@ async function chLoad(r, a, b, labels = {}) {
   catch (e) { r.res = null; r.loading = false; r.el.innerHTML = `<p class="bad" style="margin:0">${esc(e.message)}</p>`; return null; }
   r.loading = false;
   chRender(r);
+  chLinks(r);
   const changed = r.res.files.filter(chCounted).filter((f) => f.status !== 'same' && !(f.binary && f.status === 'changed'));
-  if (changed.length === 1) chToggle(r, changed[0].key); // one file: show its rows straight away
+  if (changed.length === 1 && !r.opts.lineOnly) chToggle(r, changed[0].key); // one file: show its rows straight away
   return r.res;
+}
+// Makes the reports of both runs (when they are runs, not baselines) and the links to them, the side by side page and the drift report.
+async function chLinks(r) {
+  r.links = null;
+  if (!can('hunts.export')) return;
+  const pool = r.pool === 'auto' ? 'auto' : r.pool === 'pool', a = r.a, b = r.b;
+  try { const l = await api('POST', '/api/diff/reports', { a, b, pool }); if (r.a === a && r.b === b) r.links = l; } catch { r.links = null; }
+  if (r.opts.onLinks) r.opts.onLinks(r);
+  if (r.res) chRender(r);
 }
 const chCounted = (f) => f.kind !== 'record' && !f.hostMissing && f.kind !== 'combined';
 const chName = (r, p) => r.labels[p] || (r.res && r.res.a.path === p ? r.res.a.name : r.res && r.res.b.path === p ? r.res.b.name : String(p).slice(String(p).lastIndexOf('/') + 1));
+
+// One line: the report of each run and the drift report.
+function chLine(r) {
+  const L = r.links, none = 'A baseline has no report of its own';
+  const link = (u, text, title) => (u ? `<a class="ch-lk" href="${esc(u)}" target="_blank" rel="noopener" title="${esc(title)}">${text} ↗</a>` : `<span class="ch-lk off" title="${esc(title)}">${text}</span>`);
+  return `<span class="ch-lbl">Reports</span>${link(L && L.a && L.a.url, 'Before', L && L.a ? L.a.name : none)}${link(L && L.b && L.b.url, 'After', L && L.b ? L.b.name : none)}${link(L && L.drift, 'Drift report', 'What changed, colour coded red, amber and green')}`;
+}
 
 function chGroups(r) {
   const files = r.res.files.filter(chCounted).filter((f) => r.show.has(f.status));
@@ -62,6 +79,8 @@ const chSideTag = { changed: 'Changed', added: 'New', removed: 'Gone', same: 'Id
 
 function chRender(r) {
   const s = r.res; if (!s) return;
+  if (r.opts.lineOnly && r.opts.draw) { r.el.innerHTML = r.opts.draw(r); return; }
+  if (r.opts.lineOnly) { r.el.innerHTML = `<div class="ch-line">${chLine(r)}</div>`; return; } // Diff shows only the line: the two reports and the drift report
   const counted = s.files.filter(chCounted), t = (st) => counted.filter((f) => f.status === st).length;
   const rows = s.rows, none = !rows.added && !rows.removed && !rows.modified && !t('added') && !t('removed') && !t('changed');
   const chip = (st, label) => `<button type="button" class="df-chip ${st} ${r.show.has(st) ? 'on' : ''}" data-chshow="${st}">${label} <b>${t(st)}</b></button>`;
@@ -71,6 +90,7 @@ function chRender(r) {
   const changedFiles = counted.filter((f) => f.status === 'changed' || f.status === 'added' || f.status === 'removed');
   r.el.innerHTML = `<div class="ch-head"><div class="ch-sides"><span class="ch-side"><i>Before</i> ${esc(chName(r, s.a.path))}</span><span class="ch-arrow">→</span><span class="ch-side"><i>After</i> ${esc(chName(r, s.b.path))}</span></div>
       <div class="ch-tiles">${tile('add', '+', rows.added, 'new')}${tile('rem', '−', rows.removed, 'gone')}${tile('mod', '~', rows.modified, 'changed')}${s.hostCounts ? `<div class="ch-tile info"><b>${s.hostCounts.a}→${s.hostCounts.b}</b><span>hosts</span></div>` : ''}</div></div>
+    <div class="ch-line">${chLine(r)}</div>
     ${s.pooled ? `<div class="df-note" title="Each collection is compared across all the hosts of each side. Rows say which hosts have them.">${esc(s.poolReason || 'Hosts are pooled.')}</div>` : ''}
     ${rows.noise && !r.strict ? `<div class="ch-noise"><span>${chNum(rows.noise)} item${rows.noise === 1 ? '' : 's'} differ only in a time or a counter and ${rows.noise === 1 ? 'is' : 'are'} not counted as changes.</span> <label><input type="checkbox" data-chopt="timeOnly" ${r.timeOnly ? 'checked' : ''}> list them</label></div>` : ''}
     <div class="ch-bar"><input type="search" data-chq placeholder="Search collections, hosts and opened rows" value="${esc(r.q)}" autocomplete="off">
@@ -168,6 +188,7 @@ async function chReload(r) { // after a setting changed or a row was marked: com
   r.opts.onChange?.(r.res);
 }
 async function chOpenAll(r) {
+  if (r.opts.lineOnly) return;
   const files = r.res.files.filter(chCounted).filter((f) => f.status !== 'same' && !(f.binary && f.status === 'changed')).slice(0, 60);
   for (const f of files) r.open.add(f.key);
   for (const g of chGroups(r)) r.gopen.set(g.key, true);

@@ -884,6 +884,32 @@ const poolOf = (b) => (b.pool === true || b.pool === false ? b.pool : 'auto');
 app.post('/api/diff', readyBaselines(diffWrap((b) => require('./src/diff').summarise(String(b.a || ''), String(b.b || ''), { strict: b.strict === true, pool: poolOf(b), nameOf: hostNameAt }))));
 app.post('/api/diff/file', readyBaselines(diffWrap((b) => require('./src/diff').detail(String(b.a || ''), String(b.b || ''), b.key, { strict: b.strict === true, pool: poolOf(b), noise: b.noise === true, nameOf: hostNameAt }))));
 
+// Drift (src/drift.js): the reports of both runs of a comparison (made when missing or older than the run) and the drift report that
+// rates every change red, amber or green. A baseline has no report of its own.
+const driftMod = require('./src/drift');
+const runAtPath = (p) => db.runs.find((r) => `/output/${r.outputPath}` === String(p));
+const sideName = (p) => {
+  const r = runAtPath(p); if (r) return `${r.name || r.collectionName || 'run'} · ${new Date(r.startedAt).toLocaleString()}`;
+  const bm = /^baseline:([0-9a-f]+)/.exec(String(p)), b = bm && baselines.find(bm[1]); return b ? `Baseline: ${b.name}` : String(p).slice(String(p).lastIndexOf('/') + 1);
+};
+const htmlSandboxed = (res, html, frames) => res.set({ 'Content-Type': 'text/html; charset=utf-8', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': `sandbox allow-scripts allow-popups; default-src 'none'; ${frames ? "frame-src 'self'; " : ''}style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:` }).send(html);
+app.post('/api/diff/reports', readyBaselines(diffWrap((b) => {
+  const out = {};
+  for (const side of ['a', 'b']) {
+    const r = runAtPath(b[side]);
+    if (!r || r.status === 'running') { out[side] = null; continue; }
+    const file = reports.reportFile(r), fresh = file && require('fs').statSync(file).mtimeMs >= Date.parse(r.finishedAt || r.startedAt || 0);
+    if (!fresh) reports.writeReport(r, hostsInfo());
+    out[side] = { runId: r.id, name: sideName(b[side]), url: `/api/runs/${r.id}/report` };
+  }
+  const q = `a=${encodeURIComponent(b.a)}&b=${encodeURIComponent(b.b)}${b.pool === true ? '&pool=1' : b.pool === false ? '&pool=0' : ''}`;
+  return { ...out, drift: `/api/diff/drift-report?${q}` };
+})));
+app.get('/api/diff/drift-report', readyBaselines((req, res) => {
+  try { const pool = req.query.pool === '1' ? true : req.query.pool === '0' ? false : 'auto'; htmlSandboxed(res, driftMod.driftReport(String(req.query.a || ''), String(req.query.b || ''), { a: sideName(req.query.a), b: sideName(req.query.b) }, { pool, nameOf: hostNameAt })); }
+  catch (e) { res.status(e.status || 400).json({ error: firstLine(e.message) }); }
+}));
+
 // Cross-host comparison (Results > Analysis): list the CSVs of a run, then compare one across its hosts.
 const compareMod = require('./src/compare');
 const hostNameAt = (folder) => { const h = db.hosts.find((x) => x.address === folder); return h ? (h.name || h.hostname || folder) : folder; };

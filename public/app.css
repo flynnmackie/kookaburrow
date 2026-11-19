@@ -974,3 +974,8 @@
 
 /* YARA rule picker */
 .yr-pick { display:flex; flex-direction:column; align-items:stretch; gap:6px; } .yr-pick select { width:100%; } .yr-text { width:100%; font:12px var(--f-mono, monospace); background:var(--panel2,#11161d); color:var(--text); border:1px solid var(--line-hi); border-radius:6px; padding:8px 10px; resize:vertical; min-height:190px; white-space:pre; tab-size:4; } .yr-text[readonly] { opacity:.85; } .yr-note { font-size:11.5px; }
+
+/* Drift: the one-line bar and the red / amber / green marks */
+.ch-line { display:flex; align-items:center; gap:8px; flex-wrap:nowrap; overflow-x:auto; white-space:nowrap; padding:6px 10px; margin:0 0 10px; border:1px solid var(--line-hi); border-radius:var(--r-m); background:var(--panel2); font-size:12.5px; }
+.ch-lbl { font:600 10px var(--f-ui); text-transform:uppercase; letter-spacing:.05em; color:var(--dim); } .ch-sep { width:1px; align-self:stretch; background:var(--line-hi); margin:0 6px; }
+.ch-lk { border:1px solid var(--line-hi); border-radius:var(--r-s); padding:1px 9px; text-decoration:none; } .ch-lk:hover { background:var(--hover); } .ch-lk.off { opacity:.45; cursor:default; }

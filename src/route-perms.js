@@ -55,6 +55,7 @@ const RULES = [
   ['GET', /^\/api\/runs(\/|$)/, ['hunts.view']],
   ['GET', /^\/api\/browse\/download$/, ['hunts.export']],
   ['DELETE', /^\/api\/browse$/, ['hunts.run', 'actions.run']], // output, reports and pulled files only; the server refuses anything else
+  ['*', /^\/api\/diff\/(reports|drift-report)$/, ['hunts.export']], // makes the reports of both runs, and the drift report
   ['*', /^\/api\/(pins|diff|compare)(\/|$)/, ['hunts.view']],
   ['GET', /^\/api\/baselines(\/changes)?$/, ['hunts.view']],
   ['GET', /^\/api\/baselines\/[^/]+\/download$/, ['hunts.export']],

@@ -388,9 +388,23 @@ $('bbPinFolder').onclick = async () => { await bbTogglePin(bb.path); renderBrows
 // runs of a hunt in one click, and optionally one file from each. See src/diff.js for what counts as a change.
 const df = { runs: [], rep: null, files: { A: [], B: [] }, label: {} };
 const dfWhen = (t) => new Date(t).toLocaleString([], { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+// Every comparison leaves a permanent line below: the names of the two runs and the links to their reports and the drift report.
+const DF_KEY = 'kb.diffLines';
+const dfLines = () => { try { return JSON.parse(localStorage.getItem(DF_KEY)) || []; } catch { return []; } };
+function dfRemember(r) {
+  if (!r.links) return;
+  const L = r.links, line = { a: r.labels[r.a] || (L.a && L.a.name) || r.a, b: r.labels[r.b] || (L.b && L.b.name) || r.b, ra: L.a && L.a.url, rb: L.b && L.b.url, drift: L.drift, at: Date.now() };
+  const list = dfLines().filter((x) => x.drift !== line.drift); list.unshift(line);
+  try { localStorage.setItem(DF_KEY, JSON.stringify(list.slice(0, 200))); } catch {}
+}
+function dfHistory(r) {
+  const lk = (u, t) => (u ? `<a class="ch-lk" href="${esc(u)}" target="_blank" rel="noopener">${t} ↗</a>` : `<span class="ch-lk off">${t}</span>`);
+  const line = (x) => `<div class="ch-line"><span class="ch-lbl">${esc(x.a)} → ${esc(x.b)}</span>${lk(x.ra, 'Before')}${lk(x.rb, 'After')}${lk(x.drift, 'Drift report')}</div>`;
+  return (r.links ? '' : '<p class="dim" style="margin:0">Making the reports…</p>') + dfLines().map(line).join('');
+}
 async function loadDiff() {
   loadPins();
-  if (!df.rep) df.rep = chNew($('dfOut'));
+  if (!df.rep) df.rep = chNew($('dfOut'), { lineOnly: true, onLinks: dfRemember, draw: dfHistory });
   try { df.runs = await api('GET', '/api/diff/runs'); } catch (e) { $('dfOut').innerHTML = `<p class="bad">${esc(e.message)}</p>`; return; }
   const opt = (r) => `<option value="${esc(r.path)}">${esc(r.name)} · ${esc(dfWhen(r.startedAt))}</option>`;
   const html = (kind, label) => { const l = df.runs.filter((r) => r.kind === kind); return l.length ? `<optgroup label="${label}">${l.map(opt).join('')}</optgroup>` : ''; };
@@ -399,7 +413,7 @@ async function loadDiff() {
   if (keepA) $('dfA').value = keepA; if (keepB) $('dfB').value = keepB;
   dfQuick();
   if (!df.runs.length) $('dfOut').innerHTML = '<p class="dim" style="margin:0">There are no hunts or responses to compare yet.</p>';
-  else if (!df.rep.res) $('dfOut').innerHTML = '<p class="dim" style="margin:0">Choose two runs and press Compare, or pick one of the quick comparisons above.</p>';
+  else if (!df.rep.res) $('dfOut').innerHTML = '<p class="dim" style="margin:0">Choose two runs and press Compare, or pick one of the quick comparisons above.</p>' + dfHistory({ links: true });
 }
 // One-click comparisons: for every hunt that has run at least twice, its latest run against the one before.
 function dfQuick() {
