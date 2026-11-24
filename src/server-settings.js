@@ -58,6 +58,8 @@ function allowedHosts(s = settings()) {
   const port = s.port, set = new Set();
   const add = (h) => { set.add(`${h}:${port}`.toLowerCase()); if (port === 80) set.add(String(h).toLowerCase()); };
   ['localhost', '127.0.0.1', '[::1]'].forEach(add);
+  // Extra names the server is reached by behind a reverse proxy (comma-separated, bare host names as the proxy forwards them).
+  String(process.env.KB_ALLOWED_HOSTS || '').split(',').map((h) => h.trim().toLowerCase()).filter(Boolean).forEach((h) => set.add(h));
   if (!isLoopbackHost(s.host)) {
     if (s.host !== '0.0.0.0') add(s.host);
     else localAddresses().forEach((a) => add(a.address));
