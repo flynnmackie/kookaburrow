@@ -1,5 +1,5 @@
 // Name: Executables - Windows programs and libraries (PE)
-// Description: Every Windows PE file by its content, whatever it is called: programs, DLLs and drivers. Use it to list all executables in a folder, or to find a program that was renamed.
+// Description: Every Windows PE file by content, whatever its name: programs, DLLs and drivers.
 import "pe"
 
 rule KB_PE_Any_Windows_Binary

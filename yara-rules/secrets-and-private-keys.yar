@@ -1,5 +1,5 @@
 // Name: Files - Secrets, private keys and credentials
-// Description: Private keys, cloud access keys and files that hold passwords in clear text. Finds credentials left on a system, which an attacker would collect first. Run it over home folders, web roots and backup folders.
+// Description: Private keys, cloud access keys and passwords in clear text.
 
 rule KB_Private_Key_File
 {

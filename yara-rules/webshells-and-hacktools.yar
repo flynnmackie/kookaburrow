@@ -1,5 +1,5 @@
 // Name: Web shells and well-known attack tool strings
-// Description: Script files that run commands from web requests (PHP, ASP.NET, JSP), and programs or scripts that contain the names of widely used attack tools. Run it over web roots and over folders where a user could write.
+// Description: Webshells, and scripts or programs naming well-known attack tools.
 
 rule KB_Webshell_PHP_Generic
 {

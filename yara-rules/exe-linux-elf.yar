@@ -1,5 +1,5 @@
 // Name: Executables - Linux programs and libraries (ELF)
-// Description: Every ELF file by its header: Linux programs, shared libraries and kernel modules. Use it to list all executables in a folder or to find a binary with a harmless name.
+// Description: Every ELF file by header: Linux programs, shared libraries and kernel modules.
 
 rule KB_ELF_Any_Binary
 {

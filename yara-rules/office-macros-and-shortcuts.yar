@@ -1,5 +1,5 @@
 // Name: Documents - Office macros, shortcuts and script launchers
-// Description: Office files that contain macros, Windows shortcut files, and HTML applications: the usual first-stage files of a phishing attack. Run it over Downloads, Desktop, Temp and mail folders.
+// Description: Office macros, shortcut files and HTML applications: typical phishing first stage.
 
 rule KB_Office_Macro_Document
 {

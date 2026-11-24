@@ -1,5 +1,5 @@
 // Name: Files - Archives and disk images
-// Description: Every archive or container by its header: zip, 7-Zip, RAR, gzip, bzip2, xz, tar, cab, ISO and VHD files. Finds staged data and renamed archives.
+// Description: Archives and disk images by header (zip, 7-Zip, RAR, gzip, tar, ISO, VHD). Finds staged data and renamed archives.
 
 rule KB_Archive_Any
 {

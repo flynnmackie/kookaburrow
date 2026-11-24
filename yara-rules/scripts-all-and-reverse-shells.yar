@@ -1,5 +1,5 @@
 // Name: Scripts - All script files, and reverse shell commands
-// Description: Script files by their content (shell, Python, Perl, PowerShell, batch, VBScript, JScript) to list every script in a folder, and shell or script one-liners that open a reverse shell.
+// Description: Scripts by content (shell, Python, Perl, PowerShell, batch, VBScript, JScript), and reverse-shell one-liners.
 
 rule KB_Script_Any
 {

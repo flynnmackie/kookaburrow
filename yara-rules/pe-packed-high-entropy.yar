@@ -1,5 +1,5 @@
 // Name: Executables - Packed or encrypted programs (high entropy)
-// Description: Windows programs with a large section that looks random, which is what packers, crypters and embedded payloads produce. Also matches some legitimate installers and compressed resources.
+// Description: Programs with a large random-looking section, as packers and crypters produce. Also matches some legitimate installers.
 import "pe"
 import "math"
 

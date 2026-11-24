@@ -1,5 +1,5 @@
 // Name: Files - Executables hidden inside other files
-// Description: Files that are not programs themselves but contain a Windows or Linux program, such as a dropper holding its payload, or an executable appended to a document or image.
+// Description: Files that are not programs but contain one: droppers, or an executable appended to a document or image.
 
 rule KB_Embedded_PE_In_Other_File
 {

@@ -1,5 +1,5 @@
 // Name: Executables - Windows programs with no digital signature
-// Description: PE files that carry no Authenticode signature. Most of a clean system is signed, so this is a short list on a server and a useful one in user folders and temp directories.
+// Description: PE files with no Authenticode signature. A short list on a server; useful in user and temp folders.
 import "pe"
 
 rule KB_PE_Unsigned

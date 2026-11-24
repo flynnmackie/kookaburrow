@@ -1,5 +1,5 @@
 // Name: Scripts - Suspicious PowerShell
-// Description: PowerShell scripts and command lines that decode, download or run hidden code. Run it over script folders, profiles, scheduled task folders and temp directories.
+// Description: PowerShell that decodes, downloads or runs hidden code.
 
 rule KB_PowerShell_Encoded_Or_Hidden
 {

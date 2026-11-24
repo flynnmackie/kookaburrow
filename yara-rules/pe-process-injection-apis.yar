@@ -1,5 +1,5 @@
 // Name: Executables - Process injection and credential dumping APIs
-// Description: Windows programs that import the API calls used to write into other processes or read their memory. Plenty of legitimate software does this (debuggers, security tools); treat a hit in a user folder or temp directory as a lead.
+// Description: Programs that import process-injection or memory-reading APIs. Common in legitimate tools; a hit in a user or temp folder is a lead.
 import "pe"
 
 rule KB_PE_Imports_Process_Injection
