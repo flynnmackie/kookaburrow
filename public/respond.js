@@ -4,7 +4,7 @@
 // and the values you type for an action's parameters are used for that run only (never stored or logged).
 // Shares helpers with app.js: api, esc, $, toast, go, isActive, metaIcons, VERIFIED, highlight, bbFmt, huntStatus, huntElapsed, huntName.
 const br = { runs: [], sel: null, tab: 'details' };
-const BR_HINT = '<p class="dim" style="margin:0">Select a response to see its files, errors and downloads.</p>';
+const BR_HINT = '<p class="dim" style="margin:0">Select a response.</p>';
 let respPoll;
 
 async function loadRespond() {
@@ -22,7 +22,7 @@ function renderRespList() {
     ? `<table class="bh"><thead><tr><th>Response</th><th>Run by</th><th>Status</th><th>Started</th><th>Finished</th><th>Elapsed</th><th></th></tr></thead><tbody>${br.runs.map((r) => `<tr class="bh-row ${r.id === br.sel ? 'on' : ''}" data-id="${esc(r.id)}">
         <td class="bh-name">${esc(huntName(r))}${schedTag(r)}</td><td>${r.startedBy ? esc(r.startedBy) : '<span class="dim">-</span>'}</td><td>${huntStatus(r)}</td>
         <td class="dim">${esc(new Date(r.startedAt).toLocaleString())}</td><td class="dim">${r.finishedAt ? esc(new Date(r.finishedAt).toLocaleString()) : '-'}</td><td class="dim">${esc(huntElapsed(r))}</td><td class="bh-del">${r.status === 'running' && !r.cancelRequested ? `<a class="dl bad" data-cancel="${esc(r.id)}" data-perm="actions.run" data-perm-what="cancel responses" title="Stop this run">Cancel</a> ` : ''}<a class="dl bad" data-del="${esc(r.id)}" data-perm="actions.run" data-perm-what="delete responses" title="Delete this response and its output folder">Delete</a></td></tr>`).join('')}</tbody></table>`
-    : '<p class="dim" style="margin:0">No responses yet. Use New Response to run actions on your hosts.</p>';
+    : '<p class="dim" style="margin:0">No responses yet.</p>';
 }
 async function showResponse(id) {
   br.sel = id; renderRespList();
@@ -149,12 +149,12 @@ function rmRenderTargetList() {
   const list = rm.hosts.filter((h) => ids.has(h.id));
   rmEl('TargetsHead').textContent = `Will run against ${list.length} host${list.length === 1 ? '' : 's'}`;
   rmEl('Targets').innerHTML = list.map((h) => `<div class="pick"><span class="pn">${esc(h.name)}</span><span class="pt">${esc(h.address)}</span><span class="proto-${h.protocol === 'ssh' ? 'ssh' : 'winrm'}">${h.protocol === 'ssh' ? 'SSH' : 'WinRM'}</span><button type="button" class="unpick" data-unpick-host="${esc(h.id)}" title="Remove this host from the response" aria-label="Remove">×</button></div>`).join('')
-    || '<p class="dim" style="margin:6px 10px">No hosts selected yet. Choose them on the Who tab.</p>';
+    || '<p class="dim" style="margin:6px 10px">No hosts selected.</p>';
   // and what will run on them
   const items = rm.actions.filter((a) => rm.selA.has(a.id));
   rmEl('ItemsHead').textContent = `${items.length} action${items.length === 1 ? '' : 's'} to run`;
   rmEl('Items').innerHTML = items.map((a) => `<div class="pick"><span class="pn" title="${esc(a.description)}">${esc(a.name)}</span>${metaIcons(a)}<span class="pt">${a.type === 'bash' ? 'Linux' : 'PowerShell'}</span><button type="button" class="unpick" data-unpick="${esc(a.id)}" title="Remove this action from the response" aria-label="Remove">×</button></div>`).join('')
-    || '<p class="dim" style="margin:6px 10px">No actions selected yet. Choose them on the Actions tab.</p>';
+    || '<p class="dim" style="margin:6px 10px">No actions selected.</p>';
 }
 const RM_ORDER = ['who', 'act', 'params', 'name'];
 rmEl('Next').onclick = () => { const cur = document.querySelector('#rmTabs .on')?.dataset.pane; rmTab(RM_ORDER[Math.min(RM_ORDER.indexOf(cur) + 1, RM_ORDER.length - 1)]); };

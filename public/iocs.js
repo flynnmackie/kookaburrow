@@ -35,7 +35,7 @@ function renderIocs() {
         <span class="ioc-badge">${iocBadge(l)}</span><span class="ioc-meta dim">${esc(types)}</span><span class="ioc-by dim">${esc(l.createdBy || '')} · ${esc(iocWhen(l.createdAt))}</span>
         <span class="ioc-acts"><a data-iocscan="${esc(l.id)}" title="Look through the hunt output again">Rescan</a><a class="bad" data-iocdel="${esc(l.id)}" data-perm="hunts.run" data-perm-what="delete IOC lists">Delete</a></span></div>
       ${open ? `<div class="ioc-body">${l.note ? `<div class="dim" style="margin-bottom:6px">${esc(l.note)}</div>` : ''}${iocItems(l)}${iocMatches(l, m)}</div>` : ''}</div>`;
-  }).join('') || '<p class="dim" style="margin:6px 0 0">No IOC lists yet. Press Add IOC list to upload one.</p>';
+  }).join('') || '<p class="dim" style="margin:6px 0 0">No IOC lists yet.</p>';
   decorateLocks($('iocLists'));
 }
 function iocItems(l) {

@@ -13,7 +13,7 @@ async function loadReports() {
           <a class="dl" href="/api/runs/${esc(r.runId)}/report?download=1" download data-perm="hunts.export" data-perm-what="download reports">Download</a> ·
           <a class="dl" data-regen="${esc(r.runId)}" data-perm="hunts.export" data-perm-what="generate reports" title="Make the report again from the run's current data">Regenerate</a> ·
           <a class="dl bad" data-delrep="${esc(r.runId)}" data-perm="hunts.run" data-perm-what="delete reports">Delete</a></td></tr>`).join('')}</tbody></table>`
-    : '<p class="dim" style="margin:0">No reports yet. Use Generate report to make one from a hunt or response.</p>';
+    : '<p class="dim" style="margin:0">No reports yet.</p>';
 }
 $('rpList').onclick = async (e) => {
   const regen = e.target.closest('[data-regen]'), del = e.target.closest('[data-delrep]');

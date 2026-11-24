@@ -16,7 +16,7 @@ async function loadElasticExtras(s) {
       : st.installed === true ? `<span class="ok">Installed</span> for ${esc((st.patterns || []).join(', '))}${st.upToDate === false ? ` <span class="bad">(the saved index prefix is now ${esc(s.index)}: install again to update it)</span>` : ''}.`
       : st.installed === false ? '<span class="st-warn">Not installed.</span> New indexes are created with guessed (text) fields until it is.'
       : esc(st.note || 'Not known.');
-    $('elDashInfo').textContent = `${d.dashboards.length} dashboards (${d.dashboards.map((x) => x.title.replace(/^Kookaburrow - /, '')).join(', ')}), ${d.visualizations} visualizations, ${d.searches} saved searches and a data view. Needs Kibana.`;
+    $('elDashInfo').textContent = `${d.dashboards.length} dashboards, ${d.visualizations} visualizations, ${d.searches} saved searches and a data view.`;
   } catch (e) { $('elTemplate').textContent = e.message; }
 }
 window.loadElasticExtras = loadElasticExtras;

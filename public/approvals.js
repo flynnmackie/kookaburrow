@@ -38,7 +38,7 @@ async function loadApprovals() {
   clearTimeout(apPoll);
   if (isActive('burrow/approvals')) apPoll = setTimeout(loadApprovals, 10000);
 }
-const apDetailHint = () => { $('apDetail').innerHTML = '<p class="dim" style="margin:0">Click a request above to see what it will run, on which hosts, and to approve or reject it.</p>'; };
+const apDetailHint = () => { $('apDetail').innerHTML = '<p class="dim" style="margin:0">Select a request.</p>'; };
 function apRenderList() {
   document.querySelectorAll('#apFilter button').forEach((b) => b.classList.toggle('on', b.dataset.f === ap.filter));
   const rows = ap.items.filter((a) => ap.filter === 'all' || a.status === 'pending');
@@ -101,7 +101,7 @@ function asRender() {
   const editable = can('system.manage'), s = as.settings;
   setSwitch('asEnabled', s.enabled);
   $('asEnabledLabel').textContent = `Approvals: ${s.enabled ? 'On' : 'Off'}`;
-  $('asEnabledNote').textContent = s.enabled ? 'Running an action sends a request first' : 'Actions run as soon as they are started';
+  $('asEnabledNote').textContent = '';
   $('asBody').classList.toggle('hs-off', !s.enabled);
   document.querySelectorAll('input[name=asScope]').forEach((r) => { r.checked = r.value === as.scope; r.disabled = !editable; });
   $('asActions').hidden = as.scope === 'all';

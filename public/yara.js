@@ -18,11 +18,11 @@ const yrCheck = (c) => (!c ? '' : c.clash?.length ? `<span class="badge orange" 
 
 function renderYara() {
   const b = yr.built || {}, s = yr.scanner || {};
-  const joined = !b.files ? '<span class="bad">No rules are enabled</span>, so the YARA collections have no <code>kb-rules.yar</code> to run with.'
+  const joined = !b.files ? '<span class="bad">No rules are enabled</span>.'
     : `<b>${b.rules}</b> rule${b.rules === 1 ? '' : 's'} from <b>${b.files}</b> file${b.files === 1 ? '' : 's'} in <code>kb-rules.yar</code> ${b.check?.ok === true ? '<span class="badge green">compiles</span>' : b.check?.ok === false ? `<span class="badge red" title="${esc(b.check.error || '')}">does not compile</span> <span class="bad">${esc(b.check.error || '')}</span>` : '<span class="badge grey">not checked</span>'}`;
   $('yrStatus').innerHTML = `<div>${joined}</div>
-    <div class="dim">${s.yara64 ? '<code>yara64.exe</code> is uploaded.' : '<span class="bad"><code>yara64.exe</code> is not uploaded yet</span>: add it on <a href="#settings/binaries">Binaries</a> (from the YARA releases on GitHub) before running a YARA hunt.'} ${yr.compiler ? `Rules are compiled here with ${esc(yr.compiler)}.` : 'Rules are not compiled on this server (no YARA here), so a mistake only shows when a hunt runs.'}</div>`;
-  if (!yr.files.length) { $('yrList').innerHTML = '<p class="dim" style="margin:10px 0 0">No rule files yet. Press Add rules to upload or paste some.</p>'; return; }
+    <div class="dim">${s.yara64 ? '<code>yara64.exe</code> is uploaded.' : '<span class="bad"><code>yara64.exe</code> is not uploaded</span>: add it on <a href="#settings/binaries">Binaries</a>.'} ${yr.compiler ? `Rules are compiled here with ${esc(yr.compiler)}.` : 'Rules are not compiled on this server; mistakes show only when a hunt runs.'}</div>`;
+  if (!yr.files.length) { $('yrList').innerHTML = '<p class="dim" style="margin:10px 0 0">No rule files yet.</p>'; return; }
   const may = can('collections.manage');
   $('yrList').innerHTML = `<table class="bh yr-tbl"><thead><tr><th></th><th>Rule file</th><th class="num">Rules</th><th>Check</th><th class="num">Size</th><th>Added</th><th></th></tr></thead><tbody>${yr.files.map((f) => {
     const open = yr.open.has(f.id), t = yr.text.get(f.id);

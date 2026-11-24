@@ -13,7 +13,7 @@ function ssoBody() {
 function ssoShowSwitch() {
   const on = ssoOn();
   $('ssoEnabledLabel').textContent = `Single sign-on: ${on ? 'On' : 'Off'}`;
-  $('ssoEnabledNote').textContent = on ? 'The sign-in page shows the button once this is saved.' : 'Only local accounts can sign in.';
+  $('ssoEnabledNote').textContent = on ? '' : 'Only local accounts can sign in.';
 }
 function ssoShowRedirect() {
   const u = $('ssoPublicUrl').value.trim().replace(/\/+$/, '');

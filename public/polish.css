@@ -318,3 +318,99 @@ table .act.sec, table button.act.sec { min-height:22px; padding:1px 10px; font-s
 .rs-adv.ok, .rs-adv.warn, .rs-adv.bad { color:var(--text); background:none; }
 .rs-adv.ok { border-left-color:var(--ok); } .rs-adv.warn { border-left-color:var(--orange); } .rs-adv.bad { border-left-color:var(--bad); }
 .hd-warn, .um-lock, .bl-note, .smb-warn, .smb-note { color:var(--text); }
+
+/* ---- Readability pass (the app is drawn at 75%, so these sizes are what ends up 25% smaller on screen) ---- */
+/* Headings, top bar and the side menu are larger everywhere. */
+h2 { font-size:16.5px; }
+#topnav button { font-size:15px; }
+#topnav button.right { font-size:14px; height:30px; }
+#sidenav { width:194px; }
+#sidenav button { font-size:15.5px; padding:5px 14px; white-space:nowrap; }
+#sidenav button.sub { padding-left:26px; }
+#sidenav button.sidehead { font-size:13px; padding:5px 14px; margin-top:8px; }
+#sidenav button.sidehead .chev { font-size:11px; width:12px; }
+#sidenav button.sidelink { font-size:13.5px; padding:5px 14px; }
+#sidenav .empty, #sidenav .empty.sub { font-size:14px; }
+/* Pages that are mostly settings, forms and short lists are enlarged as a whole (text, controls and spacing together). The text-heavy
+   pages stay small on purpose: collections, actions, binaries, user management, everything under Burrow!, and the hunt/results logs.
+   The Shell terminal is left alone too, because the terminal measures its own character grid. */
+.page:not(:is(
+  [id="settings/view-collections"], [id="settings/view-actions"], [id="settings/binaries"], [id="settings/user-management"],
+  [id^="burrow/"], [id="output/log"], [id="output/json"], [id="shell/shell"]
+)) { zoom:1.15; }
+/* Shell host list in the side menu */
+#sidenav button.shgrp { font-size:12.5px; }
+.shellhost .sh-ip { font-size:13px; }
+.sidesearch input { font-size:14px; }
+#sidenav .sidesearch button.act { font-size:14px; }
+
+/* ---- User Management: clearer sections ----
+   Same tokens as the rest of the app; the changes are structure (left-aligned sections, a bordered block per permission area) and
+   state (what is granted reads at a glance, what is not recedes). */
+/* Users / roles list */
+.um-list { background:var(--panel); }
+.um-item { padding:10px 14px; }
+.um-item .um-name { font-size:14px; }
+.um-item.on { background:var(--blue-soft); box-shadow:inset 3px 0 0 var(--blue); }
+.um-sub { gap:5px; margin-top:5px; }
+.um-chip { font-size:11px; padding:1px 8px; color:var(--dim); background:var(--panel2); border:1px solid var(--line-hi); }
+.um-chip.admin { color:var(--accent-text); background:var(--blue-soft); border-color:var(--blue-line); }
+
+/* Detail panel: the title block is separated from the sections below it */
+.um-detail { background:var(--panel); padding:18px 22px 22px; }
+.um-title { text-align:left; font-size:19px; margin-bottom:3px; }
+.um-detail > .dim { text-align:left; margin-bottom:0 !important; padding-bottom:14px; border-bottom:1px solid var(--line); }
+
+/* Section headings (Members, Roles, Password, Permissions): left-aligned with a marker, not a faint centred label */
+.um-detail .hd-label { justify-content:flex-start; text-align:left; margin:26px 0 10px; padding:1px 0 1px 10px; border-left:3px solid var(--blue); font-size:13px; font-weight:600; color:var(--text); }
+.um-detail .hd-label::before, .um-detail .hd-label::after { display:none; }
+.um-detail .hd-label .dim { font-weight:400; font-size:12px; margin-left:4px; color:var(--dim); }
+
+/* Each permission area is its own block with a header bar and a count */
+.um-group { margin-top:14px; border:1px solid var(--line-hi); border-radius:var(--r-m); overflow:hidden; }
+.um-ghead { justify-content:flex-start; margin:0; padding:7px 12px; background:var(--panel2); border-bottom:1px solid var(--line-hi); }
+.um-ghead b { font-size:13px; color:var(--text); }
+.um-ghead .dim { margin-left:auto; padding:0 8px; font-size:11.5px; color:var(--dim); background:var(--inset); border:1px solid var(--line); border-radius:999px; }
+.um-group .um-perms { border:0; border-radius:0; background:var(--panel); }
+
+/* Rows: granted = full strength with a green marker, not granted = quieter. Same for roles on a user. */
+.um-perm { padding:8px 12px; box-shadow:inset 3px 0 0 transparent; }
+.um-perm > span > b { font-size:13px; font-weight:600; }
+.um-inc { font-size:11.5px; color:var(--dim); margin-top:1px; }
+.um-perm:has(input:checked) { box-shadow:inset 3px 0 0 var(--ok); }
+.um-perm:has(input:not(:checked)) > span { opacity:.6; }
+.um-roles .um-perm { padding:10px 14px; }
+.um-roles .um-perm:has(input:checked) { background:var(--blue-soft); box-shadow:inset 3px 0 0 var(--blue); }
+.um-roles .um-perm:has(input:not(:checked)) > span { opacity:.6; }
+.um-perm.um-master { background:var(--blue-soft); box-shadow:inset 3px 0 0 var(--blue); border-color:var(--blue-line); }
+.um-perm.um-on:hover { background:var(--hover); }
+.um-roles .um-perm.um-on:hover { background:var(--hover); }
+
+/* Notices and action rows get room above them */
+.um-lock { margin-top:10px; }
+.um-actions { margin-top:12px; }
+.um-detail .um-actions, .um-detail .um-pw { justify-content:flex-start; }
+.um-detail .um-msg { text-align:left; }
+.um-detail .fl { text-align:left; }
+.um-detail input[type=text], .um-detail input[type=password] { margin-left:0; margin-right:auto; }
+.um-detail .um-chips { justify-content:flex-start; }
+
+/* Users / Roles switch: two pill buttons, no tab underline */
+.um-bar #umTabs { width:auto; margin:0; padding:0; gap:8px; border:0; border-radius:0; background:none; overflow:visible; justify-content:center; }
+.um-bar #umTabs button { flex:0 0 auto; margin:0; padding:5px 22px; font:500 15px var(--f-ui); color:var(--dim); background:transparent; border:1px solid var(--line-hi); border-radius:999px; box-shadow:none; }
+.um-bar #umTabs button:hover { color:var(--text); background:var(--hover); }
+.um-bar #umTabs button.on { color:#fff; background:var(--blue-soft); border-color:var(--blue); box-shadow:none; }
+
+/* User Management: a compact list so the detail panel gets the room */
+.um-layout { grid-template-columns:200px minmax(0, 1fr); gap:14px; }
+.um-item { padding:6px 12px; }
+.um-item .um-name { font-size:14px; line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.um-sub { margin-top:2px; gap:4px; line-height:1.3; }
+.um-chip { padding:0 7px; line-height:1.5; }
+.um-detail .um-pw input[type=password] { margin:0; }
+#umDetail .um-pw, #umDetail .um-actions { justify-content:flex-start; }
+
+/* Side menu group titles use the same light blue as Burrow! in the top bar */
+#sidenav button.sidehead, #sidenav button.sidehead .chev, #sidenav button.shgrp { color:var(--accent-text); }
+#sidenav button.sidehead:hover, #sidenav button.shgrp:hover { color:#fff; }
+#sidenav button.sidehead:hover .chev { color:#fff; }

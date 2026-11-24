@@ -189,12 +189,12 @@ const loaders = {
 };
 
 // Side menu. Pages with a group sit under a titled dropdown.
-// Every dropdown starts closed; the ones you open stay open across refreshes (kept in localStorage).
-const OPEN_KEY = 'kb.openGroups';
-const openGroups = new Set();
-try { JSON.parse(localStorage.getItem(OPEN_KEY) || '[]').forEach((k) => openGroups.add(k)); } catch { /* storage unavailable: all closed */ }
-function saveOpenGroups() {
-  try { localStorage.setItem(OPEN_KEY, JSON.stringify([...openGroups])); } catch { /* ignore */ }
+// Every dropdown starts open; the ones you close stay closed across refreshes (kept in localStorage).
+const CLOSED_KEY = 'kb.closedGroups';
+const closedGroups = new Set();
+try { JSON.parse(localStorage.getItem(CLOSED_KEY) || '[]').forEach((k) => closedGroups.add(k)); } catch { /* storage unavailable: all open */ }
+function saveClosedGroups() {
+  try { localStorage.setItem(CLOSED_KEY, JSON.stringify([...closedGroups])); } catch { /* ignore */ }
 }
 let currentTab = null, currentSlug = null;
 function renderSide() {
@@ -205,7 +205,7 @@ function renderSide() {
   if (!tab.pages.length) { $('sidenav').innerHTML = '<div class="empty">Nothing here yet</div>'; return; }
   let html = '', last = null;
   const heading = (name) => {
-    const open = openGroups.has(`${tab.id}/${name}`);
+    const open = !closedGroups.has(`${tab.id}/${name}`);
     html += `<button class="sidehead" data-group="${esc(`${tab.id}/${name}`)}" aria-expanded="${open}"><span class="chev">${open ? '▾' : '▸'}</span>${esc(name)}</button>`;
     return open;
   };
@@ -219,7 +219,7 @@ function renderSide() {
     const key = group ? `${tab.id}/${group}` : null;
     if (group && group !== last) heading(group);
     last = group || null;
-    if (key && !openGroups.has(key) && currentSlug !== `${tab.id}/${pid}`) continue; // the page you are on always shows
+    if (key && closedGroups.has(key) && currentSlug !== `${tab.id}/${pid}`) continue; // the page you are on always shows
     const locked = !pageAllowed(`${tab.id}/${pid}`);
     html += `<button data-tab="${tab.id}" data-page="${pid}" class="${group ? 'sub' : ''} ${currentSlug === `${tab.id}/${pid}` ? 'on' : ''} ${locked ? 'locked' : ''}"${locked ? ` title="Locked: needs ${esc(permLabel(PAGE_PERM[`${tab.id}/${pid}`]))}"` : ''}>${locked ? LOCK : ''}${esc(label)}</button>`;
   }
@@ -283,8 +283,8 @@ NAV.forEach((t, i) => {
   const head = e.target.closest('button[data-group]');
   if (head) { // titles only open/close their group
     const key = head.dataset.group;
-    if (openGroups.has(key)) openGroups.delete(key); else openGroups.add(key);
-    saveOpenGroups();
+    if (closedGroups.has(key)) closedGroups.delete(key); else closedGroups.add(key);
+    saveClosedGroups();
     renderSide();
     return;
   }
@@ -683,7 +683,7 @@ function mnRenderLog() {
   $('mnLog').innerHTML = mnAttempts.map((a) => `<div class="mnrow">
       <span class="${a.ok ? 'ok' : 'bad'}">${a.ok ? '✓' : '✗'}</span> <b>${esc(a.name)}</b> <span class="dim">${esc(a.address)} · ${a.protocol === 'ssh' ? 'SSH' : 'WinRM'}</span><span class="mnwhen">${esc(a.when)}</span>
       <div class="mnwhy ${a.ok ? 'dim' : 'bad'}">${esc(a.text)}</div></div>`).join('')
-    || '<p class="dim" style="margin:0">Hosts you add here appear in this list, along with the reason when a login fails.</p>';
+    || '';
 }
 async function mnSubmit() {
   if (mnBusy) return;
@@ -1307,13 +1307,13 @@ async function loadBurrowHunts() {
   if (runs.some((r) => r.status === 'running') && isActive('burrow/hunt')) huntPoll = setTimeout(loadBurrowHunts, 2000);
 }
 let huntPoll;
-const BH_HINT = '<p class="dim" style="margin:0">Select a hunt to see its files, errors and downloads.</p>';
+const BH_HINT = '<p class="dim" style="margin:0">Select a hunt.</p>';
 function renderHuntList() {
   $('bhList').innerHTML = bh.runs.length
     ? `<table class="bh"><thead><tr><th>Hunt</th><th>Run by</th><th>Status</th><th>Started</th><th>Finished</th><th>Elapsed</th><th></th></tr></thead><tbody>${bh.runs.map((r) => `<tr class="bh-row ${r.id === bh.sel ? 'on' : ''}" data-id="${esc(r.id)}">
         <td class="bh-name">${esc(huntName(r))}${schedTag(r)}</td><td>${r.startedBy ? esc(r.startedBy) : '<span class="dim">-</span>'}</td><td>${huntStatus(r)}</td>
         <td class="dim">${esc(new Date(r.startedAt).toLocaleString())}</td><td class="dim">${r.finishedAt ? esc(new Date(r.finishedAt).toLocaleString()) : '-'}</td><td class="dim">${esc(huntElapsed(r))}</td><td class="bh-del">${r.status === 'running' && !r.cancelRequested ? `<a class="dl bad" data-cancel="${esc(r.id)}" data-perm="hunts.run" data-perm-what="cancel hunts" title="Stop this run">Cancel</a> ` : ''}<a class="dl bad" data-del="${esc(r.id)}" data-perm="hunts.run" data-perm-what="delete hunts" title="Delete this hunt and its output folder">Delete</a></td></tr>`).join('')}</tbody></table>`
-    : '<p class="dim" style="margin:0">No hunts yet. Use New Hunt to run collections against your hosts.</p>';
+    : '<p class="dim" style="margin:0">No hunts yet.</p>';
 }
 // A collection or action that needs a binary that has not been uploaded cannot be picked: clicking it says what is missing.
 function showMissingBinary(item) {
@@ -1623,12 +1623,12 @@ function hmRenderTargetList() {
   const list = hm.hosts.filter((h) => ids.has(h.id));
   hmEl('TargetsHead').textContent = `Will run against ${list.length} host${list.length === 1 ? '' : 's'}`;
   hmEl('Targets').innerHTML = list.map((h) => `<div class="pick"><span class="pn">${esc(h.name)}</span><span class="pt">${esc(h.address)}</span><span class="proto-${h.protocol === 'ssh' ? 'ssh' : 'winrm'}">${h.protocol === 'ssh' ? 'SSH' : 'WinRM'}</span><button type="button" class="unpick" data-unpick-host="${esc(h.id)}" title="Remove this host from the hunt" aria-label="Remove">×</button></div>`).join('')
-    || '<p class="dim" style="margin:6px 10px">No hosts selected yet. Choose them on the Who tab.</p>';
+    || '<p class="dim" style="margin:6px 10px">No hosts selected.</p>';
   // and what will run on them
   const items = hm.collections.filter((c) => hm.selC.has(c.id));
   hmEl('ItemsHead').textContent = `${items.length} collection${items.length === 1 ? '' : 's'} to run`;
   hmEl('Items').innerHTML = items.map((c) => `<div class="pick"><span class="pn" title="${esc(c.description)}">${esc(c.name)}</span>${metaIcons(c)}<span class="pt">${c.type === 'bash' ? 'Linux' : 'PowerShell'}</span><button type="button" class="unpick" data-unpick="${esc(c.id)}" title="Remove this collection from the hunt" aria-label="Remove">×</button></div>`).join('')
-    || '<p class="dim" style="margin:6px 10px">No collections selected yet. Choose them on the Collections tab.</p>';
+    || '<p class="dim" style="margin:6px 10px">No collections selected.</p>';
   // a collection that pulls back large files: say what will be switched on, and for which hosts, before the hunt runs
   const big = items.filter((c) => c.transfer === 'large'), win = list.filter((h) => h.protocol !== 'ssh'), lin = list.filter((h) => h.protocol === 'ssh');
   const names = (hs) => hs.slice(0, 4).map((h) => esc(h.name)).join(', ') + (hs.length > 4 ? ` and ${hs.length - 4} more` : '');
@@ -1891,7 +1891,7 @@ function renderUserMgmt() {
   decorateLocks(nb);
   $('umList').innerHTML = items.map((x) => `<div class="um-item ${um.mode === 'view' && x.id === um.sel[um.tab] ? 'on' : ''}" data-id="${esc(x.id)}">
       <div class="um-name">${esc(x.name || x.username)}${x.username === access.username ? ' <span class="dim">(you)</span>' : ''}${x.sso ? ' <span class="dim" title="Signs in through single sign-on">(SSO)</span>' : ''}</div>
-      <div class="um-sub">${users ? (x.roles.length ? x.roles.map((r) => umChip(um.roles.find((q) => q.id === r)?.name || r)).join('') : '<span class="dim">No roles</span>')
+      <div class="um-sub">${users ? (x.roles.length ? x.roles.map((r) => umChip(um.roles.find((q) => q.id === r)?.name || r, r === 'admin' ? 'admin' : '')).join('') : '<span class="dim">No roles</span>')
         : `${x.members.length} member${x.members.length === 1 ? '' : 's'} · ${x.all ? 'full access' : `${x.permissions.length} permissions`}`}</div></div>`).join('')
     || `<p class="dim" style="margin:6px 10px">No ${um.tab} yet.</p>`;
   $('umModal').hidden = um.mode !== 'new';
@@ -1912,7 +1912,7 @@ function umRoleBoxes(draft, locked) {
 
 function renderNewUser() {
   um.draft = um.draft || new Set();
-  $('umModalBody').innerHTML = `<div class="dim" style="margin-bottom:8px; text-align:center">The new user signs in with this username and password.</div>
+  $('umModalBody').innerHTML = `
     <span class="fl">Username</span><input id="umUser" type="text" autocomplete="off" spellcheck="false" placeholder="e.g. jsmith">
     <span class="fl">Password <span class="dim">(at least 8 characters)</span></span><input id="umPass" type="password" autocomplete="new-password">
     <div class="hd-label hd-label-dep">Roles</div>
@@ -2053,7 +2053,7 @@ async function loadHealthSettings() {
   hs.defaults = r.defaults; hs.limits = r.limits; hs.hosts = r.hosts; hs.enabled = r.settings.enabled;
   setSwitch('hsEnabled', hs.enabled);
   $('hsEnabledLabel').textContent = `Health monitoring: ${hs.enabled ? 'On' : 'Off'}`;
-  $('hsEnabledNote').textContent = hs.enabled ? 'Hosts are being checked' : 'No checks are running and the Health page and top-bar counts are off';
+  $('hsEnabledNote').textContent = hs.enabled ? '' : 'Monitoring is off';
   $('hsBody').classList.toggle('hs-off', !hs.enabled);
   hs.pingOn = new Set(r.hosts.filter((h) => !r.settings.pingOff.includes(h.id)).map((h) => h.id));
   hs.remoteOn = new Set(r.hosts.filter((h) => !r.settings.remoteOff.includes(h.id)).map((h) => h.id));
@@ -2352,7 +2352,7 @@ async function loadElastic() {
   const editable = can('system.manage');
   setSwitch('elEnabled', s.enabled);
   $('elEnabledLabel').textContent = `Send hunts by default: ${s.enabled ? 'On' : 'Off'}`;
-  $('elEnabledNote').textContent = s.enabled ? 'New hunts start with Send results to Elastic on. Each hunt can change it.' : 'New hunts start with it off. Each hunt can turn it on.';
+  $('elEnabledNote').textContent = '';
   $('elUrl').value = s.url; $('elAuth').value = s.auth; $('elIndex').value = s.index; $('elInsecure').checked = s.insecure; $('elCa').value = s.ca; $('elUser').value = s.username;
   $('elKey').value = ''; $('elPass').value = '';
   $('elKey').placeholder = s.hasApiKey ? '(saved: type to replace)' : 'Paste the key (encoded or id:key)';
@@ -2409,13 +2409,13 @@ async function loadCertificate() {
   const editable = can('system.manage');
   setSwitch('ceEnabled', st.enabled);
   $('ceEnabledLabel').textContent = `HTTPS: ${st.enabled ? 'On' : 'Off'}`;
-  $('ceEnabledNote').textContent = st.enabled ? 'Other machines are redirected to https://. This PC can still use plain http://.' : st.hasCert ? 'Turn it on to serve the certificate below.' : 'Generate a certificate first.';
+  $('ceEnabledNote').textContent = st.enabled ? '' : st.hasCert ? 'Turn it on to serve the certificate below.' : 'Generate a certificate first.';
   $('ceNames').value = (st.names.length ? st.names : ce.addrs).join('\n');
   $('ceNames').disabled = !editable;
   const c = st.cert, ca = st.ca;
   $('ceInfo').innerHTML = c
     ? `<div class="bd-facts"><div><span>Names and addresses</span>${esc(c.names.join(', '))}</div><div><span>Valid until</span>${esc(ceDate(c.notAfter))} <span class="dim" style="display:inline;text-transform:none">(${c.daysLeft} days)</span></div><div><span>Certificate fingerprint</span><code style="font-size:11px;word-break:break-all">${esc(c.fingerprint)}</code></div>${ca ? `<div><span>CA (trust this one)</span>${esc(ca.subject)}, until ${esc(ceDate(ca.notAfter))}<br><code style="font-size:11px;word-break:break-all">${esc(ca.fingerprint)}</code></div>` : ''}</div>`
-    : '<p class="dim" style="margin:0">No certificate yet. Check the names below and press Generate.</p>';
+    : '<p class="dim" style="margin:0">No certificate yet.</p>';
   $('ceAdvice').innerHTML = [...st.warnings.map((t) => `<div class="rs-adv warn">\u26A0 ${esc(t)}</div>`), ...(st.loadError ? [`<div class="rs-adv bad">${esc(st.loadError)}</div>`] : []), ...(!st.engine ? ['<div class="rs-adv bad">The bundled Python is not installed, so certificates cannot be generated. Run: npm run setup-winrm</div>'] : [])].join('');
   $('ceCa').hidden = !ca;
   $('ceGen').disabled = $('ceNewCa').disabled = $('ceAddMine').disabled = !editable || !st.engine;
@@ -2527,7 +2527,7 @@ function renderMonitor() {
     return;
   }
   const pe = fmtSecs(monSnap.summary.pingEveryMs / 1000), re = fmtSecs(monSnap.summary.portsEveryMs / 1000);
-  $('monSub').textContent = `Ping every ${pe}, WinRM / SSH port every ${re}. Green up, red down, dashed not monitored.`;
+  $('monSub').textContent = `Ping every ${pe}, WinRM / SSH port every ${re}.`;
   $('monSum').innerHTML = monCountsHtml(monSnap) + (monSnap.summary.excluded ? `<span class="dim" title="Change which hosts are monitored in Settings > System > Health Settings">${monSnap.summary.excluded} not monitored</span>` : '');
   const n = (ip) => ip.split('.').reduce((a, b) => a * 256 + Number(b), 0) || 0;
   const hosts = [...monSnap.hosts].sort((a, b) => n(a.address) - n(b.address) || a.address.localeCompare(b.address));
@@ -2547,7 +2547,7 @@ function renderMonitor() {
       </div>
       ${q ? `<div class="q-banner">⚠ ${qs === 'pending' ? 'QUARANTINING…' : qs === 'releasing' ? 'RELEASING…' : `QUARANTINED · ${q.until ? `until ${esc(new Date(q.until).toLocaleString([], { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }))}` : 'until released'}${q.by ? ` · by ${esc(q.by)}` : ''}`}</div>${q.lastError ? `<div class="q-err" title="${esc(q.lastError)}">Last release failed: ${esc(q.lastError)}</div>` : ''}` : ''}
       <div class="mon-foot"><span class="mon-btns"><button class="act sec mon-check" type="button" data-check="${esc(h.id)}" title="Ping this host and check its ${rm.label} port now">Check</button><button class="act mon-q ${q ? 'on' : ''}" type="button" data-q="${esc(h.id)}" data-qname="${esc(h.name)}" data-qon="${q ? 1 : ''}" ${qs === 'pending' || qs === 'releasing' ? 'disabled' : ''} data-perm="actions.run" data-perm-what="quarantine hosts" title="${q ? 'Lift the quarantine: restore this host\'s network access' : 'Isolate this host from the network with Host - Isolate'}">${qs === 'pending' ? 'Quarantining…' : qs === 'releasing' ? 'Releasing…' : q ? 'Unquarantine' : 'Quarantine'}</button></span>${hp.state === 'off' ? 'ping off' : `pinged ${ago(hp.checkedAt)}`} · ${rm.state === 'off' ? `${rm.label} check off` : `${rm.label} checked ${ago(rm.checkedAt)}`}</div></div>`;
-  }).join('') || '<p class="dim" style="margin:0">No saved hosts yet. Add and authenticate hosts under Host Management to monitor them.</p>';
+  }).join('') || '<p class="dim" style="margin:0">No saved hosts yet.</p>';
 }
 async function loadMonitor() {
   await fetchMonitor();
@@ -2684,7 +2684,7 @@ function renderShellMain() {
   $('shellHead').innerHTML = h
     ? `<span class="sh-title">${esc(h.name || h.hostname)}</span><span class="dim">${esc(h.address)} · ${h.protocol === 'ssh' ? 'SSH' : 'WinRM'}</span><span class="badge ${cls}">${label}</span>${shellCfg && !shellCfg.enabled ? '<span class="badge red" title="Turned off in Settings > System > Shell Settings">Shell access is off</span>' : shellDenied(shellHost) ? '<span class="badge red" title="Change this in Settings > System > Shell Settings">Not allowed for this host</span>' : ''}
        <span class="shell-actions"><button class="act sec" data-shell-act="Send file" data-perm="shell.files" data-perm-what="send files to hosts">Send file</button><button class="act sec" data-shell-act="Pull file" data-perm="shell.files" data-perm-what="pull files from hosts">Pull file</button><button class="act sec" data-shell-act="Quick hunt" data-perm="hunts.run" data-perm-what="run hunts">Quick hunt</button><button class="act sec" data-shell-act="Quick response" data-perm="actions.run" data-perm-what="run actions">Quick response</button></span>`
-    : '<span class="dim">Select a host on the left, then press Start shell.</span>';
+    : '<span class="dim">Select a host.</span>';
   for (const [id, s] of shells) s.el.hidden = id !== shellHost;
   $('termEmpty').hidden = !!sh;
   if (sh) { sh.fit.fit(); sh.term.focus(); }
@@ -3306,7 +3306,7 @@ function renderLog() {
         <span class="dim">${esc(new Date(r.startedAt).toLocaleString())}</span><span class="dim">${ok}/${r.results.length} ok · ${r.eventCount} event${r.eventCount === 1 ? '' : 's'}</span>
         <span class="lg-btns"><a href="/api/runs/${r.id}/log.csv" download data-stop="1" data-perm="hunts.export" data-perm-what="export logs" title="Download this hunt's log as CSV">Export CSV</a><a data-del="${r.id}" data-stop="1" data-perm="hunts.run" data-perm-what="delete hunt records">Delete</a></span></div>
       ${open ? `<div class="lg-body">${table}</div>` : ''}</div>`;
-  }).join('') || '<p class="dim" style="margin:0">No hunts yet. Use Burrow → Hunt to run collections against your hosts.</p>';
+  }).join('') || '<p class="dim" style="margin:0">No hunts yet.</p>';
 }
 async function toggleLog(id, to) {
   const r = logRuns.find((x) => x.id === id); if (!r) return;

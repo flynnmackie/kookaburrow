@@ -37,7 +37,7 @@ function wfItem(w) {
 }
 function renderWorkflows() {
   renderProcessors();
-  $('wfList').innerHTML = wf.workflows.map(wfItem).join('') || '<p class="dim" style="margin:0">No workflows yet. Press New Workflow to create one.</p>';
+  $('wfList').innerHTML = wf.workflows.map(wfItem).join('') || '<p class="dim" style="margin:0">No workflows yet.</p>';
 }
 
 $('wfList').onclick = async (e) => {
@@ -72,7 +72,7 @@ function wfRenderEditor() {
   const accepted = new Set(e.steps.flatMap((s) => wfProc(s.processor)?.accepts || []));
   $('wfColls').innerHTML = producers.length ? producers.map((c) => `<label class="wf-coll"><input type="checkbox" data-wf-coll="${esc(c.id)}" ${e.collectionIds.includes(c.id) ? 'checked' : ''}> ${esc(c.name)} <span class="dim">${esc(c.produces.join(', '))}${c.type === 'bash' ? ', Linux' : ''}</span></label>`).join('')
     : '<p class="dim" style="margin:0">No collection declares the files it produces.</p>';
-  $('wfSteps').innerHTML = e.steps.map(wfStepHtml).join('') || '<p class="dim" style="margin:0">No steps yet. Add one to process what the hunt collects.</p>';
+  $('wfSteps').innerHTML = e.steps.map(wfStepHtml).join('') || '<p class="dim" style="margin:0">No steps yet.</p>';
   const chosen = new Set(producers.filter((c) => e.collectionIds.includes(c.id)).flatMap((c) => c.produces));
   const warn = e.steps.length && chosen.size && ![...accepted].some((k) => chosen.has(k));
   $('wfWarn').innerHTML = warn ? '<div class="rs-adv warn">⚠ None of the chosen collections produce files these steps read.</div>' : '';

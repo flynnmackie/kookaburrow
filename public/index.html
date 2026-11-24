@@ -78,14 +78,14 @@
         <div class="bh-bar"><h2>Previous hunts <a href="#" class="doclink" data-doc="04-hunts.md#following-a-hunt">Guide</a></h2><button class="act" id="bhNew" data-perm="hunts.run" data-perm-what="run hunts">New Hunt</button></div>
         <div id="bhList"></div>
       </div>
-      <div class="card bh-detail" id="bhDetail"><p class="dim" style="margin:0">Click a hunt above to see what it ran, the files it pulled back, any errors, and to download its results.</p></div>
+      <div class="card bh-detail" id="bhDetail"><p class="dim" style="margin:0">Select a hunt.</p></div>
     </section>
     <section class="page" id="burrow/respond">
       <div class="card bh-top">
         <div class="bh-bar"><h2>Previous responses <a href="#" class="doclink" data-doc="05-responses.md#running-a-response">Guide</a></h2><button class="act" id="brNew" data-perm="actions.run" data-perm-what="run actions">New Response</button></div>
         <div id="brList"></div>
       </div>
-      <div class="card bh-detail" id="brDetail"><p class="dim" style="margin:0">Click a response above to see what it ran, its output files, any errors, and to download the results.</p></div>
+      <div class="card bh-detail" id="brDetail"><p class="dim" style="margin:0">Select a response.</p></div>
     </section>
     <section class="page" id="burrow/approvals">
       <div class="card bh-top">
@@ -93,17 +93,17 @@
         <p class="dim hs-sub" id="apNote"></p>
         <div id="apList"></div>
       </div>
-      <div class="card bh-detail" id="apDetail"><p class="dim" style="margin:0">Click a request above to see what it will run, on which hosts, and to approve or reject it.</p></div>
+      <div class="card bh-detail" id="apDetail"><p class="dim" style="margin:0">Select a request.</p></div>
     </section>
     <section class="page" id="burrow/workflow">
       <div class="card">
         <div class="bh-bar"><h2>Workflows <a href="#" class="doclink" data-doc="07-workflows-and-recurring.md#workflows">Guide</a></h2><button class="act" id="wfNew" data-perm="workflows.manage" data-perm-what="create workflows">New Workflow</button></div>
-        <p class="dim hs-sub">Collect, process on the server, send on. Attach one to a hunt with <b>Workflow</b> on the Automation tab of New Hunt.</p>
+        
         <div id="wfList"></div>
       </div>
       <div class="card">
         <h2>Processors</h2>
-        <p class="dim hs-sub">Server-side tools a workflow can run on what a hunt collected. Upload each tool under <a href="#settings/binaries">External &gt; Binaries</a>.</p>
+        <p class="dim hs-sub">Server-side tools for workflows. Upload under <a href="#settings/binaries">External &gt; Binaries</a>.</p>
         <div id="wfProcs"></div>
       </div>
     </section>
@@ -116,7 +116,7 @@
     <section class="page" id="settings/yara">
       <div class="card">
         <div class="ioc-top"><h2>YARA Rules</h2><button type="button" class="act" id="yrAdd" data-perm="collections.manage" data-perm-what="add YARA rules">Add rules</button></div>
-        <p class="dim hs-sub">Rule files for the <b>Yara - Scan Files</b> and <b>Yara - Scan Processes</b> collections. The enabled files are joined into <code>kb-rules.yar</code>, which every YARA hunt copies to the host with <code>yara64.exe</code>.</p>
+        <p class="dim hs-sub">Enabled files are joined into <code>kb-rules.yar</code> and copied to the host with <code>yara64.exe</code> for each YARA hunt.</p>
         <div class="yr-status" id="yrStatus"></div>
         <div class="yr-add" id="yrForm" hidden>
           <div class="yr-grid">
@@ -176,7 +176,7 @@
     </section>
     <section class="page" id="settings/user-management">
       <div class="card">
-        <div class="um-top"><h2>User Management <a href="#" class="doclink" data-doc="08-settings.md#users-and-roles">Guide</a></h2><p class="dim">Who can sign in, and what each role allows them to do.</p></div>
+        <div class="um-top"><h2>User Management <a href="#" class="doclink" data-doc="08-settings.md#users-and-roles">Guide</a></h2></div>
         <div class="um-bar"><span class="um-listtitle" id="umListTitle">Users:</span><div class="toggle" id="umTabs"><button type="button" data-t="users" class="on">Users</button><button type="button" data-t="roles">Roles</button></div><button class="act" id="umNew" type="button">New user</button></div>
         <div class="um-layout">
           <div class="um-list" id="umList"></div>
@@ -187,7 +187,7 @@
     <section class="page" id="settings/shell-settings">
       <div class="card">
         <h2>Shell Settings</h2>
-        <p class="dim hs-sub">Who may use interactive shells. Changes apply immediately.</p>
+        
         <div class="sw-row" data-perm="system.manage" data-perm-what="turn shell access on or off"><button class="switch" id="ssEnabled" type="button" role="switch" aria-checked="true" aria-label="Shell access"></button><b id="ssEnabledLabel">Shell access: On</b><span class="dim" id="ssEnabledNote"></span></div>
         <div id="ssBody">
           <div class="hs-block">
@@ -207,7 +207,7 @@
     <section class="page" id="settings/run-settings">
       <div class="card">
         <h2>Run Settings</h2>
-        <p class="dim hs-sub">Hosts a hunt or response works on at once. Applies to runs started afterwards. More is faster but loads the server and network.</p>
+        <p class="dim hs-sub">Hosts worked on at once. Applies to runs started afterwards.</p>
         <p class="rs-server" id="rsServer"></p>
         <div class="hs-block">
           <span class="fl">Hosts at once (per hunt or response)</span>
@@ -223,7 +223,7 @@
     <section class="page" id="settings/approvals">
       <div class="card">
         <h2>Approvals <a href="#" class="doclink" data-doc="05-responses.md#approvals">Guide</a></h2>
-        <p class="dim hs-sub">Hold actions until a second person approves them. When on, <b>Run</b> on Respond sends a request to <a href="#burrow/approvals">Burrow! &gt; Approvals</a> instead of starting. Give a role <b>Approve actions</b> in User Management to let its users decide. Quarantine and shells are not held.</p>
+        <p class="dim hs-sub">Hold actions until a second person approves them in <a href="#burrow/approvals">Burrow! &gt; Approvals</a>. Quarantine and shells are not held.</p>
         <div class="sw-row" data-perm="system.manage" data-perm-what="turn approvals on or off"><button class="switch" id="asEnabled" type="button" role="switch" aria-checked="false" aria-label="Approvals"></button><b id="asEnabledLabel">Approvals: Off</b><span class="dim" id="asEnabledNote"></span></div>
         <div id="asBody">
           <div class="hs-block">
@@ -245,7 +245,7 @@
     <section class="page" id="settings/server-settings">
       <div class="card">
         <h2>Server Settings <a href="#" class="doclink" data-doc="08-settings.md#server-settings">Guide</a></h2>
-        <p class="dim hs-sub">Listen address, port and allowed clients. Saving restarts the server. localhost is always allowed.</p>
+        <p class="dim hs-sub">Saving restarts the server. localhost is always allowed.</p>
         <div class="rs-adv warn" id="svFallback" hidden><span id="svFallbackText"></span> <a id="svFallbackDismiss" style="cursor:pointer">Dismiss</a></div>
         <p class="rs-server" id="svNow"></p>
         <div class="hs-block">
@@ -268,7 +268,7 @@
     <section class="page" id="settings/elastic">
       <div class="card">
         <h2>Elastic</h2>
-        <p class="dim hs-sub">Connection to Elasticsearch (also SOF-ELK: use its Elasticsearch port, 9200). Each hunt chooses whether to send on its Automation tab; this sets the default. <a href="#" class="doclink" data-doc="10-elastic.md#setting-up-elasticsearch-on-ubuntu">Setup guide</a> · <a href="#" class="doclink" data-doc="10-elastic.md#creating-the-kookaburrow-data-view">Kibana data view</a></p>
+        <p class="dim hs-sub">Elasticsearch connection (SOF-ELK: port 9200). Sets the default for each hunt's Automation tab. <a href="#" class="doclink" data-doc="10-elastic.md#setting-up-elasticsearch-on-ubuntu">Setup guide</a> · <a href="#" class="doclink" data-doc="10-elastic.md#creating-the-kookaburrow-data-view">Kibana data view</a></p>
         <div class="sw-row" data-perm="system.manage" data-perm-what="change whether hunts send by default"><button class="switch" id="elEnabled" type="button" role="switch" aria-checked="false" aria-label="Send hunts to Elastic by default"></button><b id="elEnabledLabel">Send hunts by default: Off</b><span class="dim" id="elEnabledNote"></span></div>
         <div class="hs-block">
           <span class="fl">Elasticsearch address</span>
@@ -287,11 +287,11 @@
         <div id="elAdvice"></div>
         <div class="hs-actions"><button class="act" id="elSave" type="button" data-perm="system.manage" data-perm-what="change Elastic settings">Save</button><button class="act sec" id="elTest" type="button" data-perm="system.manage" data-perm-what="test the Elastic connection">Test connection</button><span class="um-msg" id="elMsg"></span></div>
         <h3 style="margin:16px 0 4px;font-size:13px">Send a past hunt</h3>
-        <p class="dim" style="font-size:12.5px;margin:0 0 6px">Sends all of a finished hunt's rows. Sending again replaces the same documents, so nothing is duplicated.</p>
+        <p class="dim" style="font-size:12.5px;margin:0 0 6px">Sending again replaces the same documents.</p>
         <div class="hs-row"><select id="elRun" style="max-width:420px"></select><button class="act sec" id="elSend" type="button" data-perm="system.manage" data-perm-what="send a hunt to Elastic">Send</button></div>
         <p class="dim" id="elStatus" style="font-size:12.5px;margin:10px 0 0"></p>
         <h3 style="margin:18px 0 4px;font-size:13px">Index template <a href="#" class="doclink" data-doc="10-elastic.md#kibana-dashboards">Guide</a></h3>
-        <p class="dim" style="font-size:12.5px;margin:0 0 6px">Maps the fields the dashboards chart. Install it before the first hunt is sent: indexes that already exist keep their old mapping (delete them and send the hunts again).</p>
+        <p class="dim" style="font-size:12.5px;margin:0 0 6px">Install before the first hunt is sent: existing indexes keep their old mapping.</p>
         <p class="dim" id="elTemplate" style="font-size:12.5px;margin:0 0 6px"></p>
         <div class="hs-row"><button class="act sec" id="elTmplInstall" type="button" data-perm="system.manage" data-perm-what="install the index template">Install index template</button><a href="#" class="doclink" id="elTmplShow">Show the request</a></div>
         <pre class="code" id="elTmplReq" hidden style="max-height:220px;overflow:auto;font-size:11.5px;margin:6px 0 0"></pre>
@@ -303,12 +303,12 @@
     <section class="page" id="settings/sso">
       <div class="card">
         <h2>Single Sign-On</h2>
-        <p class="dim hs-sub">Sign in through an OpenID Connect provider such as authentik, Keycloak, Entra ID or Okta. Local accounts keep working. <a href="#" class="doclink" data-doc="08-settings.md#single-sign-on">Guide</a></p>
+        <p class="dim hs-sub">OpenID Connect sign-in. Local accounts keep working. <a href="#" class="doclink" data-doc="08-settings.md#single-sign-on">Guide</a></p>
         <div class="sw-row" data-perm="system.manage" data-perm-what="turn single sign-on on or off"><button class="switch" id="ssoEnabled" type="button" role="switch" aria-checked="false" aria-label="Single sign-on"></button><b id="ssoEnabledLabel">Single sign-on: Off</b><span class="dim" id="ssoEnabledNote"></span></div>
         <div class="hs-block">
           <span class="fl">Provider</span>
           <div class="hs-row"><input id="ssoIssuer" type="text" spellcheck="false" placeholder="https://authentik.lab.local/application/o/kookaburrow/" style="width:420px;max-width:100%"></div>
-          <div class="dim" style="font-size:12px;margin:-2px 0 6px">The issuer address. The provider's /.well-known/openid-configuration is found from it.</div>
+          
           <span class="fl">Client ID</span>
           <div class="hs-row"><input id="ssoClientId" type="text" spellcheck="false" autocomplete="off" style="width:320px;max-width:100%"></div>
           <span class="fl">Client secret</span>
@@ -322,7 +322,7 @@
           <span class="fl">Scopes</span>
           <div class="hs-row"><input id="ssoScopes" type="text" spellcheck="false" style="width:320px;max-width:100%"></div>
           <span class="fl">Claim that holds the user name</span>
-          <div class="hs-row"><input id="ssoClaim" type="text" spellcheck="false" style="width:240px"><span class="dim">for example preferred_username, email or upn</span></div>
+          <div class="hs-row"><input id="ssoClaim" type="text" spellcheck="false" style="width:240px"></div>
           <span class="fl">Users</span>
           <label class="dim" style="display:block;margin:2px 0"><input type="checkbox" id="ssoLink"> Sign in as the existing user with the same name (and link them to the provider)</label>
           <label class="dim" style="display:block;margin:2px 0"><input type="checkbox" id="ssoCreate"> Create a user when there is none. New users get the role <b>No Access</b> (no permissions) until an administrator gives them another.</label>
@@ -342,7 +342,7 @@
     <section class="page" id="settings/certificate">
       <div class="card">
         <h2>Certificate <a href="#" class="doclink" data-doc="08-settings.md#certificate">Guide</a></h2>
-        <p class="dim hs-sub">HTTPS with a built-in CA. Import the CA on browsing machines to avoid warnings. Other machines are redirected to HTTPS; localhost keeps plain HTTP.</p>
+        <p class="dim hs-sub">Built-in CA. Other machines are redirected to HTTPS; localhost keeps plain HTTP.</p>
         <div class="sw-row" data-perm="system.manage" data-perm-what="turn HTTPS on or off"><button class="switch" id="ceEnabled" type="button" role="switch" aria-checked="false" aria-label="HTTPS"></button><b id="ceEnabledLabel">HTTPS: Off</b><span class="dim" id="ceEnabledNote"></span></div>
         <div id="ceInfo" style="margin:10px 0"></div>
         <div class="hs-block">
@@ -364,7 +364,7 @@
     <section class="page" id="settings/health-settings">
       <div class="card">
         <h2>Health Settings</h2>
-        <p class="dim hs-sub">Monitoring on or off, check interval and which hosts are checked.</p>
+        
         <div class="sw-row" data-perm="system.manage" data-perm-what="turn health monitoring on or off"><button class="switch" id="hsEnabled" type="button" role="switch" aria-checked="true" aria-label="Health monitoring"></button><b id="hsEnabledLabel">Health monitoring: On</b><span class="dim" id="hsEnabledNote"></span></div>
         <div id="hsBody">
         <div class="hs-block">
@@ -374,7 +374,7 @@
           <div class="hs-row"><input id="hsPort" type="number" min="1" step="1"><select id="hsPortUnit"></select><span class="dim" id="hsPortHint"></span></div>
         </div>
         <div class="hs-hosts-head"><span class="fl" style="margin:0">Hosts to monitor</span><span class="dim" id="hsCount"></span><span class="hs-links"><a id="hsAll">All</a><a id="hsNone">None</a></span></div>
-        <p class="dim" style="margin:0 0 6px; max-width:760px; font-size:12px">Choose per host whether ping, the WinRM / SSH port, or both are checked.</p>
+        
         <div class="hs-hosts" id="hsHosts"></div>
         <div class="hs-actions"><button class="act" id="hsSave" type="button" data-perm="system.manage" data-perm-what="change health settings">Save</button><button class="act sec" id="hsDefaults" type="button" data-perm="system.manage" data-perm-what="change health settings">Reset to defaults</button><span class="um-msg" id="hsMsg"></span></div>
         </div>
@@ -383,14 +383,14 @@
     <section class="page" id="settings/dependencies">
       <div class="card">
         <div style="display:flex; align-items:center; gap:10px"><h2 style="margin:0">Server Dependencies <a href="#" class="doclink" data-doc="08-settings.md#dependencies">Guide</a></h2><button class="act sec" id="depRecheck" type="button" style="margin-left:auto">Re-check</button></div>
-        <p class="dim hs-sub">Software that must be installed on this server for some workflow tools. Kookaburrow only checks; it does not install anything.</p>
+        <p class="dim hs-sub">Installed on this server, not by Kookaburrow.</p>
         <div id="depList"></div>
       </div>
     </section>
     <section class="page" id="settings/binaries">
       <div class="card">
         <div style="display:flex; align-items:center; gap:10px"><h2 style="margin:0">Binaries <a href="#" class="doclink" data-doc="08-settings.md#binaries">Guide</a></h2><button class="act sec" id="binFromServer" type="button" style="margin-left:auto" data-perm="collections.manage" data-perm-what="upload binaries">Upload from server</button></div>
-        <p class="dim hs-sub">Tools that hunts, actions and workflows depend on. Upload each one here.</p>
+        
         <div class="bin-bar">
           <div class="toggle" id="binKind"><button type="button" data-k="all" class="on">All <span class="bn"></span></button><button type="button" data-k="hunt" title="Used by collections: staged on the target for a hunt">Hunts <span class="bn"></span></button><button type="button" data-k="action" title="Used by actions, such as the deploy installers: staged on the target for a response">Actions <span class="bn"></span></button><button type="button" data-k="processing" title="Used by workflow processors: unpacked and run on the server">Processing <span class="bn"></span></button></div>
           <select id="binState" aria-label="Filter by upload status"><option value="all">All binaries</option><option value="up">Uploaded</option><option value="missing">Not uploaded</option></select>
@@ -456,7 +456,7 @@
       </div>
       <div class="card">
         <div class="bh-bar"><h2>Discovered hosts</h2><button class="act sec" id="scanClear" type="button" title="Remove every host from the subnet scan results">Clear all</button></div>
-        <p class="dim">Results of the last scan. OS is assumed from open ports until a host is authenticated.</p>
+        <p class="dim">Last scan. OS is inferred from open ports until authenticated.</p>
         <table id="authTable"><thead><tr><th>Host</th><th>Hostname</th><th>OS (assumed)</th><th>Open ports</th><th>Profile</th><th>Remote protocol</th></tr></thead><tbody></tbody></table>
         <div class="row" style="margin-top:12px">
           <button class="act" id="authBtn" data-perm="hosts.manage" data-perm-what="authenticate hosts">Authenticate</button> <span id="authMsg"></span>
@@ -472,7 +472,7 @@
           <div class="toggle" id="mnProto"><button type="button" data-v="winrm" class="on">WinRM (Windows)</button><button type="button" data-v="ssh">SSH (Linux)</button></div>
           <span class="fl">IP address or host name</span>
           <input id="mnAddr" type="text" placeholder="192.168.50.100" autocomplete="off" spellcheck="false">
-          <span class="fl">Name <span class="dim">(optional; defaults to the host's own name)</span></span>
+          <span class="fl">Name <span class="dim">(optional)</span></span>
           <input id="mnName" type="text" placeholder="e.g. Finance server" autocomplete="off">
           <div id="mnDomainBox">
             <span class="fl">Domain <span class="dim">(optional)</span></span>
@@ -522,7 +522,7 @@
     <section class="page" id="health/monitor-log">
       <div class="card">
         <div class="mon-top"><h2>Health log</h2><span class="dim" id="mlCount"></span></div>
-        <p class="dim lg-sub">Every ping and port check, newest first (latest 1000). Kept in data/monitor-log.jsonl.</p>
+        <p class="dim lg-sub">Latest 1000 checks.</p>
         <div class="row" style="margin-bottom:8px"><input id="mlSearch" type="search" placeholder="Search host, address, command or message" autocomplete="off" style="flex:1; max-width:460px"><div class="toggle" id="mlFilter" style="margin:0"><button type="button" data-f="all" class="on">All</button><button type="button" data-f="ok">Success</button><button type="button" data-f="fail">Failed</button></div></div>
         <div id="mlBox"></div>
       </div>
@@ -530,7 +530,7 @@
     <section class="page" id="health/quarantine-log">
       <div class="card">
         <div class="mon-top"><h2>Quarantine log</h2><span class="dim" id="qlCount"></span></div>
-        <p class="dim lg-sub">Quarantine and release events, newest first: who, when and the result.</p>
+        
         <div class="row" style="margin-bottom:8px"><input id="qlSearch" type="search" placeholder="Search host, address, event, user or detail" autocomplete="off" style="flex:1; max-width:460px"></div>
         <div id="qlBox"></div>
       </div>
@@ -538,15 +538,15 @@
     <section class="page" id="health/watches">
       <div class="card bh-top">
         <div class="bh-bar"><h2>Watches <a href="#" class="doclink" data-doc="03-hosts.md#continuous">Guide</a></h2><span class="mon-sum" id="wcSum"></span><button class="act" id="wcNew" type="button" data-perm="hunts.run" data-perm-what="create watches">New Watch</button></div>
-        <p class="dim hs-sub">Light, repeated collections with no agent. A watch collects a few cheap things every few minutes (processes, network, persistence, accounts) and records only what <b>changed</b>. It is a snapshot taken often, not a live stream: something that starts and stops between two runs is missed.</p>
+        <p class="dim hs-sub">Light repeated collections, no agent. Only <b>changes</b> are recorded; anything that starts and stops between two runs is missed.</p>
         <div id="wcList"></div>
       </div>
-      <div class="card bh-detail" id="wcDetail"><p class="dim" style="margin:0">Select a watch to see its hosts, what it collects and what it has found.</p></div>
+      <div class="card bh-detail" id="wcDetail"><p class="dim" style="margin:0">Select a watch.</p></div>
     </section>
     <section class="page" id="health/events">
       <div class="card">
         <div class="mon-top"><h2>Continuous events <a href="#" class="doclink" data-doc="03-hosts.md#continuous">Guide</a></h2><span class="dim" id="weCount"></span></div>
-        <p class="dim lg-sub">What the watches found, newest first. Select a row for the values; reading a row marks it as seen.</p>
+        
         <div class="we-bar"><input id="weSearch" type="search" placeholder="Search host, what, collection or values" autocomplete="off"><select id="weWatch"></select>
           <select id="weSince"><option value="3600">Last hour</option><option value="86400" selected>Last 24 hours</option><option value="604800">Last 7 days</option><option value="">All</option></select>
           <label class="df-all"><input type="checkbox" id="weUnseen"> not seen yet</label>
@@ -560,12 +560,12 @@
         <div class="bh-bar"><h2>Checks <a href="#" class="doclink" data-doc="03-hosts.md#validate">Guide</a></h2><span class="mon-sum" id="vdSum"></span><button class="act" id="vdNew" type="button" data-perm="hunts.run" data-perm-what="create checks">New Check</button></div>
         <div id="vdList"></div>
       </div>
-      <div class="card bh-detail" id="vdDetail"><p class="dim" style="margin:0">Select a check to see which hosts pass, what it checks and how it has run.</p></div>
+      <div class="card bh-detail" id="vdDetail"><p class="dim" style="margin:0">Select a check.</p></div>
     </section>
     <section class="page" id="health/validate-history">
       <div class="card">
         <div class="mon-top"><h2>Validate history</h2><span class="dim" id="vhCount"></span></div>
-        <p class="dim lg-sub">Every run of every check, newest first (the latest 30 of each check are kept). Select one to open it on the Checks page.</p>
+        <p class="dim lg-sub">Latest 30 runs of each check.</p>
         <div class="row" style="margin-bottom:8px"><input id="vhSearch" type="search" placeholder="Search check or user" autocomplete="off" style="flex:1; max-width:460px"><div class="toggle" id="vhFilter" style="margin:0"><button type="button" data-f="all" class="on">All</button><button type="button" data-f="issues">Issues</button><button type="button" data-f="pass">All pass</button></div></div>
         <div id="vhList"></div>
       </div>
@@ -618,7 +618,7 @@
     <section class="page" id="output/diff">
       <div class="card auto">
         <h2>Diff <a href="#" class="doclink" data-doc="06-results.md#diff">Guide</a></h2>
-        <p class="dim hs-sub">What is new, gone and changed between two runs or baselines. Times, process IDs and counters that differ on every run are not counted as changes.</p>
+        <p class="dim hs-sub">Times, process IDs and counters are not counted as changes.</p>
         <div class="df-quick" id="dfQuick" hidden><span class="fl">Quick compare</span><div class="df-chips" id="dfQuickList"></div></div>
         <div class="df-pick">
           <div><span class="fl">Before (usually the older)</span><div class="df-sel"><select id="dfA"></select><button type="button" class="act sec" id="dfPinA" title="Pin run A">☆</button></div></div>
@@ -634,14 +634,14 @@
     <section class="page" id="output/ioc">
       <div class="card" id="iocCard">
         <div class="ioc-top"><h2>IOC</h2><button type="button" class="act" id="iocAdd" data-perm="hunts.run" data-perm-what="add IOC lists">Add IOC list</button></div>
-        <p class="dim hs-sub">Upload indicators (IPs, domains, hashes, URLs, file names) and see which hunts and files contain them.</p>
+        
         <div id="iocLists"></div>
       </div>
     </section>
     <section class="page" id="output/compare">
       <div class="card auto">
         <h2>Cross-host comparison <a href="#" class="doclink" data-doc="06-results.md#cross-host-comparison">Guide</a></h2>
-        <p class="dim hs-sub">Find the host that is not like the others. Choose a hunt that ran on several hosts: each collection is listed with how much it differs between them.</p>
+        
         <div class="cp-pick"><div><span class="fl">Hunt or response</span><select id="cpRun"></select></div></div>
       </div>
       <div class="card" id="cpOut"></div>
@@ -649,7 +649,7 @@
     <section class="page" id="output/yara-scan">
       <div class="card" style="flex:none">
         <div class="ioc-top"><h2>YARA scan</h2></div>
-        <p class="dim hs-sub">Scan the output of one or more runs with YARA rules, here on the server: every CSV, every workflow output and every collected file (event logs, hives, memory images, captures). Nothing runs on the hosts.</p>
+        <p class="dim hs-sub">Scans run output and collected files on the server. Nothing runs on the hosts.</p>
         <div class="yr-status" id="ysSetup"></div>
         <div class="ys-pick">
           <div><span class="fl">Runs <span class="dim" id="ysRunCount"></span></span><input id="ysRunQ" type="search" placeholder="Filter runs by name" autocomplete="off"><div class="ys-box" id="ysRuns"></div></div>
@@ -662,13 +662,13 @@
     <section class="page" id="output/baseline">
       <div class="card" id="blCard" style="flex:none">
         <div class="ioc-top"><h2>Baseline <a href="#" class="doclink" data-doc="06-results.md#baseline">Guide</a></h2><button type="button" class="act" id="blAdd" data-perm="hunts.run" data-perm-what="add baselines">Add baseline</button></div>
-        <p class="dim hs-sub">Known-good states. Mark one baseline per system as the <b>standard</b>, then add newer baselines (or upload them) and see at a glance what changed: against the standard, and against the one before. Click a baseline, or a change count, for the details below.</p>
+        <p class="dim hs-sub">Known-good states. Mark one per system as the <b>standard</b>; newer ones are compared against it and the one before.</p>
         <div class="toggle bl-os" id="blOs"><button type="button" data-os="all" class="on">All<span class="dim"></span></button><button type="button" data-os="windows">Windows<span class="dim"></span></button><button type="button" data-os="linux">Linux<span class="dim"></span></button><button type="button" data-os="other">Other<span class="dim"></span></button></div>
         <div id="blList"></div>
       </div>
       <div class="card" id="blCmpCard" style="flex:none">
         <h2>Compare</h2>
-        <p class="dim hs-sub">Pick a reference and something newer: another baseline, or a run. Hosts do not need to match: when the two share no host, each collection is compared across all the hosts of each side.</p>
+        <p class="dim hs-sub">Hosts need not match; with no shared host, each collection is compared across all hosts.</p>
         <div class="df-quick" id="blQuickWrap" hidden><span class="fl">Quick compare</span><div class="df-chips" id="blQuick"></div></div>
         <div class="df-pick">
           <div><span class="fl">Reference (the standard or an older baseline)</span><select id="blCmpA"></select></div>
@@ -681,14 +681,14 @@
       <div class="card" id="blReportWrap" hidden style="flex:none"><div id="blReport"></div></div>
       <div class="card" id="exCard">
         <div class="ioc-top"><h2>Expected changes</h2><span class="dim" id="exCount"></span></div>
-        <p class="dim hs-sub">Rows marked in a change report as known to come and go. They are not reported as new, gone or changed by Diff, baselines or recurring hunts, on any host. Mark one with <b>Expected</b> in a report.</p>
+        <p class="dim hs-sub">Rows marked <b>Expected</b> in a report are ignored by Diff, baselines and recurring hunts, on every host.</p>
         <div id="exList"></div>
       </div>
     </section>
     <section class="page" id="output/log">
       <div class="card">
         <div class="lg-top"><h2>Activity log</h2><span class="lg-btns"><a id="logExpand">Expand all</a><a id="logCollapse">Collapse all</a></span></div>
-        <p class="dim lg-sub">Timestamped record of every step of each hunt, with hashes. Hover Detail for the SHA-256.</p>
+        <p class="dim lg-sub">Every step of each hunt, with hashes.</p>
         <div id="logBox"></div>
       </div>
     </section>
@@ -707,7 +707,7 @@
     <section class="page" id="output/report">
       <div class="card">
         <div class="bh-bar"><h2>Reports</h2><button class="act" id="rpNew" type="button" data-perm="hunts.export" data-perm-what="generate reports">Generate report</button></div>
-        <p class="dim lg-sub">Searchable HTML report of a hunt or response, saved in output/reports.</p>
+        
         <div id="rpList"></div>
       </div>
     </section>
@@ -749,7 +749,7 @@
       </section>
       <section class="hsec" data-pane="opts" hidden>
         <h3>Automation</h3>
-        <p class="dim" style="margin:0 0 8px">What happens after the hunt, and whether it repeats.</p>
+        
         <div id="hmWfRow" class="hm-wf" hidden><span class="fl">Workflow</span><div class="hs-row"><select id="hmWorkflow"><option value="">Nothing</option></select></div><p class="dim" id="hmWfNote" style="margin:2px 0 8px"></p></div>
         <div id="hmElRow"><div class="sw-row"><button class="switch" id="hmElastic" type="button" role="switch" aria-checked="false" aria-label="Send results to Elastic"></button><b id="hmElasticLabel">Send results to Elastic: Off</b></div><p class="dim" id="hmElNote" style="margin:2px 0 8px"></p></div>
         <div class="sw-row"><button class="switch" id="hmRecurring" type="button" role="switch" aria-checked="false" aria-label="Recurring hunt"></button><b id="hmRecurringLabel">Recurring hunt: Off</b></div>
@@ -771,7 +771,7 @@
 <div class="modal" id="rerunModal" hidden role="dialog" aria-modal="true" aria-labelledby="rrTitle">
   <div class="dlg rr">
     <div class="dlg-head"><h2 id="rrTitle">Rerun a past hunt</h2><button class="dlg-x" id="rrClose" aria-label="Close">×</button></div>
-    <div class="dlg-body"><p class="dim" style="margin:2px 0 8px">Pick a hunt. Its hosts and collections are filled in for you; you then check the details and press Run Hunt.</p><div id="rrList"></div></div>
+    <div class="dlg-body"><div id="rrList"></div></div>
     <div class="dlg-foot"><button class="act" id="rrUse" type="button" disabled>Use this hunt</button><button class="act sec" id="rrCancel" type="button">Cancel</button><span id="rrMsg"></span></div>
   </div>
 </div>
@@ -823,7 +823,7 @@
 <div class="modal" id="rerunRespModal" hidden role="dialog" aria-modal="true" aria-labelledby="rxTitle">
   <div class="dlg rr">
     <div class="dlg-head"><h2 id="rxTitle">Rerun a past response</h2><button class="dlg-x" id="rxClose" aria-label="Close">×</button></div>
-    <div class="dlg-body"><p class="dim" style="margin:2px 0 8px">Pick a response to reuse its hosts and actions. Re-enter any parameters.</p><div id="rxList"></div></div>
+    <div class="dlg-body"><p class="dim" style="margin:2px 0 8px">Parameters must be re-entered.</p><div id="rxList"></div></div>
     <div class="dlg-foot"><button class="act" id="rxUse" type="button" disabled>Use this response</button><button class="act sec" id="rxCancel" type="button">Cancel</button><span id="rxMsg"></span></div>
   </div>
 </div>
@@ -845,9 +845,9 @@
     <div class="dlg-body pw-body">
       <span class="fl">Name</span><input id="wfName" type="text" maxlength="80" autocomplete="off">
       <span class="fl">Description <span class="dim">(optional)</span></span><input id="wfDesc" type="text" maxlength="500" autocomplete="off">
-      <span class="fl">Collections <span class="dim">(chosen for you when the workflow is picked on a hunt)</span></span>
+      <span class="fl">Collections <span class="dim">(set by the workflow)</span></span>
       <div class="pickbox wf-colls" id="wfColls"></div>
-      <span class="fl">Steps <span class="dim">(run on the server, in order, over the files the collections pull back)</span></span>
+      <span class="fl">Steps <span class="dim">(run on the server, in order)</span></span>
       <div id="wfSteps"></div>
       <div style="margin-top:6px"><button class="act sec" id="wfAddStep" type="button" style="width:auto">Add step</button></div>
       <div id="wfWarn"></div>
@@ -860,12 +860,12 @@
   <div class="dlg kbdlg">
     <div class="dlg-head"><h2 id="kbTitle">Import dashboards into Kibana</h2><button class="dlg-x" id="kbX" aria-label="Close">×</button></div>
     <div class="dlg-body kb-body">
-      <p class="dim" style="margin:0 0 8px;font-size:12.5px">Imports the Kookaburrow dashboards, visualizations, saved searches and data view. Importing again replaces them. The sign-in below is used once and not saved.</p>
+      <p class="dim" style="margin:0 0 8px;font-size:12.5px">Importing again replaces them. The sign-in is used once and not saved.</p>
       <span class="fl">Kibana address</span><input id="kbUrl" type="text" spellcheck="false" placeholder="http://kibana.lab.local:5601" autocomplete="off">
       <span class="fl">Sign-in</span><select id="kbAuth"><option value="basic">User name and password</option><option value="apikey">API key</option><option value="none">None (security off)</option></select>
       <div id="kbBasic"><span class="fl">User name</span><input id="kbUser" type="text" autocomplete="off" value="elastic"><span class="fl">Password</span><input id="kbPass" type="password" autocomplete="new-password"></div>
       <div id="kbKeyRow" hidden><span class="fl">API key</span><input id="kbKey" type="password" autocomplete="off" placeholder="The encoded value of a key that may use Kibana"></div>
-      <span class="fl">Space <span class="dim">(optional; blank is the default space)</span></span><input id="kbSpace" type="text" spellcheck="false" autocomplete="off">
+      <span class="fl">Space <span class="dim">(optional)</span></span><input id="kbSpace" type="text" spellcheck="false" autocomplete="off">
       <label class="dim" style="display:block;margin:8px 0 2px"><input type="checkbox" id="kbInsecure"> Skip certificate check (https with a self-signed certificate; not recommended)</label>
       <div id="kbResult" style="margin-top:8px"></div>
     </div>
@@ -908,7 +908,7 @@
       <span class="fl">Indicators</span>
       <div class="ioc-file"><label class="act sec" for="iocFile">Choose a file…</label><input type="file" id="iocFile" accept=".txt,.csv,.ioc,.tsv,.list,.json,text/*" hidden><span class="dim" id="iocFileName">.txt or .csv, one indicator per line</span></div>
       <textarea id="iocText" rows="9" spellcheck="false" placeholder="Or paste them here, one per line&#10;185.220.101.4&#10;evil-domain.example&#10;44d88612fea8a8f36de82e1278abb02f&#10;C:UsersPublicevil.exe"></textarea>
-      <div class="dim" style="margin-top:4px">CSV column: ioc, indicator, value, hash, ip, domain or url. # lines ignored; defanged indicators restored.</div>
+      <div class="dim" style="margin-top:4px">CSV column: ioc, indicator, value, hash, ip, domain or url.</div>
       <span class="fl">Note (optional)</span><input id="iocNote" type="text" maxlength="500" placeholder="Where these came from" autocomplete="off">
       <div class="um-actions"><button class="act" type="button" id="iocSave">Add list</button><button class="act sec" type="button" id="iocCancel">Cancel</button><span class="um-msg" id="iocMsg"></span></div>
     </div>
@@ -928,7 +928,7 @@
       </section>
       <section class="hsec" data-pane="cond" hidden>
         <h3>Conditions</h3>
-        <p class="dim pr-help">A host passes when the whole expression is true. A condition that does not apply to a host's OS, or that could not be checked, counts as false. <b class="pr-k red">Red</b> is not filled in yet, <b class="pr-k green">green</b> is complete.</p>
+        <p class="dim pr-help">Conditions that do not apply or could not be checked count as false. <b class="pr-k red">Red</b> is not filled in yet, <b class="pr-k green">green</b> is complete.</p>
         <div class="hcoll vc">
           <div class="coll-list">
             <div class="pickbox" id="vdTree"></div>
@@ -939,7 +939,7 @@
       </section>
       <section class="hsec" data-pane="opts" hidden>
         <h3>Schedule</h3>
-        <p class="dim" style="margin:0 0 8px">Whether the check repeats. Either way it runs once as soon as you save it.</p>
+        
         <div class="sw-row"><button class="switch" id="vdRecurring" type="button" role="switch" aria-checked="false" aria-label="Recurring check"></button><b id="vdRecurringLabel">Recurring check: Off</b></div>
         <div class="rec-box" id="vdRecBox" hidden></div>
       </section>
@@ -952,7 +952,7 @@
         <div class="ov-cols"><div><span class="fl" id="vdTargetsHead">Will check</span><div class="pickbox hm-tlist" id="vdTargets"></div></div>
           <div><span class="fl" id="vdItemsHead">Passes when</span><div class="pickbox hm-tlist" id="vdItems"></div></div></div>
         <div id="vdOvOpts" class="ov-opts"></div>
-        <div class="vd-try"><span class="fl">Try it first <span class="dim">(runs the conditions on one host now, without saving)</span></span>
+        <div class="vd-try"><span class="fl">Try it first <span class="dim">(one host, not saved)</span></span>
           <div class="hs-row"><select id="vdTryHost"></select><button type="button" class="act sec" id="vdTry">Try on host</button></div>
           <div class="vd-tryout" id="vdTryOut" hidden></div></div>
       </section>
@@ -969,7 +969,7 @@
           <span class="fl">Hosts and groups</span><div class="hs-hosts wc-box" id="wcHosts"></div></div>
         <div><span class="fl">What to watch <span class="dim" id="wcCount"></span></span><div class="df-chips" id="wcPresets" style="margin:0 0 6px"></div>
           <input id="wcQ" type="search" placeholder="Search the collections" autocomplete="off"><div class="hs-hosts wc-box" id="wcColls" style="margin-top:6px"></div>
-          <p class="dim" style="font-size:11.5px;margin:6px 0 0">Only collections that change nothing on the host, need no uploaded tool and return no files are offered. The first run takes a baseline; changes are reported from the second.</p></div>
+          <p class="dim" style="font-size:11.5px;margin:6px 0 0">Only read-only collections that need no uploaded tool and return no files.</p></div>
       </div>
       <div class="um-actions"><button class="act" type="button" id="wcSave">Save</button><button class="act sec" type="button" id="wcCancel">Cancel</button><span class="um-msg" id="wcMsg"></span></div>
     </div>
@@ -981,7 +981,7 @@
     <div class="dlg-body um-detail">
       <div class="toggle" id="blMode" style="margin:0 0 4px"><button type="button" data-mode="run" class="on">From a run</button><button type="button" data-mode="file">Upload a baseline</button></div>
       <span class="fl">Baseline name</span><input id="blName" type="text" maxlength="80" placeholder="e.g. Domain controllers, golden image" autocomplete="off" spellcheck="false">
-      <div id="blFromRun"><span class="fl">Run</span><select id="blRun"></select><div class="dim" style="font-size:11.5px;margin-top:3px">Its CSVs and workflow output are copied. Collected files (event logs, hives) are not.</div></div>
+      <div id="blFromRun"><span class="fl">Run</span><select id="blRun"></select><div class="dim" style="font-size:11.5px;margin-top:3px">CSVs and workflow output are copied; collected files are not.</div></div>
       <div id="blFromFile" hidden><span class="fl">Scan file</span>
       <div class="ioc-file"><label class="act sec" for="blFile">Choose a file…</label><input type="file" id="blFile" hidden><span class="dim" id="blFileName">A zip of a run folder, or one CSV or JSON (up to 200 MB)</span></div></div>
       <span class="fl">Note (optional)</span><input id="blNote" type="text" maxlength="500" placeholder="Which hosts, when it was taken" autocomplete="off">
@@ -1009,7 +1009,7 @@
     <div class="dlg-body">
       <div class="gm-who" id="gmWho"></div>
       <span class="fl">Current groups</span><div class="gm-current" id="gmCurrent"></div>
-      <span class="fl">All groups <span class="dim" style="text-transform:none; letter-spacing:0">(tick to add the host, untick to remove it)</span></span>
+      <span class="fl">All groups </span>
       <div class="pickbox gm-list" id="gmList"></div>
     </div>
     <div class="dlg-foot"><button class="act" id="gmDone" type="button">Done</button></div>
@@ -1025,7 +1025,7 @@
 <div class="modal" id="reportModal" hidden role="dialog" aria-modal="true" aria-labelledby="rpTitle">
   <div class="dlg rr">
     <div class="dlg-head"><h2 id="rpTitle">Generate report</h2><button class="dlg-x" id="rpClose" aria-label="Close">×</button></div>
-    <div class="dlg-body"><p class="dim" style="margin:2px 0 8px">Pick a hunt or response. The report includes every host it ran against.</p><div id="rpRuns"></div></div>
+    <div class="dlg-body"><div id="rpRuns"></div></div>
     <div class="dlg-foot"><button class="act" id="rpMake" type="button" disabled>Generate report</button><button class="act sec" id="rpCancel" type="button">Cancel</button><span id="rpMsg"></span></div>
   </div>
 </div>

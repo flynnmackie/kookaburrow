@@ -413,7 +413,7 @@ async function loadDiff() {
   if (keepA) $('dfA').value = keepA; if (keepB) $('dfB').value = keepB;
   dfQuick();
   if (!df.runs.length) $('dfOut').innerHTML = '<p class="dim" style="margin:0">There are no hunts or responses to compare yet.</p>';
-  else if (!df.rep.res) $('dfOut').innerHTML = '<p class="dim" style="margin:0">Choose two runs and press Compare, or pick one of the quick comparisons above.</p>' + dfHistory({ links: true });
+  else if (!df.rep.res) $('dfOut').innerHTML = dfHistory({ links: true });
 }
 // One-click comparisons: for every hunt that has run at least twice, its latest run against the one before.
 function dfQuick() {

@@ -38,7 +38,7 @@ async function loadWatches() {
   if (isActive('health/watches')) wcPoll = setTimeout(loadWatches, wc.watches.some((w) => w.running) ? 2500 : 10000);
 }
 window.loadWatches = loadWatches;
-const WC_HINT = '<p class="dim" style="margin:0">Select a watch to see its hosts, what it collects and what it has found.</p>';
+const WC_HINT = '<p class="dim" style="margin:0">Select a watch.</p>';
 function renderWatches() {
   const on = wc.watches.filter((w) => w.enabled).length;
   $('wcSum').innerHTML = wc.watches.length ? `<span>${on} running</span>${wcUnseen ? `<span class="rc-unseen">${wcUnseen} new event${wcUnseen === 1 ? '' : 's'}</span>` : ''}` : '';
@@ -62,7 +62,7 @@ async function renderWatchDetail() {
     <div class="bd-facts"><div><span>Runs every</span>${esc(wcEvery(w.everyMinutes))}</div><div><span>Last run</span>${esc(wcWhen(w.lastRun))}</div><div><span>Next run</span>${w.status === 'active' && w.nextRun ? esc(wcWhen(w.nextRun)) : '-'}</div><div><span>Created by</span>${w.createdBy ? esc(w.createdBy) : '-'}</div></div>
     ${w.lastError ? `<div class="hd-warn" style="margin-top:8px">${esc(w.lastError)}</div>` : ''}
     <div class="hd-label">Hosts</div>${hostHtml || '<p class="dim">None of its hosts exist any more.</p>'}
-    <div class="hd-label">Latest events</div>${ev.length ? wcEventTable(ev, false) : '<p class="dim" style="margin:0">Nothing has changed since the first run (which only takes the baseline).</p>'}`;
+    <div class="hd-label">Latest events</div>${ev.length ? wcEventTable(ev, false) : '<p class="dim" style="margin:0">Nothing has changed since the first run.</p>'}`;
 }
 $('wcList').onclick = async (e) => {
   const run = e.target.closest('[data-wcrun]');

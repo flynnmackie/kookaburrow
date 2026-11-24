@@ -18,7 +18,7 @@ async function loadCompare() {
   const keep = $('cpRun').value;
   $('cpRun').innerHTML = `<option value="">Choose a hunt…</option>${group('hunt', 'Hunts')}${group('response', 'Responses')}`;
   if (keep) $('cpRun').value = keep;
-  if (!cp.run) $('cpOut').innerHTML = cp.runs.length ? '<p class="dim" style="margin:0">Choose a hunt that ran on two or more hosts. Its collections are listed with how much they differ between hosts, the most interesting first.</p>' : '<p class="dim" style="margin:0">No run has results from two or more hosts yet.</p>';
+  if (!cp.run) $('cpOut').innerHTML = cp.runs.length ? '<p class="dim" style="margin:0">Choose a hunt that ran on two or more hosts.</p>' : '<p class="dim" style="margin:0">No run has results from two or more hosts yet.</p>';
 }
 $('cpRun').onchange = () => { cp.run = $('cpRun').value; cp.key = ''; cp.res = null; if (cp.run) cpOverview(); else loadCompare(); };
 async function cpOverview() {
@@ -28,7 +28,7 @@ async function cpOverview() {
   const cols = cp.ov.collections;
   if (!cols.length) { $('cpOut').innerHTML = '<p class="dim" style="margin:0">Nothing in this run came from more than one host.</p>'; return; }
   const num = (n, cls) => (n ? `<b class="${cls}">${n.toLocaleString()}</b>` : '<span class="dim">0</span>');
-  $('cpOut').innerHTML = `<div class="df-sum"><div><b>${cols.length}</b> collection${cols.length === 1 ? '' : 's'} on <b>${cp.ov.hosts}</b> host${cp.ov.hosts === 1 ? '' : 's'}</div><div class="dim">Open one to see what differs. The first ones differ the most.</div></div>
+  $('cpOut').innerHTML = `<div class="df-sum"><div><b>${cols.length}</b> collection${cols.length === 1 ? '' : 's'} on <b>${cp.ov.hosts}</b> host${cp.ov.hosts === 1 ? '' : 's'}</div><div class="dim">Most different first.</div></div>
     <div class="bb-tablewrap"><table class="bh cp-ov"><thead><tr><th>Collection</th><th class="num">Hosts</th><th class="num">Rows</th><th class="num" title="Items that are different on different hosts">Differ</th><th class="num" title="Items some hosts do not have">Missing on some</th><th class="num" title="Rows only one host has">On one host</th><th>Odd one out</th></tr></thead><tbody>${cols.map((c) => `<tr class="bh-row" data-cpopen="${esc(c.key)}"><td class="bh-name">${esc(c.label || c.key)}${c.label ? '' : ''}</td><td class="num">${c.hosts}</td><td class="num dim">${c.rows == null ? '-' : c.rows.toLocaleString()}</td><td class="num">${num(c.differs, 'mod')}</td><td class="num">${num(c.partial, 'warn')}</td><td class="num">${num(c.onOneHost, 'rem')}</td><td>${c.oddHost ? `${esc(c.oddHost.host)} <span class="dim">(${c.oddHost.score})</span>` : '<span class="dim">-</span>'}</td></tr>`).join('')}</tbody></table></div>`;
 }
 async function cpOpen(key, keepMatch) {

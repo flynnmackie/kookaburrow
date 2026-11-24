@@ -9,7 +9,7 @@ let vdPoll;
 const vdFull = (t) => (t ? new Date(t).toLocaleString() : '-');
 // classes m-*, not ok / bad: those get a status dot inside tables (polish.css)
 const VD_MARK = { 1: ['m-ok', '✓', 'True'], 0: ['m-bad', '✗', 'False'], N: ['m-na', '–', 'Not applicable on this OS'], E: ['m-err', '!', 'Could not check'] };
-const VD_HINT = '<p class="dim" style="margin:0">Select a check to see which hosts pass, what it checks and how it has run.</p>';
+const VD_HINT = '<p class="dim" style="margin:0">Select a check.</p>';
 const vdCheck = () => vd.checks.find((x) => x.id === vd.sel) || null;
 
 async function loadValidate() {
@@ -47,7 +47,7 @@ function renderList() {
         <td class="bh-name">${esc(c.name)}</td><td>${vdResult(c)}</td><td class="dim">${c.hosts}</td><td>${vdRuns(c)}</td>
         <td class="dim">${c.last ? esc(vdFull(c.last.startedAt)) : '-'}</td><td class="dim">${c.status === 'active' && c.nextRun ? esc(vdFull(c.nextRun)) : '-'}</td>
         <td class="bh-del vd-act"><a class="dl" data-vdrun="${esc(c.id)}" data-perm="hunts.run" data-perm-what="run checks" title="Run it on all its hosts now">Run now</a><a class="dl" data-vdedit="${esc(c.id)}" data-perm="hunts.run" data-perm-what="edit checks">Edit</a>${c.status === 'manual' || c.status === 'finished' ? '' : `<a class="dl" data-vdpause="${esc(c.id)}" data-perm="hunts.run" data-perm-what="pause checks">${c.status === 'paused' ? 'Resume' : 'Pause'}</a>`}<a class="dl bad" data-vddel="${esc(c.id)}" data-perm="hunts.run" data-perm-what="delete checks" title="Delete this check and its history">Delete</a></td></tr>`).join('')}</tbody></table>`
-    : '<p class="dim" style="margin:0">No checks yet. Use New Check to test that a service is running, a port is listening or a type of logging is on across your hosts.</p>';
+    : '<p class="dim" style="margin:0">No checks yet.</p>';
   decorateLocks($('vdList'));
 }
 $('vdList').onclick = async (e) => {
@@ -65,7 +65,7 @@ $('vdList').onclick = async (e) => {
 // ---- the detail card ----
 const VD_TABS = [['results', 'Results'], ['about', 'About'], ['history', 'History']];
 function paneResults(c, run) {
-  if (!run) return '<p class="dim" style="margin:0">It has not run yet. Use Run now in the list above.</p>';
+  if (!run) return '<p class="dim" style="margin:0">Not run yet.</p>';
   const hs = run.hosts, n = hs.length, by = (s) => hs.filter((h) => h.status === s).length;
   const pass = by('pass'), fail = by('fail'), err = by('error'), busy = n - pass - fail - err, done = run.status === 'done';
   const result = !done ? '<span class="st-run">Running</span>' : !fail && !err ? '<span class="ok">All pass</span>' : `<span class="${fail ? 'bad' : 'st-warn'}">${[fail ? `${fail} fail` : '', err ? `${err} unreachable` : ''].filter(Boolean).join(', ')}</span>`;
@@ -86,7 +86,7 @@ function paneResults(c, run) {
       <div><span>Elapsed</span>${esc(fmtDur((done ? new Date(run.finishedAt) : Date.now()) - new Date(run.startedAt)))}</div><div><span>Hosts passing</span>${pass} of ${n}</div><div><span>Run by</span>${run.by === 'schedule' ? 'its schedule' : esc(run.by || '-')}</div></div>
     ${latest ? `<p class="dim" style="margin:6px 0 0">This is an earlier run. <a class="dl" data-vdlatest="1">Show the latest</a></p>` : ''}
     <div class="pall" style="margin-top:8px"><span class="pbar">${seg(pass, 'ok')}${seg(fail, 'bad')}${seg(err, 'can')}${seg(busy, 'run')}</span><span>${pass} of ${n} host${n === 1 ? '' : 's'} pass</span></div>
-    <div class="vd-filter"><div class="toggle">${chip('all', 'All', n)}${chip('fail', 'Failing', fail)}${chip('pass', 'Passing', pass)}${chip('error', 'Unreachable', err)}</div><span class="dim">Select a host for what each condition found. ✓ true · ✗ false · – not applicable · ! could not check</span></div>
+    <div class="vd-filter"><div class="toggle">${chip('all', 'All', n)}${chip('fail', 'Failing', fail)}${chip('pass', 'Passing', pass)}${chip('error', 'Unreachable', err)}</div><span class="dim">Select a host. ✓ true · ✗ false · – not applicable · ! could not check</span></div>
     <div class="vd-res"><table class="bh vd-grid"><thead><tr><th>Host</th><th>Result</th>${heads}</tr></thead><tbody>${body || `<tr><td colspan="${c.conditions.length + 2}" class="dim">No hosts match.</td></tr>`}</tbody></table></div>`;
 }
 function paneAbout(c) {
@@ -291,7 +291,7 @@ $('vdRecurring').onclick = () => wzSetRecurring(!wz.rec);
 function wzRenderOverview() {
   const hosts = wzHostList(), rows = wzRows();
   $('vdTargetsHead').textContent = `Will check ${hosts.length} host${hosts.length === 1 ? '' : 's'}`;
-  $('vdTargets').innerHTML = hosts.map((h) => `<div class="pick"><span class="pn">${esc(hname(h))}</span><span class="pt">${esc(h.address)}</span><span class="proto-${h.protocol === 'ssh' ? 'ssh' : 'winrm'}">${h.protocol === 'ssh' ? 'SSH' : 'WinRM'}</span></div>`).join('') || '<p class="dim" style="margin:6px 10px">No hosts chosen yet. Choose them on the Who tab.</p>';
+  $('vdTargets').innerHTML = hosts.map((h) => `<div class="pick"><span class="pn">${esc(hname(h))}</span><span class="pt">${esc(h.address)}</span><span class="proto-${h.protocol === 'ssh' ? 'ssh' : 'winrm'}">${h.protocol === 'ssh' ? 'SSH' : 'WinRM'}</span></div>`).join('') || '<p class="dim" style="margin:6px 10px">No hosts chosen.</p>';
   const n = wzLeaves(wz.tree).length;
   $('vdItemsHead').textContent = `Passes when (${n} condition${n === 1 ? '' : 's'})`;
   $('vdItems').innerHTML = rows.map(({ n: x, depth, join }) => `<div class="pick"><span class="pn" style="padding-left:${depth * 16}px">${join ? `<span class="vc-op">${join.toUpperCase()}</span>` : ''}${x.type === 'group' ? `<span class="vc-grp">${x.op === 'or' ? 'ANY of' : 'ALL of'}</span>${x.not ? '<span class="vc-not">NOT</span>' : ''}` : `${x.not ? '<span class="vc-not" style="margin:0 6px 0 0">NOT</span>' : ''}${esc(wzSentence(x))}`}</span></div>`).join('');
