@@ -54,7 +54,26 @@ async function findZeek() {
   return { found: false };
 }
 
+// smbclient (Samba client): how a Linux server pulls large files from Windows hosts over SMB (src/remote/smb.js). Windows servers use
+// the built-in SMB client, so this entry exists on Linux only.
+const SMBCLIENT_CANDIDATES = ['smbclient', '/usr/bin/smbclient', '/usr/local/bin/smbclient', '/usr/local/samba/bin/smbclient'];
+async function findSmbclient() {
+  for (const exe of SMBCLIENT_CANDIDATES) {
+    if (path.isAbsolute(exe) && !fs.existsSync(exe)) continue;
+    const out = await run(exe, ['--version']);
+    const m = out && /Version\s+(\S+)/i.exec(out);
+    if (m) return { found: true, version: m[1], exe };
+  }
+  return { found: false };
+}
+
 const CATALOG = [
+  ...(WIN ? [] : [{
+    id: 'smbclient', name: 'SMB client (smbclient)', needed: 'Large-transfer collections on Windows hosts (event logs, registry hives, memory and other big files pulled over SMB)',
+    detect: () => findSmbclient(),
+    install: ['Ubuntu / Debian: sudo apt install smbclient', 'RHEL / Fedora / Rocky: sudo dnf install samba-client', 'Alpine: apk add samba-client'],
+    after: 'Install it, then press Re-check.',
+  }]),
   {
     id: 'dotnet10', name: '.NET 10 runtime', needed: 'Eric Zimmerman tools (EvtxECmd, MFTECmd, PECmd and others)',
     detect: () => findDotnet(10),
