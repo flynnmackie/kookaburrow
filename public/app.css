@@ -11,8 +11,8 @@
   body { margin:0; background:var(--bg); color:var(--text); font:13px/1.4 var(--f-ui); display:flex; flex-direction:column; height:100vh; overflow:hidden; }
 
   /* everything except the Home page is drawn at 75% (same as browser zoom 75%); the height is scaled up so the page still fills the window */
-  body:not(.home) { zoom:.75; height:calc(100vh / .75); }
-  body.home header { zoom:.75; } /* the top bar is the same size on Home as on every other page */
+  body:not(.home) { zoom:var(--kbz,.75); height:calc(100vh / var(--kbz,.75)); }
+  body.home header { zoom:var(--kbz,.75); } /* the top bar is the same size on Home as on every other page */
   header { display:flex; align-items:center; gap:24px; padding:0 14px; height:56px; flex-shrink:0; border-bottom:1px solid var(--line); background:var(--inset); }
   header h1 { margin:0; font:600 14px/1 var(--f-ui); color:var(--text); white-space:nowrap; }
 
