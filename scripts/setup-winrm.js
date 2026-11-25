@@ -38,6 +38,7 @@ async function windows() {
     const zip = path.join(tmp, 'python.zip');
     await download(`https://www.python.org/ftp/python/${PY_VERSION}/python-${PY_VERSION}-embed-${arch}.zip`, zip);
     execFileSync('powershell.exe', ['-NoProfile', '-Command', `Expand-Archive -LiteralPath '${zip}' -DestinationPath '${root}' -Force`], { stdio: 'pipe' });
+    if (!fs.existsSync(exe)) throw new Error(`python.exe is not in ${root} after unpacking the zip (${fs.statSync(zip).size} bytes); the folder holds: ${fs.readdirSync(root).join(', ') || '(empty)'}`);
     const mm = PY_VERSION.split('.').slice(0, 2).join('');
     // the embeddable Python ignores site-packages unless its ._pth file lists it
     fs.writeFileSync(path.join(root, `python${mm}._pth`), `python${mm}.zip\n.\nLib\\site-packages\nimport site\n`);
