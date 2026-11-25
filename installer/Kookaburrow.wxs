@@ -104,9 +104,9 @@
     <!-- The data folder holds the database and encryption key: only SYSTEM and Administrators. -->
     <CustomAction Id="LockData" Directory="TARGETDIR" Execute="deferred" Impersonate="no" Return="ignore"
                   ExeCommand="&quot;[System64Folder]icacls.exe&quot; &quot;[HOMEDIR].&quot; /inheritance:r /grant:r *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F" />
-    <!-- The server opens and closes its own Windows Firewall rule (src/firewall.js); uninstalling removes it. -->
+    <!-- The server opens and closes its own Windows Firewall rule (src/firewall.js); uninstalling removes it, including the older "(TCP <port>)" names. -->
     <CustomAction Id="RemoveFirewallRule" Directory="TARGETDIR" Execute="deferred" Impersonate="no" Return="ignore"
-                  ExeCommand="&quot;[System64Folder]netsh.exe&quot; advfirewall firewall delete rule name=&quot;Kookaburrow web interface&quot;" />
+                  ExeCommand="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command &quot;Get-NetFirewallRule -DisplayName 'Kookaburrow web interface*' -ErrorAction SilentlyContinue | Remove-NetFirewallRule&quot;" />
     <CustomAction Id="OpenBrowser" Directory="TARGETDIR" ExeCommand="explorer.exe &quot;http://127.0.0.1:[KBPORT]/&quot;" Return="asyncNoWait" />
 
     <InstallExecuteSequence>
