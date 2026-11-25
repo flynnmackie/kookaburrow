@@ -1,10 +1,11 @@
 # Builds the offline Windows installer (.msi and setup .exe) and the Debian/Ubuntu package (.deb), and attaches them to a GitHub release.
 #   Release:  git tag v1.0.1 && git push origin v1.0.1
-#   Test:     Actions > Build installer > Run workflow (the files are kept as build artifacts)
+#   Test:     push to the ci-build branch, or Actions > Build installer > Run workflow (the files are kept as build artifacts, nothing is published)
 name: Build installer
 on:
   push:
     tags: ['v*']
+    branches: ['ci-build']   # push to this branch to test the builds without publishing a release
   workflow_dispatch:
 permissions:
   contents: write

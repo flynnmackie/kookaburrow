@@ -30,7 +30,7 @@ async function ensureWix() {
   const res = await fetch(WIX_URL);
   if (!res.ok) throw new Error(`download failed: HTTP ${res.status}`);
   fs.writeFileSync(zip, Buffer.from(await res.arrayBuffer()));
-  run('tar', ['-xf', zip, '-C', wix]);
+  run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `Expand-Archive -LiteralPath '${zip}' -DestinationPath '${wix}' -Force`]); // not tar: on some machines (GitHub runners) tar is GNU tar, which cannot unzip
 }
 
 function copyTree(from, to, skip = () => false) {
@@ -45,7 +45,7 @@ function copyTree(from, to, skip = () => false) {
   fs.rmSync(stage, { recursive: true, force: true });
   fs.mkdirSync(stage, { recursive: true });
   for (const f of ['server.js', 'package.json', 'package-lock.json', 'README.md']) fs.copyFileSync(path.join(root, f), path.join(stage, f));
-  for (const d of ['src', 'public', 'collections', 'actions', 'processors', 'docs', 'elastic']) copyTree(path.join(root, d), path.join(stage, d));
+  for (const d of ['src', 'public', 'collections', 'actions', 'processors', 'docs', 'elastic', 'yara-rules']) copyTree(path.join(root, d), path.join(stage, d));
   fs.mkdirSync(path.join(stage, 'scripts'));
   for (const f of ['install-setup.js', 'verify-collections.js']) fs.copyFileSync(path.join(root, 'scripts', f), path.join(stage, 'scripts', f));
 
