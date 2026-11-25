@@ -30,7 +30,7 @@ async function ensureWix() {
   const res = await fetch(WIX_URL);
   if (!res.ok) throw new Error(`download failed: HTTP ${res.status}`);
   fs.writeFileSync(zip, Buffer.from(await res.arrayBuffer()));
-  run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `$ErrorActionPreference='Stop'; Expand-Archive -LiteralPath '${zip}' -DestinationPath '${wix}' -Force`]); // not tar: on some machines (GitHub runners) tar is GNU tar, which cannot unzip
+  run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `$ErrorActionPreference='Stop'; Add-Type -AssemblyName System.IO.Compression.FileSystem; [IO.Compression.ZipFile]::ExtractToDirectory('${zip}', '${wix}')`]); // not tar: on some machines (GitHub runners) tar is GNU tar, which cannot unzip
 }
 
 function copyTree(from, to, skip = () => false) {
