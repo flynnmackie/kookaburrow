@@ -24,10 +24,18 @@ jobs:
           SIGNING_PFX_BASE64: ${{ secrets.SIGNING_PFX_BASE64 }}
           KB_SIGN_PFX_PASSWORD: ${{ secrets.SIGNING_PFX_PASSWORD }}
         run: |
+          $ErrorActionPreference = 'Continue'
           if ($env:SIGNING_PFX_BASE64) {
             [IO.File]::WriteAllBytes("$env:RUNNER_TEMP\sign.pfx", [Convert]::FromBase64String($env:SIGNING_PFX_BASE64))
-            node scripts/build-msi.js "--sign-pfx=$env:RUNNER_TEMP\sign.pfx"
-          } else { node scripts/build-msi.js }
+            $args1 = @('scripts/build-msi.js', "--sign-pfx=$env:RUNNER_TEMP\sign.pfx")
+          } else { $args1 = @('scripts/build-msi.js') }
+          node @args1 *>&1 | Tee-Object -FilePath build.log
+          if ($LASTEXITCODE -ne 0) {
+            # job logs are only readable by repo admins; an error annotation shows the cause to everyone
+            $tail = (Get-Content build.log -Tail 25) -join '%0A'
+            Write-Output "::error title=Installer build failed::$tail"
+            exit 1
+          }
       - uses: actions/upload-artifact@v4
         with:
           name: Kookaburrow-msi
