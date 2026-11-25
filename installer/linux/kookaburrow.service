@@ -1,0 +1,23 @@
+[Unit]
+Description=Kookaburrow threat hunting platform
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=kookaburrow
+Group=kookaburrow
+WorkingDirectory=/opt/kookaburrow
+Environment=KB_HOME=/var/lib/kookaburrow
+Environment=KB_SERVICE=1
+# Optional overrides (KB_HOST, KB_PORT, KB_ALLOWED_HOSTS ...), one NAME=value per line
+EnvironmentFile=-/etc/kookaburrow/kookaburrow.env
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=10
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/var/lib/kookaburrow
+
+[Install]
+WantedBy=multi-user.target

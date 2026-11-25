@@ -1,0 +1,21 @@
+#!/bin/sh
+set -e
+if [ "$1" = configure ]; then
+  getent group kookaburrow >/dev/null || addgroup --system kookaburrow
+  getent passwd kookaburrow >/dev/null || adduser --system --ingroup kookaburrow --home /var/lib/kookaburrow --no-create-home --shell /usr/sbin/nologin kookaburrow
+  install -d -o kookaburrow -g kookaburrow -m 0750 /var/lib/kookaburrow
+  install -d -m 0755 /etc/kookaburrow
+  # The WinRM engine (a private Python with pypsrp) is built here because it must match this machine's Python. Needs internet once;
+  # without it Kookaburrow still runs, but cannot reach Windows hosts until: sudo node /opt/kookaburrow/scripts/setup-winrm.js
+  if [ ! -x /opt/kookaburrow/vendor/winrm-runtime/bin/python3 ]; then
+    echo "kookaburrow: building the WinRM engine (needs internet) ..."
+    /usr/bin/node /opt/kookaburrow/scripts/setup-winrm.js --quiet || echo "kookaburrow: WinRM engine not built; run: sudo node /opt/kookaburrow/scripts/setup-winrm.js"
+  fi
+  if [ -d /run/systemd/system ]; then
+    systemctl daemon-reload || true
+    systemctl enable kookaburrow.service >/dev/null 2>&1 || true
+    systemctl restart kookaburrow.service || echo "kookaburrow: could not start the service; see: journalctl -u kookaburrow"
+  fi
+  echo "kookaburrow: http://127.0.0.1:46200  (first sign-in admin / admin; change it). Settings: /etc/kookaburrow/kookaburrow.env, data: /var/lib/kookaburrow"
+fi
+exit 0
