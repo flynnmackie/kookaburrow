@@ -25,6 +25,7 @@ const exists = (p) => fs.existsSync(p);
 async function ensureWix() {
   if (exists(path.join(wix, 'candle.exe'))) return;
   step('Downloading the WiX Toolset 3 (one time)');
+  fs.rmSync(wix, { recursive: true, force: true });
   fs.mkdirSync(wix, { recursive: true });
   const zip = path.join(build, 'tools', 'wix.zip');
   const res = await fetch(WIX_URL);

@@ -30,6 +30,7 @@ function download(url, dest) {
 
 async function windows() {
   const exe = path.join(root, 'python.exe');
+  fs.rmSync(root, { recursive: true, force: true }); // unpacking does not overwrite, so start from nothing
   fs.mkdirSync(root, { recursive: true });
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'kb-winrm-'));
   try {
