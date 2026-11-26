@@ -1,8 +1,9 @@
 #!/bin/sh
 set -e
 if [ "$1" = configure ]; then
-  getent group kookaburrow >/dev/null || addgroup --system kookaburrow
-  getent passwd kookaburrow >/dev/null || adduser --system --ingroup kookaburrow --home /var/lib/kookaburrow --no-create-home --shell /usr/sbin/nologin kookaburrow
+  # groupadd/useradd (package passwd, always present), not addgroup/adduser, which minimal images lack
+  getent group kookaburrow >/dev/null || groupadd --system kookaburrow
+  getent passwd kookaburrow >/dev/null || useradd --system --gid kookaburrow --home-dir /var/lib/kookaburrow --no-create-home --shell /usr/sbin/nologin kookaburrow
   install -d -o kookaburrow -g kookaburrow -m 0750 /var/lib/kookaburrow
   install -d -m 0755 /etc/kookaburrow
   # The WinRM engine (a private Python with pypsrp) is built here because it must match this machine's Python. Needs internet once;

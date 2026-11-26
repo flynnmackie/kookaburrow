@@ -3,7 +3,7 @@ set -e
 if [ -d /run/systemd/system ]; then systemctl daemon-reload || true; fi
 if [ "$1" = purge ]; then
   rm -rf /var/lib/kookaburrow /etc/kookaburrow /opt/kookaburrow
-  getent passwd kookaburrow >/dev/null && deluser --system kookaburrow >/dev/null 2>&1 || true
-  getent group kookaburrow >/dev/null && delgroup --system kookaburrow >/dev/null 2>&1 || true
+  getent passwd kookaburrow >/dev/null && userdel kookaburrow >/dev/null 2>&1 || true
+  getent group kookaburrow >/dev/null && groupdel kookaburrow >/dev/null 2>&1 || true
 fi
 exit 0
